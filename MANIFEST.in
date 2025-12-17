@@ -5,7 +5,7 @@ include pyproject.toml
 include setup.py
 
 # Include Cython source files for building from source
-recursive-include src/graph_layout/cola *.pyx *.pxd
+include src/graph_layout/_speedups.pyx src/graph_layout/_speedups.pxd
 
 # Include type stubs
 include src/graph_layout/py.typed

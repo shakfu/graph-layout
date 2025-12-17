@@ -1,6 +1,6 @@
 [project]
 name = "graph-layout"
-version = "0.4.0"
+version = "0.1.6"
 description = "A collection of graph layout algorithms in Python"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,9 +27,6 @@ dependencies = [
     "sortedcontainers>=2.4.0",
 ]
 
-[project.optional-dependencies]
-fast = ["scipy>=1.7.0"]
-
 [build-system]
 requires = [
     "setuptools>=64",
@@ -47,8 +44,8 @@ dev = [
     "ruff>=0.13.3",
     "Cython>=3.0.0",
     "matplotlib>=3.9.4",
-    "build>=1.0.0",
     "twine>=5.0.0",
+    "typing-extensions>=4.15.0",
 ]
 
 [project.urls]
@@ -144,4 +141,4 @@ where = ["src"]
 "graph_layout" = ["py.typed"]
 
 [tool.setuptools.exclude-package-data]
-"graph_layout.cola" = ["*.c", "*.pyx", "*.pxd"]
+"graph_layout" = ["*.c", "*.pyx", "*.pxd"]

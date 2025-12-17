@@ -1,10 +1,9 @@
 """
 Shortest paths calculation with optimized implementations.
 
-This module provides a priority cascade for shortest path calculations:
-1. Cython-compiled Dijkstra (fastest, no runtime dependencies)
-2. SciPy sparse graph algorithms (fast, requires scipy)
-3. Pure Python Dijkstra (slowest, always available)
+This module provides shortest path calculations with automatic implementation selection:
+1. Cython-compiled Dijkstra (fastest, pre-built in PyPI wheels)
+2. Pure Python Dijkstra (fallback, always available)
 
 The implementation is selected automatically at import time based on availability.
 """
@@ -12,38 +11,30 @@ The implementation is selected automatically at import time based on availabilit
 from __future__ import annotations
 
 import warnings
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Callable, TypeVar, cast
 
 
 class PerformanceWarning(UserWarning):
     """Warning about performance-related issues."""
     pass
 
+
 T = TypeVar("T")
 
 # Determine which implementation to use
-_IMPLEMENTATION = "unknown"
-_Calculator: Optional[Any] = None
+_IMPLEMENTATION: str
+_Calculator: Any
 
 # Try Cython implementation first
 try:
-    from . import _shortestpaths_cy  # type: ignore[attr-defined]
-    _Calculator = _shortestpaths_cy.Calculator
+    from .. import _speedups  # type: ignore[attr-defined]
+    _Calculator = _speedups.Calculator
     _IMPLEMENTATION = "cython"
-except ImportError as e:
-    _cython_error = str(e)
-
-    # Try scipy as fallback
-    try:
-        import numpy as np
-        from scipy.sparse import csr_matrix
-        from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-        _IMPLEMENTATION = "scipy"
-    except ImportError:
-        # Fall back to pure Python
-        from ._shortestpaths_py import Calculator as _PyCalculator
-        _Calculator = _PyCalculator
-        _IMPLEMENTATION = "python"
+except ImportError:
+    # Fall back to pure Python
+    from ._shortestpaths_py import Calculator as _PyCalculator
+    _Calculator = _PyCalculator
+    _IMPLEMENTATION = "python"
 
 
 class Calculator:
@@ -52,7 +43,6 @@ class Calculator:
 
     This is a wrapper that delegates to the best available implementation:
     - Cython (fastest, ~10-30x speedup)
-    - SciPy (fast, ~3-5x speedup)
     - Pure Python (baseline)
 
     Uses Dijkstra's algorithm with a priority queue for efficiency.
@@ -82,52 +72,15 @@ class Calculator:
         self.get_target_index = get_target_index
         self.get_length = get_length
 
-        if _IMPLEMENTATION in ("cython", "python"):
-            # Use Cython or pure Python Calculator directly
-            assert _Calculator is not None
-            self._calc: Any = _Calculator(n, edges, get_source_index, get_target_index, get_length)
-            self._scipy_mode = False
-        else:
-            # Build adjacency matrix for scipy
-            self._scipy_mode = True
-            self._build_scipy_graph()
+        self._calc: Any = _Calculator(n, edges, get_source_index, get_target_index, get_length)
 
-        # Always keep a pure Python calculator for advanced features
+        # Keep a pure Python calculator for advanced features
         # (e.g., path_from_node_to_node_with_prev_cost)
-        if _IMPLEMENTATION != "python":
+        if _IMPLEMENTATION == "cython":
             from ._shortestpaths_py import Calculator as _PyCalculator
             self._py_calc = _PyCalculator(n, edges, get_source_index, get_target_index, get_length)
         else:
             self._py_calc = self._calc
-
-    def _build_scipy_graph(self) -> None:
-        """Build scipy sparse graph representation."""
-        from scipy.sparse import csr_matrix
-
-        # Build edge lists
-        row_ind = []
-        col_ind = []
-        data = []
-
-        for edge in self.edges:
-            u = self.get_source_index(edge)
-            v = self.get_target_index(edge)
-            d = self.get_length(edge)
-
-            # Undirected graph - add both directions
-            row_ind.append(u)
-            col_ind.append(v)
-            data.append(d)
-
-            row_ind.append(v)
-            col_ind.append(u)
-            data.append(d)
-
-        # Create sparse adjacency matrix
-        self._graph = csr_matrix(
-            (data, (row_ind, col_ind)),
-            shape=(self.n, self.n)
-        )
 
     def distance_matrix(self) -> list[list[float]]:
         """
@@ -136,21 +89,7 @@ class Calculator:
         Returns:
             Matrix of shortest distances between all pairs of nodes
         """
-        if self._scipy_mode:
-            from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-
-            # Compute all-pairs shortest paths
-            dist_matrix = scipy_shortest_path(
-                self._graph,
-                method='D',  # Dijkstra
-                directed=False,
-                return_predecessors=False
-            )
-
-            # Convert to list of lists
-            return cast(list[list[float]], dist_matrix.tolist())
-        else:
-            return cast(list[list[float]], self._calc.distance_matrix())
+        return cast(list[list[float]], self._calc.distance_matrix())
 
     def distances_from_node(self, start: int) -> list[float]:
         """
@@ -162,21 +101,7 @@ class Calculator:
         Returns:
             Array of shortest distances from start to all other nodes
         """
-        if self._scipy_mode:
-            from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-
-            # Compute shortest paths from single source
-            distances = scipy_shortest_path(
-                self._graph,
-                method='D',
-                directed=False,
-                indices=start,
-                return_predecessors=False
-            )
-
-            return cast(list[float], distances.tolist())
-        else:
-            return cast(list[float], self._calc.distances_from_node(start))
+        return cast(list[float], self._calc.distances_from_node(start))
 
     def path_from_node_to_node(self, start: int, end: int) -> list[int]:
         """
@@ -189,28 +114,7 @@ class Calculator:
         Returns:
             List of node indices in the path (excluding start, including end)
         """
-        if self._scipy_mode:
-            from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-
-            # Get predecessors for path reconstruction
-            _, predecessors = scipy_shortest_path(
-                self._graph,
-                method='D',
-                directed=False,
-                indices=start,
-                return_predecessors=True
-            )
-
-            # Reconstruct path
-            path = []
-            current = end
-            while current != start and predecessors[current] != -9999:
-                path.append(predecessors[current])
-                current = predecessors[current]
-
-            return path
-        else:
-            return cast(list[int], self._calc.path_from_node_to_node(start, end))
+        return cast(list[int], self._calc.path_from_node_to_node(start, end))
 
     def path_from_node_to_node_with_prev_cost(
         self, start: int, end: int, prev_cost: Callable[[int, int, int], float]
@@ -219,7 +123,7 @@ class Calculator:
         Find shortest path with custom cost function based on previous edge.
 
         This method always uses the pure Python implementation as it requires
-        advanced features not available in the optimized implementations.
+        advanced features not available in the Cython implementation.
 
         Args:
             start: Start node index
@@ -237,23 +141,17 @@ def get_implementation() -> str:
     Get the name of the current shortest paths implementation.
 
     Returns:
-        One of: "cython", "scipy", "python"
+        One of: "cython", "python"
     """
     return _IMPLEMENTATION
-
-
-# Re-export classes from pure Python implementation for compatibility
 
 
 # Warn user about implementation choice
 if _IMPLEMENTATION == "python":
     warnings.warn(
         "Using pure Python shortest paths implementation. "
-        "For better performance, install scipy (pip install scipy) "
-        "or build with Cython extensions.",
+        "For better performance, install from PyPI (pip install graph-layout) "
+        "which includes pre-built Cython extensions.",
         PerformanceWarning,
         stacklevel=2
     )
-elif _IMPLEMENTATION == "scipy":
-    # Scipy is good, but let user know Cython would be better if they build from source
-    pass  # Silent - scipy is fast enough

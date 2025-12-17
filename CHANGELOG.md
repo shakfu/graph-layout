@@ -17,6 +17,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+## [0.1.6] - Unified Cython Speedups and PyPI Publishing
+
+### Added
+- **Unified Cython `_speedups` module** (`src/graph_layout/_speedups.pyx`):
+  - Consolidated all Cython code into a single extension module at package root
+  - Priority queue (pairing heap) for Dijkstra's algorithm
+  - Shortest paths calculator using Dijkstra's algorithm
+  - Force-directed layout calculations:
+    - `compute_repulsive_forces()` - O(n^2) pairwise repulsion
+    - `compute_attractive_forces()` - O(m) edge attraction
+    - `apply_displacements()` - O(n) position updates with bounds clamping
+  - Barnes-Hut QuadTree implementation:
+    - `FastQuadTree` class with O(n log n) force approximation
+    - `compute_repulsive_forces_barnes_hut()` function
+    - Configurable theta parameter for accuracy/speed tradeoff
+    - Depth-limited insertion to prevent stack overflow from coincident points
+
+- **Cython-accelerated Fruchterman-Reingold layout**:
+  - Automatic Cython acceleration when `_speedups` module available
+  - Falls back to pure Python implementation seamlessly
+  - Both naive O(n^2) and Barnes-Hut O(n log n) modes accelerated
+
+- **Python 3.14 support** in wheel builds (cibuildwheel v3.3.0)
+
+- **QEMU support** for aarch64 Linux wheel builds in CI
+
+- **PyPI publishing configuration**:
+  - `py.typed` marker for PEP 561 type checking support
+  - `MANIFEST.in` for source distribution
+  - Trusted Publishing workflow for GitHub Actions
+  - Wheel collection job in CI workflow
+
+### Changed
+- Moved Cython extensions from `cola/` subdirectory to package root for use by all algorithms
+- Updated `shortestpaths.py` to import from unified `_speedups` module
+- License clarified as MIT (SPDX format in pyproject.toml)
+- Excluded `.c`, `.pyx`, `.pxd` files from wheel distributions
+- Build system simplified: `uv build` replaces `python -m build` (removed `build` package from dev dependencies)
+
+### Removed
+- **`[fast]` optional dependency**: scipy fallback removed since Cython extensions are pre-built in PyPI wheels and faster than scipy
+- **scipy fallback code** in `shortestpaths.py`: Simplified from 257 to 157 lines, now just Cython > pure Python
+
+### Fixed
+- **Segfault in Barnes-Hut implementation**: Added depth limit (50 levels) to QuadTree insertion to prevent stack overflow when nodes have coincident or near-coincident positions
+- License file now correctly contains MIT license text (was GPL v3)
+
+### Performance
+With Cython `_speedups` enabled:
+
+| Algorithm | Graph Size | Time |
+|-----------|-----------|------|
+| Fruchterman-Reingold | 500 nodes, 1000 edges | 0.046s |
+| FR + Barnes-Hut | 500 nodes, 1000 edges | 0.089s |
+| Cola (constraint-based) | 500 nodes, 1000 edges | 1.167s |
+| Kamada-Kawai | 100 nodes, 200 edges | 0.674s |
+| Spring | 100 nodes, 200 edges | 0.456s |
+| Circular | 100 nodes | 0.001s |
+| Spectral | 100 nodes | 0.011s |
+
+Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes beneficial at ~2000+ nodes.
+
+---
+
 ## [0.1.5] - Pythonic API
 
 ### Changed

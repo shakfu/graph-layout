@@ -12,7 +12,7 @@ Available algorithms:
 - spectral: Spectral/eigenvector-based layouts
 """
 
-__version__ = "0.4.0"
+__version__ = "0.1.6"
 
 # Shared types for all algorithms
 # Base classes for building layouts

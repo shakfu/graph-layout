@@ -28,6 +28,13 @@ from ..types import (
     SizeType,
 )
 
+# Try to import Cython-optimized functions
+try:
+    from .. import _speedups  # type: ignore[attr-defined]
+    _HAS_CYTHON = True
+except ImportError:
+    _HAS_CYTHON = False
+
 
 class FruchtermanReingoldLayout(IterativeLayout):
     """
@@ -135,6 +142,11 @@ class FruchtermanReingoldLayout(IterativeLayout):
         # Internal state
         self._disp_x: Optional[np.ndarray] = None
         self._disp_y: Optional[np.ndarray] = None
+        self._pos_x: Optional[np.ndarray] = None
+        self._pos_y: Optional[np.ndarray] = None
+        self._fixed: Optional[np.ndarray] = None
+        self._sources: Optional[np.ndarray] = None
+        self._targets: Optional[np.ndarray] = None
         self._iteration: int = 0
 
     # -------------------------------------------------------------------------
@@ -253,10 +265,28 @@ class FruchtermanReingoldLayout(IterativeLayout):
         if self._temperature is None:
             self._temperature = self._canvas_size[0] / 10
 
-        # Initialize displacement arrays
+        # Initialize arrays for Cython-optimized computation
         n = len(self._nodes)
-        self._disp_x = np.zeros(n)
-        self._disp_y = np.zeros(n)
+        m = len(self._links)
+        self._disp_x = np.zeros(n, dtype=np.float64)
+        self._disp_y = np.zeros(n, dtype=np.float64)
+        self._pos_x = np.zeros(n, dtype=np.float64)
+        self._pos_y = np.zeros(n, dtype=np.float64)
+        self._fixed = np.zeros(n, dtype=np.uint8)
+        self._sources = np.zeros(m, dtype=np.int32)
+        self._targets = np.zeros(m, dtype=np.int32)
+
+        # Initialize position and fixed arrays
+        for i, node in enumerate(self._nodes):
+            self._pos_x[i] = node.x
+            self._pos_y[i] = node.y
+            self._fixed[i] = 1 if node.fixed else 0
+
+        # Initialize edge arrays
+        for e, link in enumerate(self._links):
+            self._sources[e] = self._get_source_index(link)
+            self._targets[e] = self._get_target_index(link)
+
         self._iteration = 0
         self._alpha = 1.0
 
@@ -286,6 +316,8 @@ class FruchtermanReingoldLayout(IterativeLayout):
         assert self._optimal_distance is not None
         assert self._disp_x is not None
         assert self._disp_y is not None
+        assert self._pos_x is not None
+        assert self._pos_y is not None
 
         if self._temperature < self._min_temperature:
             return True
@@ -300,71 +332,110 @@ class FruchtermanReingoldLayout(IterativeLayout):
         k = self._optimal_distance
         k_sq = k * k
 
+        # Sync positions from nodes to arrays
+        for i, node in enumerate(self._nodes):
+            self._pos_x[i] = node.x
+            self._pos_y[i] = node.y
+
         # Reset displacements
         self._disp_x.fill(0)
         self._disp_y.fill(0)
 
         # Calculate repulsive forces
-        if self._use_barnes_hut and n > 50:
-            self._compute_repulsive_barnes_hut(k_sq)
+        if _HAS_CYTHON:
+            if self._use_barnes_hut and n > 50:
+                _speedups.compute_repulsive_forces_barnes_hut(
+                    self._pos_x, self._pos_y,
+                    self._disp_x, self._disp_y,
+                    k_sq, n, self._barnes_hut_theta
+                )
+            else:
+                _speedups.compute_repulsive_forces(
+                    self._pos_x, self._pos_y,
+                    self._disp_x, self._disp_y,
+                    k_sq, n
+                )
         else:
-            self._compute_repulsive_naive(n, k_sq)
+            if self._use_barnes_hut and n > 50:
+                self._compute_repulsive_barnes_hut(k_sq)
+            else:
+                self._compute_repulsive_naive(n, k_sq)
 
         # Calculate attractive forces along edges
-        for link in self._links:
-            src = self._get_source_index(link)
-            tgt = self._get_target_index(link)
+        if _HAS_CYTHON and len(self._links) > 0:
+            _speedups.compute_attractive_forces(
+                self._pos_x, self._pos_y,
+                self._disp_x, self._disp_y,
+                self._sources, self._targets,
+                k, len(self._links)
+            )
+        else:
+            for link in self._links:
+                src = self._get_source_index(link)
+                tgt = self._get_target_index(link)
 
-            dx = self._nodes[src].x - self._nodes[tgt].x
-            dy = self._nodes[src].y - self._nodes[tgt].y
-            dist_sq = dx * dx + dy * dy
-            dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+                dx = self._nodes[src].x - self._nodes[tgt].x
+                dy = self._nodes[src].y - self._nodes[tgt].y
+                dist_sq = dx * dx + dy * dy
+                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
 
-            # Attractive force: f_a = d^2 / k
-            if dist > 0:
-                force = dist_sq / k
-                fx = (dx / dist) * force
-                fy = (dy / dist) * force
+                # Attractive force: f_a = d^2 / k
+                if dist > 0:
+                    force = dist_sq / k
+                    fx = (dx / dist) * force
+                    fy = (dy / dist) * force
 
-                self._disp_x[src] -= fx
-                self._disp_y[src] -= fy
-                self._disp_x[tgt] += fx
-                self._disp_y[tgt] += fy
+                    self._disp_x[src] -= fx
+                    self._disp_y[src] -= fy
+                    self._disp_x[tgt] += fx
+                    self._disp_y[tgt] += fy
 
         # Apply center gravity if enabled
         if self._center_gravity and self._gravity > 0:
             cx = self._canvas_size[0] / 2
             cy = self._canvas_size[1] / 2
             for i in range(n):
-                dx = cx - self._nodes[i].x
-                dy = cy - self._nodes[i].y
+                dx = cx - self._pos_x[i]
+                dy = cy - self._pos_y[i]
                 dist = math.sqrt(dx * dx + dy * dy)
                 if dist > 0:
                     self._disp_x[i] += self._gravity * dx
                     self._disp_y[i] += self._gravity * dy
 
         # Apply displacements, limited by temperature
-        for i in range(n):
-            node = self._nodes[i]
-
-            # Skip fixed nodes
-            if node.fixed:
-                continue
-
-            disp_len = math.sqrt(
-                self._disp_x[i] * self._disp_x[i] +
-                self._disp_y[i] * self._disp_y[i]
+        if _HAS_CYTHON:
+            _speedups.apply_displacements(
+                self._pos_x, self._pos_y,
+                self._disp_x, self._disp_y,
+                self._fixed, self._temperature,
+                0.0, 0.0, self._canvas_size[0], self._canvas_size[1], n
             )
+            # Sync positions back to nodes
+            for i, node in enumerate(self._nodes):
+                node.x = self._pos_x[i]
+                node.y = self._pos_y[i]
+        else:
+            for i in range(n):
+                node = self._nodes[i]
 
-            if disp_len > 0:
-                # Limit displacement by temperature
-                scale = min(disp_len, self._temperature) / disp_len
-                node.x += self._disp_x[i] * scale
-                node.y += self._disp_y[i] * scale
+                # Skip fixed nodes
+                if node.fixed:
+                    continue
 
-            # Keep within canvas bounds (optional)
-            node.x = max(0, min(self._canvas_size[0], node.x))
-            node.y = max(0, min(self._canvas_size[1], node.y))
+                disp_len = math.sqrt(
+                    self._disp_x[i] * self._disp_x[i] +
+                    self._disp_y[i] * self._disp_y[i]
+                )
+
+                if disp_len > 0:
+                    # Limit displacement by temperature
+                    scale = min(disp_len, self._temperature) / disp_len
+                    node.x += self._disp_x[i] * scale
+                    node.y += self._disp_y[i] * scale
+
+                # Keep within canvas bounds (optional)
+                node.x = max(0, min(self._canvas_size[0], node.x))
+                node.y = max(0, min(self._canvas_size[1], node.y))
 
         # Cool down
         self._temperature *= self._cooling_factor

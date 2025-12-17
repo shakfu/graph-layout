@@ -1,12 +1,8 @@
 """
 Profiling script for graph-layout performance analysis.
 
-This script profiles various graph layout scenarios to identify bottlenecks.
-
-Note: This script uses the internal Cola Layout class directly (cola/layout.py)
-which retains the JavaScript-style fluent API for backward compatibility with
-the WebCola port. For user-facing code, use ColaLayoutAdapter instead which
-provides the Pythonic API.
+This script profiles all layout algorithms to identify bottlenecks and
+compare performance across different graph sizes.
 """
 
 import cProfile
@@ -18,22 +14,30 @@ import sys
 from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import numpy as np
-from src.graph_layout.cola.layout import Layout
+import random
 
 
-def create_graph(n_nodes, n_edges, with_size=True):
+def create_graph(n_nodes, n_edges, with_size=False, seed=42):
     """Create a random graph with n nodes and approximately n_edges edges."""
+    random.seed(seed)
+    np.random.seed(seed)
+
     if with_size:
-        nodes = [{'x': 0, 'y': 0, 'width': 30, 'height': 30} for _ in range(n_nodes)]
+        nodes = [
+            {'x': random.uniform(0, 500), 'y': random.uniform(0, 500), 'width': 30, 'height': 30}
+            for _ in range(n_nodes)
+        ]
     else:
-        nodes = [{'x': 0, 'y': 0} for _ in range(n_nodes)]
+        nodes = [
+            {'x': random.uniform(0, 500), 'y': random.uniform(0, 500)}
+            for _ in range(n_nodes)
+        ]
 
     # Create random edges
     edges = []
-    np.random.seed(42)
     for _ in range(n_edges):
         source = np.random.randint(0, n_nodes)
         target = np.random.randint(0, n_nodes)
@@ -43,22 +47,15 @@ def create_graph(n_nodes, n_edges, with_size=True):
     return nodes, edges
 
 
-def profile_small_graph():
-    """Profile a small graph (20 nodes, 30 edges)."""
+# =============================================================================
+# Cola Layout Profiles
+# =============================================================================
+
+def profile_cola_small():
+    """Profile Cola layout: small graph (20 nodes, 30 edges)."""
+    from graph_layout.cola.layout import Layout
+
     nodes, edges = create_graph(20, 30, with_size=False)
-
-    layout = Layout()
-    layout.nodes(nodes)
-    layout.links(edges)
-    layout.link_distance(100)
-    layout.handle_disconnected(False)  # Disable to avoid node_size issues
-    layout.start(50, 0, 0, 0, False)
-
-
-def profile_medium_graph():
-    """Profile a medium graph (100 nodes, 200 edges)."""
-    nodes, edges = create_graph(100, 200, with_size=False)
-
     layout = Layout()
     layout.nodes(nodes)
     layout.links(edges)
@@ -67,10 +64,24 @@ def profile_medium_graph():
     layout.start(50, 0, 0, 0, False)
 
 
-def profile_large_graph():
-    """Profile a large graph (500 nodes, 1000 edges)."""
-    nodes, edges = create_graph(500, 1000, with_size=False)
+def profile_cola_medium():
+    """Profile Cola layout: medium graph (100 nodes, 200 edges)."""
+    from graph_layout.cola.layout import Layout
 
+    nodes, edges = create_graph(100, 200, with_size=False)
+    layout = Layout()
+    layout.nodes(nodes)
+    layout.links(edges)
+    layout.link_distance(100)
+    layout.handle_disconnected(False)
+    layout.start(50, 0, 0, 0, False)
+
+
+def profile_cola_large():
+    """Profile Cola layout: large graph (500 nodes, 1000 edges)."""
+    from graph_layout.cola.layout import Layout
+
+    nodes, edges = create_graph(500, 1000, with_size=False)
     layout = Layout()
     layout.nodes(nodes)
     layout.links(edges)
@@ -79,111 +90,228 @@ def profile_large_graph():
     layout.start(30, 0, 0, 0, False)
 
 
-def profile_with_constraints():
-    """Profile layout with overlap avoidance and constraints."""
-    nodes, edges = create_graph(50, 100)
+# =============================================================================
+# Fruchterman-Reingold Layout Profiles
+# =============================================================================
 
-    layout = Layout()
-    layout.nodes(nodes)
-    layout.links(edges)
-    layout.link_distance(100)
-    layout.avoid_overlaps(True)
-    layout.start(50, 20, 20, 0, False)
+def profile_fr_small():
+    """Profile Fruchterman-Reingold: small graph (20 nodes, 30 edges)."""
+    from graph_layout import FruchtermanReingoldLayout
 
-
-def profile_with_groups():
-    """Profile layout with hierarchical groups."""
-    from src.graph_layout.cola.layout import Group
-    import random
-    random.seed(42)
-
-    n_nodes = 60
-    # Groups require nodes with initial positions
-    nodes = [{'x': random.uniform(0, 500), 'y': random.uniform(0, 500), 'width': 30, 'height': 30}
-             for _ in range(n_nodes)]
-    edges = []
-    np.random.seed(42)
-    for _ in range(100):
-        source = np.random.randint(0, n_nodes)
-        target = np.random.randint(0, n_nodes)
-        if source != target:
-            edges.append({'source': source, 'target': target})
-
-    # Create groups
-    groups = [
-        Group(leaves=list(range(0, 20)), padding=10),
-        Group(leaves=list(range(20, 40)), padding=10),
-        Group(leaves=list(range(40, 60)), padding=10),
-    ]
-
-    layout = Layout()
-    layout.nodes(nodes)
-    layout.links(edges)
-    layout.groups(groups)
-    layout.link_distance(100)
-    layout.avoid_overlaps(True)
-    layout.start(50, 20, 20, 0, False)
+    nodes, edges = create_graph(20, 30)
+    layout = FruchtermanReingoldLayout(
+        nodes=nodes, links=edges, size=(500, 500), iterations=100
+    )
+    layout.run()
 
 
-def benchmark_scenario(name, func):
+def profile_fr_medium():
+    """Profile Fruchterman-Reingold: medium graph (100 nodes, 200 edges)."""
+    from graph_layout import FruchtermanReingoldLayout
+
+    nodes, edges = create_graph(100, 200)
+    layout = FruchtermanReingoldLayout(
+        nodes=nodes, links=edges, size=(800, 800), iterations=100
+    )
+    layout.run()
+
+
+def profile_fr_large():
+    """Profile Fruchterman-Reingold: large graph (500 nodes, 1000 edges)."""
+    from graph_layout import FruchtermanReingoldLayout
+
+    nodes, edges = create_graph(500, 1000)
+    layout = FruchtermanReingoldLayout(
+        nodes=nodes, links=edges, size=(1000, 1000), iterations=50
+    )
+    layout.run()
+
+
+def profile_fr_barnes_hut():
+    """Profile Fruchterman-Reingold with Barnes-Hut: large graph (500 nodes)."""
+    from graph_layout import FruchtermanReingoldLayout
+
+    nodes, edges = create_graph(500, 1000)
+    layout = FruchtermanReingoldLayout(
+        nodes=nodes, links=edges, size=(1000, 1000), iterations=50,
+        use_barnes_hut=True, barnes_hut_theta=0.5
+    )
+    layout.run()
+
+
+# =============================================================================
+# Kamada-Kawai Layout Profiles
+# =============================================================================
+
+def profile_kk_small():
+    """Profile Kamada-Kawai: small graph (20 nodes, 30 edges)."""
+    from graph_layout import KamadaKawaiLayout
+
+    nodes, edges = create_graph(20, 30)
+    layout = KamadaKawaiLayout(
+        nodes=nodes, links=edges, size=(500, 500), iterations=100
+    )
+    layout.run()
+
+
+def profile_kk_medium():
+    """Profile Kamada-Kawai: medium graph (100 nodes, 200 edges)."""
+    from graph_layout import KamadaKawaiLayout
+
+    nodes, edges = create_graph(100, 200)
+    layout = KamadaKawaiLayout(
+        nodes=nodes, links=edges, size=(800, 800), iterations=100
+    )
+    layout.run()
+
+
+# =============================================================================
+# Spring Layout Profiles
+# =============================================================================
+
+def profile_spring_small():
+    """Profile Spring layout: small graph (20 nodes, 30 edges)."""
+    from graph_layout import SpringLayout
+
+    nodes, edges = create_graph(20, 30)
+    layout = SpringLayout(
+        nodes=nodes, links=edges, size=(500, 500), iterations=100
+    )
+    layout.run()
+
+
+def profile_spring_medium():
+    """Profile Spring layout: medium graph (100 nodes, 200 edges)."""
+    from graph_layout import SpringLayout
+
+    nodes, edges = create_graph(100, 200)
+    layout = SpringLayout(
+        nodes=nodes, links=edges, size=(800, 800), iterations=100
+    )
+    layout.run()
+
+
+# =============================================================================
+# Static Layout Profiles
+# =============================================================================
+
+def profile_circular():
+    """Profile Circular layout: medium graph (100 nodes)."""
+    from graph_layout import CircularLayout
+
+    nodes, edges = create_graph(100, 200)
+    layout = CircularLayout(nodes=nodes, links=edges, size=(500, 500))
+    layout.run()
+
+
+def profile_spectral():
+    """Profile Spectral layout: medium graph (100 nodes, 200 edges)."""
+    from graph_layout import SpectralLayout
+
+    nodes, edges = create_graph(100, 200)
+    layout = SpectralLayout(nodes=nodes, links=edges, size=(500, 500))
+    layout.run()
+
+
+# =============================================================================
+# Benchmarking Infrastructure
+# =============================================================================
+
+def benchmark_scenario(name, func, profile=True):
     """Benchmark a scenario and print timing."""
-    print(f"\n{'='*60}")
-    print(f"Profiling: {name}")
-    print('='*60)
+    print(f"\n{'-'*60}")
+    print(f"  {name}")
+    print('-'*60)
 
-    # Create profiler
-    profiler = cProfile.Profile()
+    if profile:
+        profiler = cProfile.Profile()
+        start_time = time.time()
+        profiler.enable()
+        func()
+        profiler.disable()
+        elapsed = time.time() - start_time
 
-    # Run with profiling
-    start_time = time.time()
-    profiler.enable()
-    func()
-    profiler.disable()
-    elapsed = time.time() - start_time
+        # Print brief stats
+        s = io.StringIO()
+        ps = pstats.Stats(profiler, stream=s).sort_stats(SortKey.CUMULATIVE)
+        ps.print_stats(10)
 
-    print(f"\nTotal time: {elapsed:.3f}s")
+        print(f"Time: {elapsed:.3f}s")
+        print("\nTop 10 functions:")
+        for line in s.getvalue().split('\n')[5:16]:
+            if line.strip():
+                print(line)
 
-    # Print stats
-    s = io.StringIO()
-    ps = pstats.Stats(profiler, stream=s).sort_stats(SortKey.CUMULATIVE)
-    ps.print_stats(20)  # Top 20 functions
-
-    print("\nTop 20 functions by cumulative time:")
-    print(s.getvalue())
-
-    return profiler
+        return elapsed, profiler
+    else:
+        start_time = time.time()
+        func()
+        elapsed = time.time() - start_time
+        print(f"Time: {elapsed:.3f}s")
+        return elapsed, None
 
 
 def main():
     """Run all profiling scenarios."""
-    print("graph-layout Performance Profiling")
+    print("=" * 60)
+    print("  graph-layout Performance Profiling")
     print("=" * 60)
 
+    # Check Cython status
+    try:
+        from graph_layout import _speedups
+        print("\nCython _speedups: ENABLED")
+    except ImportError:
+        print("\nCython _speedups: DISABLED (using pure Python)")
+
+    from graph_layout.cola.shortestpaths import get_implementation
+    print(f"Shortest paths: {get_implementation()}")
+
     scenarios = [
-        ("Small Graph (20 nodes, 30 edges)", profile_small_graph),
-        ("Medium Graph (100 nodes, 200 edges)", profile_medium_graph),
-        ("Large Graph (500 nodes, 1000 edges)", profile_large_graph),
-        ("With Constraints (50 nodes, overlap avoidance)", profile_with_constraints),
-        ("With Groups (60 nodes, 3 groups)", profile_with_groups),
+        # Cola layouts
+        ("Cola: Small (20 nodes)", profile_cola_small),
+        ("Cola: Medium (100 nodes)", profile_cola_medium),
+        ("Cola: Large (500 nodes)", profile_cola_large),
+
+        # Fruchterman-Reingold layouts
+        ("FR: Small (20 nodes)", profile_fr_small),
+        ("FR: Medium (100 nodes)", profile_fr_medium),
+        ("FR: Large (500 nodes)", profile_fr_large),
+        ("FR: Large + Barnes-Hut", profile_fr_barnes_hut),
+
+        # Kamada-Kawai layouts
+        ("KK: Small (20 nodes)", profile_kk_small),
+        ("KK: Medium (100 nodes)", profile_kk_medium),
+
+        # Spring layouts
+        ("Spring: Small (20 nodes)", profile_spring_small),
+        ("Spring: Medium (100 nodes)", profile_spring_medium),
+
+        # Static layouts
+        ("Circular (100 nodes)", profile_circular),
+        ("Spectral (100 nodes)", profile_spectral),
     ]
 
-    profilers = {}
+    results = {}
     for name, func in scenarios:
-        profilers[name] = benchmark_scenario(name, func)
+        try:
+            elapsed, _ = benchmark_scenario(name, func, profile=False)
+            results[name] = elapsed
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            results[name] = None
 
-    # Save detailed profiles
-    print("\n" + "="*60)
-    print("Saving detailed profiles...")
-    print("="*60)
-
-    for name, profiler in profilers.items():
-        filename = f"profile_{name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace(',', '')}.prof"
-        profiler.dump_stats(filename)
-        print(f"Saved: {filename}")
-
-    print("\nTo view detailed profile, use:")
-    print("  python -m pstats <profile_file>")
-    print("  then type 'stats' or 'sort cumulative' and 'stats 50'")
+    # Print summary table
+    print("\n" + "=" * 60)
+    print("  Summary")
+    print("=" * 60)
+    print(f"\n{'Algorithm':<35} {'Time':>10}")
+    print("-" * 47)
+    for name, elapsed in results.items():
+        if elapsed is not None:
+            print(f"{name:<35} {elapsed:>10.3f}s")
+        else:
+            print(f"{name:<35} {'ERROR':>10}")
 
 
 if __name__ == "__main__":

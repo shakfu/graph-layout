@@ -1,12 +1,16 @@
 # graph-layout Makefile
 # Build system for graph layout algorithms in Python
 
-.PHONY: help install install-dev clean test test-watch test-coverage lint format check typecheck all dev sync build publish publish-test
+.PHONY: all help install install-dev clean test test-watch test-coverage \
+		lint format check typecheck all dev sync build publish publish-test \
+		wheel-check
 
 # Source and test directories
 SRC_DIR := src/graph_layout
 TEST_DIR := tests
 ALL_DIRS := $(SRC_DIR) $(TEST_DIR)
+
+all: build
 
 # Default target
 help:
@@ -98,6 +102,9 @@ fix:
 # Run all verification steps
 verify: check typecheck test
 
+wheel-check:
+	@uv run twine check dist/*.whl
+
 # Clean build artifacts and cache
 clean:
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -136,7 +143,8 @@ version:
 
 # Build sdist and wheel
 build: clean
-	@uv run python -m build
+	@uv build
+	@uv run twine check dist/*.whl
 
 # Upload to TestPyPI
 publish-test: build

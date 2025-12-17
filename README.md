@@ -20,11 +20,8 @@ A collection of graph layout algorithms in Python.
 ## Installation
 
 ```bash
-# Standard installation (with Cython extensions for best performance)
+# Standard installation (includes Cython extensions for best performance)
 pip install graph-layout
-
-# With optional scipy integration (faster shortest paths)
-pip install graph-layout[fast]
 
 # Development installation
 git clone https://github.com/shakfu/graph-layout.git
@@ -297,12 +294,26 @@ graph_layout/
 
 ## Performance
 
-With Cython extensions:
-- Small graphs (20 nodes): ~0.02s
-- Medium graphs (100 nodes): ~0.05s
-- Large graphs (500 nodes): ~1.1s
+With Cython extensions enabled:
 
-See `docs/OPTIMIZATION_ANALYSIS.md` for detailed benchmarks.
+| Algorithm | Graph Size | Time |
+|-----------|-----------|------|
+| Fruchterman-Reingold | 20 nodes | 0.002s |
+| Fruchterman-Reingold | 100 nodes | 0.010s |
+| Fruchterman-Reingold | 500 nodes | 0.046s |
+| Cola (constraint-based) | 500 nodes | 1.2s |
+| Circular | 100 nodes | 0.001s |
+
+For very large graphs (2000+ nodes), enable Barnes-Hut approximation for O(n log n) performance:
+
+```python
+layout = FruchtermanReingoldLayout(
+    nodes=nodes,
+    links=links,
+    use_barnes_hut=True,
+    barnes_hut_theta=0.5,  # 0=exact, higher=faster but less accurate
+)
+```
 
 ## Development
 

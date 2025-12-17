@@ -1,11 +1,12 @@
 """
 Setup script for building Cython extensions.
 
-This script builds the high-performance Cython implementations of:
+This script builds the _speedups module containing high-performance
+Cython implementations of:
 - Priority queue (pairing heap)
 - Shortest paths (Dijkstra's algorithm)
 
-These extensions are part of the graph_layout.cola subpackage.
+These extensions are part of the graph_layout package root.
 
 If Cython is not available or compilation fails, the package will still
 install and use pure Python or scipy fallbacks.
@@ -62,15 +63,8 @@ def build_extensions():
 
     extensions = [
         Extension(
-            "graph_layout.cola._pqueue_cy",
-            sources=["src/graph_layout/cola/_pqueue_cy.pyx"],
-            include_dirs=include_dirs,
-            extra_compile_args=extra_compile_args,
-            extra_link_args=extra_link_args,
-        ),
-        Extension(
-            "graph_layout.cola._shortestpaths_cy",
-            sources=["src/graph_layout/cola/_shortestpaths_cy.pyx"],
+            "graph_layout._speedups",
+            sources=["src/graph_layout/_speedups.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
             extra_link_args=extra_link_args,

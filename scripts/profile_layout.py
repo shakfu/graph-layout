@@ -2,6 +2,11 @@
 Profiling script for graph-layout performance analysis.
 
 This script profiles various graph layout scenarios to identify bottlenecks.
+
+Note: This script uses the internal Cola Layout class directly (cola/layout.py)
+which retains the JavaScript-style fluent API for backward compatibility with
+the WebCola port. For user-facing code, use ColaLayoutAdapter instead which
+provides the Pythonic API.
 """
 
 import cProfile
@@ -89,8 +94,20 @@ def profile_with_constraints():
 def profile_with_groups():
     """Profile layout with hierarchical groups."""
     from src.graph_layout.cola.layout import Group
+    import random
+    random.seed(42)
 
-    nodes, edges = create_graph(60, 100)
+    n_nodes = 60
+    # Groups require nodes with initial positions
+    nodes = [{'x': random.uniform(0, 500), 'y': random.uniform(0, 500), 'width': 30, 'height': 30}
+             for _ in range(n_nodes)]
+    edges = []
+    np.random.seed(42)
+    for _ in range(100):
+        source = np.random.randint(0, n_nodes)
+        target = np.random.randint(0, n_nodes)
+        if source != target:
+            edges.append({'source': source, 'target': target})
 
     # Create groups
     groups = [

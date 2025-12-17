@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from graph_layout.circular import CircularLayout, ShellLayout
 from graph_layout.cola import Layout as ColaLayout
 from graph_layout.force import FruchtermanReingoldLayout, KamadaKawaiLayout, SpringLayout
-from graph_layout.hierarchical import ReingoldTilfordLayout, SugiyamaLayout
+from graph_layout.hierarchical import RadialTreeLayout, ReingoldTilfordLayout, SugiyamaLayout
 from graph_layout.spectral import SpectralLayout
 
 # Output directory
@@ -29,8 +29,9 @@ def ensure_build_dir():
 
 def visualize(layout, title="Graph Layout", ax=None):
     """Visualize a completed layout on an axis."""
-    nodes = layout.nodes()
-    links = layout.links()
+    # Handle both old Cola API (method) and new Pythonic API (property)
+    nodes = layout.nodes() if callable(layout.nodes) else layout.nodes
+    links = layout.links() if callable(layout.links) else layout.links
 
     # Draw edges
     for link in links:
@@ -65,28 +66,38 @@ def save_layout(LayoutClass, name, nodes, links, filename):
     import random
     random.seed(42)  # Reproducible
 
-    # Create fresh copies - Cola needs width/height and random initial positions
+    # Create fresh copies
+    link_data = [{"source": l["source"], "target": l["target"]} for l in links]
+
+    # Cola Layout uses the old fluent API (internal class)
     if LayoutClass is ColaLayout:
         node_data = [
             {"x": random.uniform(100, 500), "y": random.uniform(100, 500), "width": 20, "height": 20}
             for _ in range(len(nodes))
         ]
-    else:
-        node_data = [{"x": 0, "y": 0} for _ in range(len(nodes))]
-    link_data = [{"source": l["source"], "target": l["target"]} for l in links]
-
-    layout = LayoutClass()
-    layout.nodes(node_data).links(link_data).size([600, 600])
-
-    # Algorithm-specific configuration
-    if LayoutClass is ColaLayout:
+        layout = ColaLayout()
+        layout.nodes(node_data).links(link_data).size([600, 600])
         layout.link_distance(80)
         layout.start(20, 0, 20, 0, False)
+    # ShellLayout with auto_shells
     elif LayoutClass is ShellLayout:
-        layout.auto_shells(2)  # Show concentric rings
-        layout.start()
+        node_data = [{} for _ in range(len(nodes))]
+        layout = ShellLayout(
+            nodes=node_data,
+            links=link_data,
+            size=(600, 600),
+            auto_shells=2,
+        )
+        layout.run()
+    # All other layouts use the new Pythonic API
     else:
-        layout.start()
+        node_data = [{} for _ in range(len(nodes))]
+        layout = LayoutClass(
+            nodes=node_data,
+            links=link_data,
+            size=(600, 600),
+        )
+        layout.run()
 
     fig, ax = plt.subplots(figsize=(8, 8))
     visualize(layout, name, ax=ax)
@@ -114,28 +125,38 @@ def save_comparison(algorithms, nodes, links, filename, title):
         import random
         random.seed(42)  # Reproducible
 
-        # Create fresh copies - Cola needs width/height and random initial positions
+        # Create fresh copies
+        link_data = [{"source": l["source"], "target": l["target"]} for l in links]
+
+        # Cola Layout uses the old fluent API (internal class)
         if LayoutClass is ColaLayout:
             node_data = [
                 {"x": random.uniform(100, 500), "y": random.uniform(100, 500), "width": 20, "height": 20}
                 for _ in range(len(nodes))
             ]
-        else:
-            node_data = [{"x": 0, "y": 0} for _ in range(len(nodes))]
-        link_data = [{"source": l["source"], "target": l["target"]} for l in links]
-
-        layout = LayoutClass()
-        layout.nodes(node_data).links(link_data).size([600, 600])
-
-        # Algorithm-specific configuration
-        if LayoutClass is ColaLayout:
+            layout = ColaLayout()
+            layout.nodes(node_data).links(link_data).size([600, 600])
             layout.link_distance(80)
             layout.start(20, 0, 20, 0, False)
+        # ShellLayout with auto_shells
         elif LayoutClass is ShellLayout:
-            layout.auto_shells(2)  # Show concentric rings
-            layout.start()
+            node_data = [{} for _ in range(len(nodes))]
+            layout = ShellLayout(
+                nodes=node_data,
+                links=link_data,
+                size=(600, 600),
+                auto_shells=2,
+            )
+            layout.run()
+        # All other layouts use the new Pythonic API
         else:
-            layout.start()
+            node_data = [{} for _ in range(len(nodes))]
+            layout = LayoutClass(
+                nodes=node_data,
+                links=link_data,
+                size=(600, 600),
+            )
+            layout.run()
 
         visualize(layout, name, ax=axes[i])
 
@@ -154,7 +175,7 @@ def save_comparison(algorithms, nodes, links, filename, title):
 
 def create_sample_graph():
     """Create a sample graph for demonstration."""
-    nodes = [{"x": 0, "y": 0} for _ in range(12)]
+    nodes = [{} for _ in range(12)]
     links = [
         # Outer ring
         {"source": 0, "target": 1},
@@ -183,7 +204,7 @@ def create_sample_graph():
 
 def create_tree_graph():
     """Create a tree graph for hierarchical layouts."""
-    nodes = [{"x": 0, "y": 0} for _ in range(15)]
+    nodes = [{} for _ in range(15)]
     links = [
         # Level 0 -> 1
         {"source": 0, "target": 1},
@@ -216,7 +237,7 @@ def generate_all():
     # Individual layouts with sample graph
     print("Generating individual layout images (sample graph)...")
 
-    # Cola (constraint-based)
+    # Cola (constraint-based) - uses internal fluent API
     save_layout(ColaLayout, "Cola (Constraint-Based)", sample_nodes, sample_links, "cola.png")
 
     force_layouts = [
@@ -239,6 +260,7 @@ def generate_all():
     print("Generating individual layout images (tree graph)...")
     hierarchical_layouts = [
         (ReingoldTilfordLayout, "Reingold-Tilford", "reingold_tilford.png"),
+        (RadialTreeLayout, "Radial Tree", "radial_tree.png"),
         (SugiyamaLayout, "Sugiyama", "sugiyama.png"),
     ]
     for LayoutClass, name, filename in hierarchical_layouts:

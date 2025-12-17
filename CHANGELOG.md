@@ -15,7 +15,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
-## [0.3.0] - Validation, Metrics, and Performance
+## [unreleased]
+
+## [0.1.5] - Pythonic API
+
+### Changed
+
+- **BREAKING: New Pythonic API** - Complete API redesign from JavaScript-style fluent methods to Pythonic constructor parameters and properties.
+
+  **Before (fluent API):**
+  ```python
+  layout = FruchtermanReingoldLayout()
+  layout.nodes(nodes).links(links).size([500, 500])
+  layout.start(iterations=100)
+  result = layout.nodes()
+  ```
+
+  **After (Pythonic API):**
+  ```python
+  layout = FruchtermanReingoldLayout(
+      nodes=nodes,
+      links=links,
+      size=(500, 500),
+      iterations=100,
+  )
+  layout.run()
+  result = layout.nodes  # Property, not method
+  ```
+
+- **Renamed `start()` to `run()`** for all layout classes (except internal Cola `Layout` class)
+- **Properties replace getter/setter methods**: `layout.nodes`, `layout.links`, `layout.size`, etc.
+- **Constructor parameters for configuration**: All algorithm-specific settings configurable via constructor
+- **Event callbacks in constructor**: `on_start`, `on_tick`, `on_end` parameters
+
+### Added
+
+- **Type aliases** in `types.py`: `NodeLike`, `LinkLike`, `GroupLike`, `SizeType` for flexible input types
+- **RadialTreeLayout** added to hierarchical layouts module
+
+### Migration Guide
+
+| Old API | New API |
+|---------|---------|
+| `layout.nodes(data)` | `layout = Layout(nodes=data)` or `layout.nodes = data` |
+| `layout.nodes()` | `layout.nodes` |
+| `layout.size([w, h])` | `layout = Layout(size=(w, h))` or `layout.size = (w, h)` |
+| `layout.start()` | `layout.run()` |
+| `layout.start(iterations=N)` | `layout = Layout(iterations=N); layout.run()` |
+| `layout.temperature(T)` | `layout = Layout(temperature=T)` or `layout.temperature = T` |
+| `layout.barnes_hut(True, theta=0.5)` | `layout = Layout(use_barnes_hut=True, barnes_hut_theta=0.5)` |
+
+### Internal
+
+- **Cola `Layout` class unchanged**: The internal `cola/layout.py` retains the JavaScript-style fluent API for compatibility with the WebCola port. Use `ColaLayoutAdapter` for the Pythonic API.
+- Updated `scripts/visualize.py` for new API
+- Updated all test files (530 tests passing)
+- Updated README.md with new API examples
+
+---
+
+## [0.1.4] - Validation, Metrics, and Performance
 
 ### Added
 - **Input Validation Module** (`validation.py`):
@@ -78,7 +137,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
-## [0.2.0] - Multi-Algorithm Layout Library
+## [0.1.3] - Multi-Algorithm Layout Library
 
 ### Added
 - **New layout algorithm families** expanding beyond Cola:

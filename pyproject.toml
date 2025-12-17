@@ -1,6 +1,6 @@
 [project]
 name = "graph-layout"
-version = "0.1.0"
+version = "0.4.0"
 description = "A collection of graph layout algorithms in Python"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -71,16 +71,24 @@ warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+# Additional strictness
+check_untyped_defs = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unused_ignores = true
 
-# Strict typing for new algorithm modules
+# Strict typing for new Pythonic API modules
 [[tool.mypy.overrides]]
 module = [
     "graph_layout.base",
     "graph_layout.types",
+    "graph_layout.validation",
+    "graph_layout.metrics",
     "graph_layout.force.*",
     "graph_layout.hierarchical.*",
     "graph_layout.circular.*",
     "graph_layout.spectral.*",
+    "graph_layout.cola.adapter",
 ]
 disallow_untyped_defs = true
 warn_return_any = true

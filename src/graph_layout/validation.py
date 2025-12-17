@@ -219,7 +219,7 @@ def _get_index(obj: Any, attr: str) -> Optional[int]:
     if isinstance(val, int):
         return val
     if hasattr(val, "index"):
-        return val.index
+        return int(val.index)
     return None
 
 
@@ -228,7 +228,7 @@ def _get_index_simple(obj: Any) -> Optional[int]:
     if isinstance(obj, int):
         return obj
     if hasattr(obj, "index"):
-        return obj.index
+        return int(obj.index)
     return None
 
 

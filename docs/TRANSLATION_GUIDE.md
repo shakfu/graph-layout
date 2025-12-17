@@ -189,9 +189,9 @@ def foo(a: float, b: float = 10.0, c: float = 20.0) -> float:
     return a + b + c
 ```
 
-### Method Chaining (Fluent Interface)
+### Method Chaining (Fluent Interface) vs Pythonic API
 
-**TypeScript:**
+**TypeScript (fluent/chaining pattern):**
 ```typescript
 class Layout {
     nodes(v: Node[]): this {
@@ -199,27 +199,38 @@ class Layout {
         return this;
     }
 }
+
+// Usage:
+layout.nodes(data).links(edges).size([800, 600]).start();
 ```
 
-**Python:**
+**Python (Pythonic API - preferred):**
 ```python
-from typing import TypeVar, Self  # Python 3.11+
-
 class Layout:
-    def nodes(self, v: list[Node]) -> Self:
-        self._nodes = v
-        return self
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        size: SizeType = (1.0, 1.0),
+    ) -> None:
+        self._nodes = list(nodes) if nodes else []
+        # ...
 
-# For Python 3.8-3.10:
-from typing import TypeVar
+    @property
+    def nodes(self) -> list[Node]:
+        return self._nodes
 
-T = TypeVar('T', bound='Layout')
+    @nodes.setter
+    def nodes(self, value: Sequence[NodeLike]) -> None:
+        self._nodes = [self._convert_node(n) for n in value]
 
-class Layout:
-    def nodes(self: T, v: list[Node]) -> T:
-        self._nodes = v
-        return self
+# Usage:
+layout = Layout(nodes=data, links=edges, size=(800, 600))
+layout.run()
 ```
+
+**Note:** The internal Cola `Layout` class (`cola/layout.py`) retains the fluent API for WebCola compatibility. User-facing layout classes use the Pythonic API with constructor parameters and properties.
 
 ### Static Methods
 

@@ -387,15 +387,20 @@ elif impl == "scipy":
 
 ```python
 import time
-from graph_layout.cola.layout import Layout
+from graph_layout import FruchtermanReingoldLayout
 
-nodes = [{'x': 0, 'y': 0} for _ in range(100)]
-edges = [{'source': i, 'target': (i+1)%100} for i in range(100)]
+nodes = [{} for _ in range(100)]
+links = [{'source': i, 'target': (i+1)%100} for i in range(100)]
 
-layout = Layout().nodes(nodes).links(edges)
+layout = FruchtermanReingoldLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    iterations=50,
+)
 
 start = time.time()
-layout.start(50, 0, 0, 0, False)
+layout.run()
 elapsed = time.time() - start
 
 print(f"Time: {elapsed:.3f}s")

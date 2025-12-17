@@ -5,6 +5,7 @@ This guide explains how to use the preprocessing utilities in `graph-layout` to 
 ## Overview
 
 Graph preprocessing utilities help you:
+
 - **Detect and remove cycles** - Required for hierarchical layouts (Sugiyama)
 - **Find connected components** - Handle disconnected graphs
 - **Compute topological order** - Understand graph structure
@@ -83,6 +84,7 @@ layout.run()
 ## Topological Sorting
 
 Topological sort orders nodes so that for every edge `u -> v`, node `u` comes before `v`. This is useful for:
+
 - Understanding dependency order
 - Processing nodes in correct sequence
 - Verifying graph is acyclic
@@ -135,7 +137,7 @@ for i, comp in enumerate(components):
 
 ### Handling Disconnected Graphs
 
-**Option 1: Layout each component separately**
+### Option 1: Layout each component separately
 
 ```python
 from graph_layout import connected_components, FruchtermanReingoldLayout
@@ -177,7 +179,7 @@ def layout_components(nodes, links, size):
     return results
 ```
 
-**Option 2: Use Cola with `handle_disconnected=True`**
+### Option 2: Use Cola with `handle_disconnected=True`
 
 ```python
 from graph_layout import ColaLayoutAdapter

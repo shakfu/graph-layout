@@ -3,7 +3,9 @@
 ## Medium Priority
 
 ### 1. Complete Type Annotations
+
 Finish typing the internal Cola module files that currently have `ignore_errors = true`:
+
 - `cola/layout.py` (1304 lines) - Core layout class with fluent API
 - `cola/gridrouter.py` (800 lines) - Grid-based edge routing
 - `cola/batch.py` (207 lines) - Batch layout operations
@@ -11,10 +13,13 @@ Finish typing the internal Cola module files that currently have `ignore_errors 
 **Known issues**: 146 mypy errors when strict checking is enabled. Main causes: Optional handling, Union types from getter/setter pattern, dynamic attribute access on ported JavaScript objects.
 
 ### 2. API Documentation
+
 Generate API reference documentation using Sphinx or MkDocs.
 
 ### 3. Property-Based Tests
+
 Add Hypothesis tests for robustness:
+
 - Fuzz testing for input validation
 - Property-based tests for layout invariants
 - Edge case testing (very large/small inputs)
@@ -24,18 +29,24 @@ Add Hypothesis tests for robustness:
 ## Low Priority
 
 ### 4. Export Formats
+
 Add export functionality:
+
 - SVG export
 - DOT (Graphviz) export
 - GraphML export
 
 ### 5. Incremental Layout
+
 Support graph modifications without full re-layout:
+
 - Add/remove nodes dynamically
 - Preserve existing positions where possible
 
 ### 6. GPU Acceleration
+
 Consider CuPy backend for large graphs:
+
 - Parallel force calculations
 - CUDA/Metal compute shaders
 
@@ -96,6 +107,7 @@ Other features common in graph layout libraries that are not yet implemented:
 ## Test Coverage Gaps
 
 ### Under-Tested Modules (<80%)
+
 | Module | Coverage | Notes |
 |--------|----------|-------|
 | `cola/batch.py` | 43% | Batch processing functionality |
@@ -106,6 +118,7 @@ Other features common in graph layout libraries that are not yet implemented:
 | `types.py` | 77% | Some utility methods untested |
 
 ### Missing Test Types
+
 - Property-based testing (Hypothesis)
 - Performance regression tests
 - Fuzz testing
@@ -126,6 +139,7 @@ Other features common in graph layout libraries that are not yet implemented:
 ## Performance Improvements
 
 ### Potential Optimizations
+
 1. **Parallel Processing**: Force calculations are embarrassingly parallel
 2. **GPU Acceleration**: Large graphs could benefit from CUDA/Metal
 3. **Lazy Evaluation**: Don't recompute unchanged portions of layout

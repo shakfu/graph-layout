@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [0.1.6] - Unified Cython Speedups and PyPI Publishing
 
 ### Added
+
 - **Unified Cython `_speedups` module** (`src/graph_layout/_speedups.pyx`):
   - Consolidated all Cython code into a single extension module at package root
   - Priority queue (pairing heap) for Dijkstra's algorithm
@@ -63,6 +64,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `docs/preprocessing-guide.md` - Guide to graph preprocessing utilities with examples and complete pipeline
 
 ### Changed
+
 - Moved Cython extensions from `cola/` subdirectory to package root for use by all algorithms
 - Updated `shortestpaths.py` to import from unified `_speedups` module
 - License clarified as MIT (SPDX format in pyproject.toml)
@@ -70,14 +72,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Build system simplified: `uv build` replaces `python -m build` (removed `build` package from dev dependencies)
 
 ### Removed
+
 - **`[fast]` optional dependency**: scipy fallback removed since Cython extensions are pre-built in PyPI wheels and faster than scipy
 - **scipy fallback code** in `shortestpaths.py`: Simplified from 257 to 157 lines, now just Cython > pure Python
 
 ### Fixed
+
 - **Segfault in Barnes-Hut implementation**: Added depth limit (50 levels) to QuadTree insertion to prevent stack overflow when nodes have coincident or near-coincident positions
 - License file now correctly contains MIT license text (was GPL v3)
 
 ### Performance
+
 With Cython `_speedups` enabled:
 
 | Algorithm | Graph Size | Time |
@@ -101,6 +106,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - **BREAKING: New Pythonic API** - Complete API redesign from JavaScript-style fluent methods to Pythonic constructor parameters and properties.
 
   **Before (fluent API):**
+
   ```python
   layout = FruchtermanReingoldLayout()
   layout.nodes(nodes).links(links).size([500, 500])
@@ -109,6 +115,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
   ```
 
   **After (Pythonic API):**
+
   ```python
   layout = FruchtermanReingoldLayout(
       nodes=nodes,
@@ -154,6 +161,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 ## [0.1.4] - Validation, Metrics, and Performance
 
 ### Added
+
 - **Input Validation Module** (`validation.py`):
   - `validate_canvas_size()` - Rejects zero/negative canvas dimensions
   - `validate_link_indices()` - Bounds-checks link source/target against node count
@@ -201,6 +209,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
   - `tests/test_quadtree.py` - QuadTree and Barnes-Hut accuracy tests
 
 ### Changed
+
 - `base.py`: Added validation in `size()` method, added `validate()` method for explicit validation
 - `types.py`: Link constructor now validates source/target are not None
 - Test count increased from 409 to 529
@@ -209,6 +218,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
   - `descent.py`: Documented `ZERO_DISTANCE`, added `MIN_DIST_SQ` class constant with explanation
 
 ### Fixed
+
 - `cola/handledisconnected.py`: Fixed TypeError when node width/height is None (now falls back to node_size)
 - `cola/descent.py`: Added missing `-> None` return type annotation on `Locks.__init__`
 
@@ -217,6 +227,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 ## [0.1.3] - Multi-Algorithm Layout Library
 
 ### Added
+
 - **New layout algorithm families** expanding beyond Cola:
   - **Force-Directed**: `FruchtermanReingoldLayout`, `KamadaKawaiLayout`, `SpringLayout`
   - **Hierarchical**: `SugiyamaLayout`, `ReingoldTilfordLayout`
@@ -233,6 +244,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - **Comprehensive test suite** for all new algorithms (409 tests total)
 
 ### Changed
+
 - Reorganized package structure with algorithm families as subpackages
 - Renamed package from `pycola` to `graph_layout`
 - All layouts now use consistent fluent API pattern
@@ -257,6 +269,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 ## [0.1.2] - Cython Shortest Paths Optimization
 
 ### Added
+
 - **Cython-compiled shortest paths (Dijkstra's algorithm)** - 5x additional speedup
 - Optional scipy integration for even better performance (`pip install graph-layout[fast]`)
 - Priority cascade implementation: Cython → scipy → pure Python
@@ -264,6 +277,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - GitHub Actions workflow for multi-platform wheel building with cibuildwheel
 
 ### Changed
+
 - **MAJOR PERFORMANCE IMPROVEMENT**: Cython-compiled Dijkstra's algorithm
   - **5x faster** for large graphs on top of vectorization gains
   - **100x total speedup** compared to original implementation (v0.1.0)
@@ -274,16 +288,19 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - Added optional `[fast]` extra for scipy integration
 
 ### Performance (Combined: Vectorization + Cython)
+
 - **Small graphs (20 nodes)**: ~0.02s (was ~1.7s) - **85x faster**
 - **Medium graphs (100 nodes)**: ~0.05s (was ~4.1s) - **82x faster**
 - **Large graphs (500 nodes)**: ~1.1s (was ~115.8s) - **105x faster**
 
 ### Installation
+
 - **With Cython extensions** (recommended): `pip install graph-layout` or `uv pip install graph-layout`
 - **With scipy** (fastest): `pip install graph-layout[fast]`
 - **From source** (for development): `pip install -e .` (requires C compiler)
 
 ### Testing
+
 - All 312 tests pass with Cython implementation
 - Fallback to pure Python when Cython extensions unavailable
 - Numerical correctness maintained across all implementations
@@ -291,12 +308,14 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 ## [0.1.1] - Performance Optimization Release
 
 ### Added
+
 - Comprehensive performance profiling system (`scripts/profile_layout.py`)
 - Performance analysis documentation (`docs/OPTIMIZATION_ANALYSIS.md`)
 - Performance comparison documentation (`docs/PERFORMANCE_COMPARISON.md`)
 - Performance benchmarks in README.md and CLAUDE.md
 
 ### Changed
+
 - **MAJOR PERFORMANCE IMPROVEMENT**: Vectorized `compute_derivatives()` in `descent.py` using NumPy broadcasting
   - **20-65x overall speedup** depending on graph size
   - **110-170x faster** for gradient descent computation specifically
@@ -309,11 +328,13 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - Updated CLAUDE.md with current performance metrics and optimization roadmap
 
 ### Fixed
+
 - Forward reference type hints in `vpsc.py`, `powergraph.py`, `descent.py`, and `layout.py`
 - Import paths in profiling scripts
 - Source directory path corrections in Makefile (`src/pycola` vs `pycola`)
 
 ### Performance
+
 - **Small graphs (20 nodes)**: ~0.03s (was ~1.7s) - **65x faster**
 - **Medium graphs (100 nodes)**: ~0.2s (was ~4.1s) - **20x faster**
 - **Large graphs (500 nodes)**: ~5.6s (was ~115.8s) - **21x faster**
@@ -321,6 +342,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - Next optimization target: Replace Dijkstra with scipy for potential 3-5x additional improvement
 
 ### Testing
+
 - All 312 tests pass with vectorized implementation
 - Numerical correctness maintained (floating-point accuracy within tolerance)
 - Test suite completes in 0.41s
@@ -328,6 +350,7 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 ## [0.1.0] - Initial Release
 
 ### Added
+
 - Complete Python port of WebCola graph layout library
 - 2D force-directed layout with gradient descent
 - 3D layout support
@@ -354,10 +377,12 @@ Note: Barnes-Hut has higher overhead than naive O(n^2) at 500 nodes; becomes ben
 - TypeScript to Python translation guide
 
 ### Dependencies
+
 - numpy>=1.20.0
 - sortedcontainers>=2.4.0
 
 ### Development
+
 - pytest>=8.3.5
 - pytest-cov>=5.0.0
 - mypy>=1.14.1

@@ -265,7 +265,7 @@ for node in layout.nodes:
 
 ## Module Structure
 
-```
+```sh
 graph_layout/
     __init__.py              # Top-level exports
     base.py                  # Base classes (BaseLayout, IterativeLayout, StaticLayout)

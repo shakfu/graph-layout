@@ -39,6 +39,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Uses temperature/cooling schedule for simulated annealing
 - Repulsive force: `k^2 / d` (inverse of distance)
 - Attractive force: `d^2 / k` (quadratic with distance)
@@ -47,6 +48,7 @@ layout.run()
 **Complexity:** O(n^2) per iteration (or O(n log n) with Barnes-Hut)
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `iterations` | Number of simulation steps | 300 |
@@ -56,6 +58,7 @@ layout.run()
 | `barnes_hut_theta` | Accuracy vs speed (0=exact, 1=fast) | 0.5 |
 
 **When to use Barnes-Hut:**
+
 - Graphs with 2000+ nodes
 - When approximate positions are acceptable
 - Real-time or interactive applications
@@ -81,6 +84,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Minimizes stress: deviation between geometric and graph-theoretic distances
 - Computes all-pairs shortest paths (expensive for large graphs)
 - Produces layouts where edge length correlates with path length
@@ -89,12 +93,14 @@ layout.run()
 **Complexity:** O(n^3) for shortest paths + O(n^2) per iteration
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `iterations` | Number of optimization steps | 100 |
 | `epsilon` | Convergence threshold | 1e-4 |
 
 **Trade-offs:**
+
 - Higher quality than Fruchterman-Reingold for small graphs
 - Much slower for large graphs due to all-pairs shortest paths
 - Best limited to graphs under ~200 nodes
@@ -123,6 +129,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Simple Hooke's law springs for edges
 - Coulomb-like repulsion between all node pairs
 - No cooling schedule (constant forces)
@@ -131,6 +138,7 @@ layout.run()
 **Complexity:** O(n^2) per iteration
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `iterations` | Number of simulation steps | 100 |
@@ -163,6 +171,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Port of WebCola constraint-based layout
 - VPSC solver for separation constraints
 - Supports node overlap avoidance
@@ -172,6 +181,7 @@ layout.run()
 **Complexity:** O(n^2) per iteration + constraint solving overhead
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `iterations` | Layout iterations | 50 |
@@ -236,6 +246,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Assigns nodes to horizontal layers
 - Minimizes edge crossings between layers
 - Produces clean, readable hierarchical layouts
@@ -244,6 +255,7 @@ layout.run()
 **Complexity:** O(n^2) for crossing minimization
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `layer_separation` | Vertical space between layers | 80 |
@@ -271,6 +283,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Classic tree drawing algorithm
 - Compact, balanced layouts
 - Preserves tree structure clearly
@@ -279,6 +292,7 @@ layout.run()
 **Complexity:** O(n)
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `root` | Index of root node | 0 |
@@ -306,6 +320,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Root at center, children in concentric rings
 - Good for visualizing distance from root
 - Works best with roughly balanced trees
@@ -313,6 +328,7 @@ layout.run()
 **Complexity:** O(n)
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `root` | Index of root node | 0 |
@@ -341,6 +357,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - All nodes placed on a single circle
 - Simple and predictable
 - Edge crossings can be minimized by node ordering
@@ -349,6 +366,7 @@ layout.run()
 **Complexity:** O(n)
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `sort_by` | Node ordering ('none', 'degree', or callable) | 'none' |
@@ -383,6 +401,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Multiple concentric circles
 - Can group nodes by degree or custom criteria
 - Inner shells typically for important/central nodes
@@ -390,6 +409,7 @@ layout.run()
 **Complexity:** O(n)
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `shells` | List of node index lists per shell | None |
@@ -418,6 +438,7 @@ layout.run()
 ```
 
 **Characteristics:**
+
 - Uses eigenvectors of the graph Laplacian matrix
 - Positions based on graph's spectral properties
 - Often reveals natural clustering
@@ -426,12 +447,14 @@ layout.run()
 **Complexity:** O(n^3) for eigendecomposition
 
 **Parameters:**
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `normalized` | Use normalized Laplacian | True |
 | `dimensions` | Number of dimensions (2 or 3) | 2 |
 
 **Trade-offs:**
+
 - Good at revealing structure but may not be visually optimal
 - Expensive for large graphs
 - Best for graphs under ~500 nodes
@@ -458,9 +481,9 @@ layout.run()
 
 ## Decision Guide
 
-### Choose based on graph type:
+### Choose based on graph type
 
-```
+```text
 Is your graph a tree?
   Yes -> Reingold-Tilford (classic) or Radial Tree (centered)
   No  -> Continue...
@@ -486,7 +509,7 @@ Do you want nodes on a circle?
   No  -> Fruchterman-Reingold (general purpose)
 ```
 
-### Choose based on requirements:
+### Choose based on requirements
 
 | Requirement | Recommended Algorithm |
 |-------------|----------------------|
@@ -507,6 +530,7 @@ Do you want nodes on a circle?
 1. **Use Cython acceleration**: Install from PyPI to get pre-built Cython extensions.
 
 2. **Enable Barnes-Hut for large graphs**:
+
    ```python
    layout = FruchtermanReingoldLayout(
        nodes=nodes, links=links,

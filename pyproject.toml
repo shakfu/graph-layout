@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 authors = [
-    {name = "graph-layout Contributors"}
+    { name = "Shakeeb Alireza", email = "me@example.org" }
 ]
 keywords = ["graph", "layout", "constraints", "optimization", "visualization", "cola", "force-directed"]
 classifiers = [

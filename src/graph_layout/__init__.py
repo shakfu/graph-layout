@@ -29,7 +29,7 @@ from .circular import (
 )
 
 # Cola layout (constraint-based)
-from .cola import Layout, Layout3D
+from .cola import ColaLayoutAdapter, Layout, Layout3D
 
 # Force-directed layouts
 from .force import (
@@ -45,6 +45,19 @@ from .hierarchical import (
     SugiyamaLayout,
 )
 
+# Metrics for layout quality evaluation
+from .metrics import (
+    angular_resolution,
+    edge_crossings,
+    edge_length_uniformity,
+    edge_length_variance,
+    layout_quality_summary,
+    stress,
+)
+
+# Spatial data structures
+from .spatial import Body, QuadTree, QuadTreeNode
+
 # Spectral layouts
 from .spectral import SpectralLayout
 from .types import (
@@ -55,6 +68,17 @@ from .types import (
     LinkAccessor,
     Node,
     is_group,
+)
+
+# Validation utilities
+from .validation import (
+    InvalidCanvasSizeError,
+    InvalidGroupError,
+    InvalidLinkError,
+    ValidationError,
+    validate_canvas_size,
+    validate_group_indices,
+    validate_link_indices,
 )
 
 __all__ = [
@@ -75,6 +99,7 @@ __all__ = [
     # Cola (constraint-based layout)
     "Layout",
     "Layout3D",
+    "ColaLayoutAdapter",
     # Force-directed layouts
     "FruchtermanReingoldLayout",
     "SpringLayout",
@@ -88,4 +113,23 @@ __all__ = [
     "ShellLayout",
     # Spectral layouts
     "SpectralLayout",
+    # Metrics
+    "edge_crossings",
+    "stress",
+    "edge_length_variance",
+    "edge_length_uniformity",
+    "angular_resolution",
+    "layout_quality_summary",
+    # Spatial data structures
+    "Body",
+    "QuadTree",
+    "QuadTreeNode",
+    # Validation
+    "ValidationError",
+    "InvalidCanvasSizeError",
+    "InvalidLinkError",
+    "InvalidGroupError",
+    "validate_canvas_size",
+    "validate_link_indices",
+    "validate_group_indices",
 ]

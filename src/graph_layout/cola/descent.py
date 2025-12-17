@@ -18,7 +18,7 @@ class Locks:
     Manages locks over nodes that should not move during descent.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.locks: dict[int, np.ndarray] = {}
 
     def add(self, id: int, x: np.ndarray) -> None:

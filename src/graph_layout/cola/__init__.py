@@ -14,13 +14,14 @@ Main classes:
 
 # Import shared types from the parent package
 from ..types import Event, EventType, Group, Link, Node, is_group
+
+# Import Cola-specific types and the Layout class
+from .adapter import ColaLayoutAdapter
 from .batch import gridify, power_graph_grid_layout
 from .descent import Descent, Locks
 from .geom import LineSegment, Point, TangentVisibilityGraph, convex_hull
 from .gridrouter import GridRouter
 from .handledisconnected import apply_packing, separate_graphs
-
-# Import Cola-specific types and the Layout class
 from .layout import InputNode, Layout
 from .layout3d import Layout3D, Link3D, Node3D
 from .linklengths import (
@@ -40,6 +41,7 @@ __all__ = [
     # Core layout
     "Layout",
     "Layout3D",
+    "ColaLayoutAdapter",
     "Node",
     "Node3D",
     "Link",

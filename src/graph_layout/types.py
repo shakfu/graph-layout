@@ -99,7 +99,23 @@ class Link:
         weight: Optional[float] = None,
         **kwargs: Any
     ) -> None:
-        """Initialize link between two nodes."""
+        """
+        Initialize link between two nodes.
+
+        Args:
+            source: Source node or node index (required)
+            target: Target node or node index (required)
+            length: Ideal edge length (optional)
+            weight: Edge weight/strength (optional)
+
+        Raises:
+            ValueError: If source or target is None
+        """
+        if source is None:
+            raise ValueError("Link source cannot be None")
+        if target is None:
+            raise ValueError("Link target cannot be None")
+
         self.source = source
         self.target = target
         self.length = length

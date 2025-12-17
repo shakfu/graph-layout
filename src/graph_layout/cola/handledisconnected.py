@@ -129,8 +129,9 @@ def _calculate_single_bb(graph: dict, node_size: float) -> None:
     max_y = -float('inf')
 
     for v in graph['array']:
-        w = getattr(v, 'width', node_size) / 2
-        h = getattr(v, 'height', node_size) / 2
+        # Use node's width/height if available and not None, else use node_size
+        w = (getattr(v, 'width', None) or node_size) / 2
+        h = (getattr(v, 'height', None) or node_size) / 2
 
         max_x = max(v.x + w, max_x)
         min_x = min(v.x - w, min_x)

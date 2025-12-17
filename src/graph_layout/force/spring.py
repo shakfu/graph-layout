@@ -14,6 +14,7 @@ import numpy as np
 from typing_extensions import Self
 
 from ..base import IterativeLayout
+from ..spatial.quadtree import Body, QuadTree
 from ..types import EventType
 
 
@@ -48,6 +49,10 @@ class SpringLayout(IterativeLayout):
         self._vel_x: Optional[np.ndarray] = None
         self._vel_y: Optional[np.ndarray] = None
         self._iteration: int = 0
+
+        # Barnes-Hut optimization
+        self._use_barnes_hut: bool = False
+        self._barnes_hut_theta: float = 0.5
 
     # -------------------------------------------------------------------------
     # Configuration Methods (Fluent API)
@@ -136,6 +141,30 @@ class SpringLayout(IterativeLayout):
         self._gravity = float(g)
         return self
 
+    def barnes_hut(
+        self, enabled: Optional[bool] = None, theta: Optional[float] = None
+    ) -> Union[bool, Self]:
+        """
+        Get or set Barnes-Hut approximation for repulsive forces.
+
+        Barnes-Hut reduces force calculation complexity from O(n^2) to O(n log n)
+        by approximating distant node clusters as single masses.
+
+        Args:
+            enabled: Enable/disable Barnes-Hut. If None, returns current enabled state.
+            theta: Accuracy parameter (0 = exact, 0.5 = balanced, 1.0+ = fast).
+                   Lower values are more accurate but slower.
+
+        Returns:
+            Current enabled state (bool) or self for chaining.
+        """
+        if enabled is None:
+            return self._use_barnes_hut
+        self._use_barnes_hut = bool(enabled)
+        if theta is not None:
+            self._barnes_hut_theta = max(0.0, float(theta))
+        return self
+
     # -------------------------------------------------------------------------
     # Layout Implementation
     # -------------------------------------------------------------------------
@@ -205,24 +234,11 @@ class SpringLayout(IterativeLayout):
         force_x = np.zeros(n)
         force_y = np.zeros(n)
 
-        # Repulsive forces between all pairs
-        for i in range(n):
-            for j in range(i + 1, n):
-                dx = self._nodes[i].x - self._nodes[j].x
-                dy = self._nodes[i].y - self._nodes[j].y
-                dist_sq = dx * dx + dy * dy
-                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
-
-                # Coulomb's law: F = k / d^2
-                if dist > 0:
-                    force = self._repulsion / dist_sq
-                    fx = (dx / dist) * force
-                    fy = (dy / dist) * force
-
-                    force_x[i] += fx
-                    force_y[i] += fy
-                    force_x[j] -= fx
-                    force_y[j] -= fy
+        # Repulsive forces
+        if self._use_barnes_hut and n > 50:
+            self._compute_repulsive_barnes_hut(force_x, force_y)
+        else:
+            self._compute_repulsive_naive(n, force_x, force_y)
 
         # Spring forces along edges (Hooke's law)
         for link in self._links:
@@ -291,6 +307,86 @@ class SpringLayout(IterativeLayout):
         })
 
         return converged
+
+    def _compute_repulsive_naive(
+        self, n: int, force_x: np.ndarray, force_y: np.ndarray
+    ) -> None:
+        """Compute repulsive forces using O(n^2) pairwise calculation."""
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx = self._nodes[i].x - self._nodes[j].x
+                dy = self._nodes[i].y - self._nodes[j].y
+                dist_sq = dx * dx + dy * dy
+                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+
+                # Coulomb's law: F = k / d^2
+                if dist > 0:
+                    force = self._repulsion / dist_sq
+                    fx = (dx / dist) * force
+                    fy = (dy / dist) * force
+
+                    force_x[i] += fx
+                    force_y[i] += fy
+                    force_x[j] -= fx
+                    force_y[j] -= fy
+
+    def _compute_repulsive_barnes_hut(
+        self, force_x: np.ndarray, force_y: np.ndarray
+    ) -> None:
+        """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""
+        # Build quadtree from current node positions
+        tree = QuadTree.from_nodes(
+            self._nodes,
+            padding=10.0,
+            theta=self._barnes_hut_theta
+        )
+
+        # Calculate force on each node using the tree
+        # We use the tree's structure but compute Coulomb forces (k/d^2)
+        for i, node in enumerate(self._nodes):
+            body = Body(node.x, node.y, mass=1.0, index=i)
+            fx, fy = self._calculate_coulomb_force(tree.root, body)
+            force_x[i] += fx
+            force_y[i] += fy
+
+    def _calculate_coulomb_force(
+        self, node: Any, body: Body
+    ) -> tuple[float, float]:
+        """Calculate Coulomb force on body from quadtree node."""
+        if node is None or node.is_empty():
+            return 0.0, 0.0
+
+        # Skip self-interaction
+        if node.is_leaf() and node.body is not None:
+            if node.body.index == body.index:
+                return 0.0, 0.0
+
+        dx = body.x - node.center_of_mass_x
+        dy = body.y - node.center_of_mass_y
+        dist_sq = dx * dx + dy * dy
+
+        if dist_sq < 1e-10:
+            return 0.0, 0.0
+
+        dist = math.sqrt(dist_sq)
+
+        # Barnes-Hut criterion: s/d < theta
+        if node.is_leaf() or (node.half_size * 2 / dist) < self._barnes_hut_theta:
+            # Coulomb's law: F = k * m / d^2
+            force = self._repulsion * node.total_mass / dist_sq
+            fx = (dx / dist) * force
+            fy = (dy / dist) * force
+            return fx, fy
+
+        # Recurse into children
+        fx, fy = 0.0, 0.0
+        if node.children:
+            for child in node.children:
+                if child is not None:
+                    cfx, cfy = self._calculate_coulomb_force(child, body)
+                    fx += cfx
+                    fy += cfy
+        return fx, fy
 
 
 __all__ = ["SpringLayout"]

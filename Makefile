@@ -75,7 +75,7 @@ format:
 
 # Lint code with ruff
 lint:
-	$(UV_RUN) ruff check $(ALL_DIRS)
+	$(UV_RUN) ruff check --fix $(ALL_DIRS)
 
 # Check formatting and linting without fixing
 check:

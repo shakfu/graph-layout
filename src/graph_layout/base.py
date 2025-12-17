@@ -18,6 +18,11 @@ from typing import Any, Callable, Optional, Union
 from typing_extensions import Self
 
 from .types import Event, EventType, Group, Link, Node
+from .validation import (
+    validate_canvas_size,
+    validate_group_indices,
+    validate_link_indices,
+)
 
 
 class BaseLayout(ABC):
@@ -145,10 +150,14 @@ class BaseLayout(ABC):
 
         Returns:
             Current size (if v is None) or self (for chaining).
+
+        Raises:
+            InvalidCanvasSizeError: If width or height is not positive.
         """
         if v is None:
             return self._canvas_size
-        self._canvas_size = [float(v[0]), float(v[1])]
+        width, height = validate_canvas_size(v)
+        self._canvas_size = [width, height]
         return self
 
     def random_seed(self, seed: Optional[int] = None) -> Union[Optional[int], Self]:
@@ -200,6 +209,31 @@ class BaseLayout(ABC):
         event_type = event.get('type')
         if event_type is not None and event_type in self._events:
             self._events[event_type](event)
+
+    # -------------------------------------------------------------------------
+    # Validation
+    # -------------------------------------------------------------------------
+
+    def validate(self) -> Self:
+        """
+        Validate current configuration.
+
+        Checks that all link/group references point to valid node indices.
+        Called automatically by start() but can be called early for fail-fast
+        behavior.
+
+        Returns:
+            self (for chaining)
+
+        Raises:
+            InvalidLinkError: If any link references an invalid node index.
+            InvalidGroupError: If any group references an invalid node/group index.
+        """
+        if self._links:
+            validate_link_indices(self._links, len(self._nodes), strict=True)
+        if self._groups:
+            validate_group_indices(self._groups, len(self._nodes), strict=True)
+        return self
 
     # -------------------------------------------------------------------------
     # Lifecycle Methods
@@ -308,13 +342,20 @@ class BaseLayout(ABC):
         return link.target.index if link.target.index is not None else 0
 
     def _build_adjacency(self) -> list[list[int]]:
-        """Build adjacency list from links."""
+        """Build adjacency list from links.
+
+        Invalid indices (out of bounds) are silently skipped to prevent crashes.
+        Use validate() first to ensure all indices are valid.
+        """
+        n = len(self._nodes)
         adj: list[list[int]] = [[] for _ in self._nodes]
         for link in self._links:
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
-            adj[src].append(tgt)
-            adj[tgt].append(src)
+            # Skip invalid indices to prevent IndexError
+            if 0 <= src < n and 0 <= tgt < n:
+                adj[src].append(tgt)
+                adj[tgt].append(src)
         return adj
 
 

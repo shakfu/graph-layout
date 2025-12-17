@@ -19,6 +19,7 @@ import numpy as np
 from typing_extensions import Self
 
 from ..base import IterativeLayout
+from ..spatial.quadtree import Body, QuadTree
 from ..types import EventType
 
 
@@ -55,6 +56,10 @@ class FruchtermanReingoldLayout(IterativeLayout):
         self._disp_x: Optional[np.ndarray] = None
         self._disp_y: Optional[np.ndarray] = None
         self._iteration: int = 0
+
+        # Barnes-Hut optimization
+        self._use_barnes_hut: bool = False
+        self._barnes_hut_theta: float = 0.5
 
     # -------------------------------------------------------------------------
     # Configuration Methods (Fluent API)
@@ -143,6 +148,30 @@ class FruchtermanReingoldLayout(IterativeLayout):
         if enabled is None:
             return self._center_gravity
         self._center_gravity = bool(enabled)
+        return self
+
+    def barnes_hut(
+        self, enabled: Optional[bool] = None, theta: Optional[float] = None
+    ) -> Union[bool, Self]:
+        """
+        Get or set Barnes-Hut approximation for repulsive forces.
+
+        Barnes-Hut reduces force calculation complexity from O(n^2) to O(n log n)
+        by approximating distant node clusters as single masses.
+
+        Args:
+            enabled: Enable/disable Barnes-Hut. If None, returns current enabled state.
+            theta: Accuracy parameter (0 = exact, 0.5 = balanced, 1.0+ = fast).
+                   Lower values are more accurate but slower.
+
+        Returns:
+            Current enabled state (bool) or self for chaining.
+        """
+        if enabled is None:
+            return self._use_barnes_hut
+        self._use_barnes_hut = bool(enabled)
+        if theta is not None:
+            self._barnes_hut_theta = max(0.0, float(theta))
         return self
 
     # -------------------------------------------------------------------------
@@ -239,24 +268,11 @@ class FruchtermanReingoldLayout(IterativeLayout):
         self._disp_x.fill(0)
         self._disp_y.fill(0)
 
-        # Calculate repulsive forces between all pairs
-        for i in range(n):
-            for j in range(i + 1, n):
-                dx = self._nodes[i].x - self._nodes[j].x
-                dy = self._nodes[i].y - self._nodes[j].y
-                dist_sq = dx * dx + dy * dy
-                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
-
-                # Repulsive force: f_r = k^2 / d
-                if dist > 0:
-                    force = k_sq / dist
-                    fx = (dx / dist) * force
-                    fy = (dy / dist) * force
-
-                    self._disp_x[i] += fx
-                    self._disp_y[i] += fy
-                    self._disp_x[j] -= fx
-                    self._disp_y[j] -= fy
+        # Calculate repulsive forces
+        if self._use_barnes_hut and n > 50:
+            self._compute_repulsive_barnes_hut(k_sq)
+        else:
+            self._compute_repulsive_naive(n, k_sq)
 
         # Calculate attractive forces along edges
         for link in self._links:
@@ -327,6 +343,44 @@ class FruchtermanReingoldLayout(IterativeLayout):
         })
 
         return False
+
+    def _compute_repulsive_naive(self, n: int, k_sq: float) -> None:
+        """Compute repulsive forces using O(n^2) pairwise calculation."""
+        assert self._disp_x is not None and self._disp_y is not None
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx = self._nodes[i].x - self._nodes[j].x
+                dy = self._nodes[i].y - self._nodes[j].y
+                dist_sq = dx * dx + dy * dy
+                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+
+                # Repulsive force: f_r = k^2 / d
+                if dist > 0:
+                    force = k_sq / dist
+                    fx = (dx / dist) * force
+                    fy = (dy / dist) * force
+
+                    self._disp_x[i] += fx
+                    self._disp_y[i] += fy
+                    self._disp_x[j] -= fx
+                    self._disp_y[j] -= fy
+
+    def _compute_repulsive_barnes_hut(self, k_sq: float) -> None:
+        """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""
+        assert self._disp_x is not None and self._disp_y is not None
+        # Build quadtree from current node positions
+        tree = QuadTree.from_nodes(
+            self._nodes,
+            padding=10.0,
+            theta=self._barnes_hut_theta
+        )
+
+        # Calculate force on each node using the tree
+        for i, node in enumerate(self._nodes):
+            body = Body(node.x, node.y, mass=1.0, index=i)
+            fx, fy = tree.calculate_force(body, repulsion_constant=k_sq)
+            self._disp_x[i] += fx
+            self._disp_y[i] += fy
 
 
 __all__ = ["FruchtermanReingoldLayout"]

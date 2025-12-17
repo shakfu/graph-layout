@@ -15,6 +15,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [0.3.0] - Validation, Metrics, and Performance
+
+### Added
+- **Input Validation Module** (`validation.py`):
+  - `validate_canvas_size()` - Rejects zero/negative canvas dimensions
+  - `validate_link_indices()` - Bounds-checks link source/target against node count
+  - `validate_group_indices()` - Validates group leaf/subgroup references
+  - Custom exceptions: `ValidationError`, `InvalidCanvasSizeError`, `InvalidLinkError`, `InvalidGroupError`
+  - Integrated into `base.py` size() method and `types.py` Link constructor
+
+- **Layout Quality Metrics Module** (`metrics.py`):
+  - `edge_crossings(nodes, links)` - Count intersecting edges
+  - `stress(nodes, links, ideal_edge_length)` - Measure distance deviation from ideal
+  - `edge_length_variance(nodes, links)` - Variance of edge lengths
+  - `edge_length_uniformity(nodes, links)` - Normalized uniformity score (0-1)
+  - `angular_resolution(nodes, links)` - Minimum angle between edges at nodes
+  - `layout_quality_summary(nodes, links)` - All metrics in one dict
+
+- **Cola Layout Adapter** (`cola/adapter.py`):
+  - `ColaLayoutAdapter` class wrapping Cola's `Layout` with `BaseLayout`-compatible interface
+  - Enables polymorphic usage with other layout algorithms
+  - Preserves access to Cola-specific features (constraints, overlap avoidance, groups)
+  - Consistent event forwarding (start, tick, end)
+
+- **Barnes-Hut Optimization** (`spatial/quadtree.py`):
+  - `QuadTree` class for spatial partitioning
+  - `Body` dataclass for node representation with mass
+  - O(n log n) approximate force calculation vs O(n^2) naive
+  - Configurable theta parameter for accuracy/speed tradeoff
+  - `QuadTree.from_nodes()` factory method for easy integration
+
+- **Barnes-Hut Integration in Force Layouts**:
+  - `FruchtermanReingoldLayout.barnes_hut(enabled, theta)` - Enable/configure approximation
+  - `SpringLayout.barnes_hut(enabled, theta)` - Enable/configure approximation
+  - Automatically activates for graphs with >50 nodes when enabled
+  - SpringLayout uses proper Coulomb force law (1/d^2) in Barnes-Hut mode
+
+- **Algorithm Assumption Warnings** (hierarchical layouts):
+  - `GraphStructureWarning` - Issued when Sugiyama layout receives cyclic graph (not a DAG)
+  - `TreeStructureWarning` - Issued when tree layouts receive non-tree graphs
+  - Warns on disconnected nodes unreachable from root
+  - Helps users identify when graph structure doesn't match algorithm assumptions
+
+- **New Tests**:
+  - `tests/test_validation.py` - Input validation tests
+  - `tests/test_metrics.py` - Layout quality metrics tests
+  - `tests/test_cola_adapter.py` - Cola adapter interface tests
+  - `tests/test_quadtree.py` - QuadTree and Barnes-Hut accuracy tests
+
+### Changed
+- `base.py`: Added validation in `size()` method, added `validate()` method for explicit validation
+- `types.py`: Link constructor now validates source/target are not None
+- Test count increased from 409 to 529
+- **Documented magic numbers**:
+  - `fruchterman_reingold.py`: Explained `_cooling_factor` and `_min_temperature` constants
+  - `descent.py`: Documented `ZERO_DISTANCE`, added `MIN_DIST_SQ` class constant with explanation
+
+### Fixed
+- `cola/handledisconnected.py`: Fixed TypeError when node width/height is None (now falls back to node_size)
+- `cola/descent.py`: Added missing `-> None` return type annotation on `Locks.__init__`
+
+---
+
 ## [0.2.0] - Multi-Algorithm Layout Library
 
 ### Added

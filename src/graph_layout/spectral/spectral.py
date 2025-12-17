@@ -7,12 +7,18 @@ This produces layouts that reveal graph structure and clustering.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union, cast
+from typing import Any, Callable, Optional, Sequence, cast
 
 import numpy as np
-from typing_extensions import Self
 
 from ..base import StaticLayout
+from ..types import (
+    Event,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
 
 
 class SpectralLayout(StaticLayout):
@@ -24,59 +30,89 @@ class SpectralLayout(StaticLayout):
     connected nodes close together and reveal community structure.
 
     Example:
-        layout = (SpectralLayout()
-            .nodes([{}, {}, {}, {}, {}])
-            .links([
+        layout = SpectralLayout(
+            nodes=[{}, {}, {}, {}, {}],
+            links=[
                 {'source': 0, 'target': 1},
                 {'source': 1, 'target': 2},
                 {'source': 2, 'target': 3},
                 {'source': 3, 'target': 4},
-            ])
-            .size([800, 600])
-            .start())
+            ],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._dimension: int = 2  # 2D or 3D layout
-        self._normalized: bool = True  # Use normalized Laplacian
-
-    # -------------------------------------------------------------------------
-    # Configuration Methods
-    # -------------------------------------------------------------------------
-
-    def dimension(self, d: Optional[int] = None) -> Union[int, Self]:
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # Spectral-specific parameters
+        dimension: int = 2,
+        normalized: bool = True,
+    ) -> None:
         """
-        Get or set the layout dimension (2 or 3).
+        Initialize Spectral layout.
 
         Args:
-            d: Dimension. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            dimension: Layout dimension (2 or 3).
+            normalized: Whether to use normalized Laplacian. Normalized
+                Laplacian often produces better layouts for graphs with
+                varying node degrees.
         """
-        if d is None:
-            return self._dimension
-        self._dimension = max(2, min(3, int(d)))
-        return self
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+        )
 
-    def normalized(self, norm: Optional[bool] = None) -> Union[bool, Self]:
-        """
-        Get or set whether to use normalized Laplacian.
+        # Spectral-specific configuration
+        self._dimension: int = max(2, min(3, int(dimension)))
+        self._normalized: bool = bool(normalized)
 
-        Normalized Laplacian often produces better layouts for graphs
-        with varying node degrees.
+    # -------------------------------------------------------------------------
+    # Properties
+    # -------------------------------------------------------------------------
 
-        Args:
-            norm: Whether to normalize. If None, returns current value.
+    @property
+    def dimension(self) -> int:
+        """Get layout dimension (2 or 3)."""
+        return self._dimension
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if norm is None:
-            return self._normalized
-        self._normalized = bool(norm)
-        return self
+    @dimension.setter
+    def dimension(self, value: int) -> None:
+        """Set layout dimension (clamped to 2-3)."""
+        self._dimension = max(2, min(3, int(value)))
+
+    @property
+    def normalized(self) -> bool:
+        """Get whether normalized Laplacian is used."""
+        return self._normalized
+
+    @normalized.setter
+    def normalized(self, value: bool) -> None:
+        """Set whether to use normalized Laplacian."""
+        self._normalized = bool(value)
 
     # -------------------------------------------------------------------------
     # Laplacian Computation

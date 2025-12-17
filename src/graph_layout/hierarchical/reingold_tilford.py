@@ -10,12 +10,24 @@ Extended with improvements from:
 
 from __future__ import annotations
 
+import warnings
 from collections import deque
-from typing import Any, Optional, Union
-
-from typing_extensions import Self
+from typing import Any, Callable, Optional, Sequence
 
 from ..base import StaticLayout
+from ..types import (
+    Event,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
+
+
+class TreeStructureWarning(UserWarning):
+    """Warning issued when graph structure doesn't match tree assumptions."""
+
+    pass
 
 
 class TreeNode:
@@ -54,99 +66,126 @@ class ReingoldTilfordLayout(StaticLayout):
     performing a traversal. Works best with actual tree graphs.
 
     Example:
-        layout = (ReingoldTilfordLayout()
-            .nodes([{}, {}, {}, {}, {}])
-            .links([
+        layout = ReingoldTilfordLayout(
+            nodes=[{}, {}, {}, {}, {}],
+            links=[
                 {'source': 0, 'target': 1},
                 {'source': 0, 'target': 2},
                 {'source': 1, 'target': 3},
                 {'source': 1, 'target': 4},
-            ])
-            .size([800, 600])
-            .start())
+            ],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._root_index: Optional[int] = None
-        self._node_separation: float = 1.0
-        self._level_separation: float = 1.0
-        self._orientation: str = 'top-to-bottom'  # or 'left-to-right', etc.
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # ReingoldTilford-specific parameters
+        root: Optional[int] = None,
+        node_separation: float = 1.0,
+        level_separation: float = 1.0,
+        orientation: str = 'top-to-bottom',
+    ) -> None:
+        """
+        Initialize Reingold-Tilford layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            root: Root node index. If None, auto-detected.
+            node_separation: Horizontal separation between sibling nodes.
+            level_separation: Vertical separation between tree levels.
+            orientation: Layout direction - 'top-to-bottom', 'bottom-to-top',
+                'left-to-right', or 'right-to-left'.
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+        )
+
+        # ReingoldTilford-specific configuration
+        self._root_index: Optional[int] = root
+        self._node_separation: float = float(node_separation)
+        self._level_separation: float = float(level_separation)
+        valid_orientations = {
+            'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'
+        }
+        if orientation not in valid_orientations:
+            raise ValueError(f"orientation must be one of {valid_orientations}")
+        self._orientation: str = orientation
 
         # Internal state
         self._tree_nodes: list[TreeNode] = []
-        self._root: Optional[TreeNode] = None
+        self._tree_root: Optional[TreeNode] = None
 
     # -------------------------------------------------------------------------
-    # Configuration Methods
+    # Properties
     # -------------------------------------------------------------------------
 
-    def root(self, index: Optional[int] = None) -> Union[Optional[int], Self]:
-        """
-        Get or set the root node index.
+    @property
+    def root(self) -> Optional[int]:
+        """Get root node index."""
+        return self._root_index
 
-        If not set, the algorithm finds a suitable root automatically.
+    @root.setter
+    def root(self, value: Optional[int]) -> None:
+        """Set root node index."""
+        self._root_index = value
 
-        Args:
-            index: Root node index. If None, returns current value.
+    @property
+    def node_separation(self) -> float:
+        """Get horizontal separation between sibling nodes."""
+        return self._node_separation
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if index is None:
-            return self._root_index
-        self._root_index = index
-        return self
+    @node_separation.setter
+    def node_separation(self, value: float) -> None:
+        """Set horizontal separation between sibling nodes."""
+        self._node_separation = float(value)
 
-    def node_separation(self, sep: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set horizontal separation between sibling nodes.
+    @property
+    def level_separation(self) -> float:
+        """Get vertical separation between tree levels."""
+        return self._level_separation
 
-        Args:
-            sep: Separation value. If None, returns current value.
+    @level_separation.setter
+    def level_separation(self, value: float) -> None:
+        """Set vertical separation between tree levels."""
+        self._level_separation = float(value)
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if sep is None:
-            return self._node_separation
-        self._node_separation = float(sep)
-        return self
+    @property
+    def orientation(self) -> str:
+        """Get tree orientation."""
+        return self._orientation
 
-    def level_separation(self, sep: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set vertical separation between tree levels.
-
-        Args:
-            sep: Separation value. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if sep is None:
-            return self._level_separation
-        self._level_separation = float(sep)
-        return self
-
-    def orientation(self, orient: Optional[str] = None) -> Union[str, Self]:
-        """
-        Get or set tree orientation.
-
-        Options: 'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'
-
-        Args:
-            orient: Orientation string. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if orient is None:
-            return self._orientation
+    @orientation.setter
+    def orientation(self, value: str) -> None:
+        """Set tree orientation."""
         valid = {'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'}
-        if orient not in valid:
+        if value not in valid:
             raise ValueError(f"orientation must be one of {valid}")
-        self._orientation = orient
-        return self
+        self._orientation = value
 
     # -------------------------------------------------------------------------
     # Tree Construction
@@ -174,6 +213,13 @@ class ReingoldTilfordLayout(StaticLayout):
                 return i
 
         # Fallback to node 0
+        warnings.warn(
+            "No root node found (all nodes have incoming edges). "
+            "This suggests the graph is not a tree. "
+            "Reingold-Tilford layout is designed for trees; results may be suboptimal.",
+            TreeStructureWarning,
+            stacklevel=4,
+        )
         return 0
 
     def _build_tree(self, root_idx: int) -> TreeNode:
@@ -190,10 +236,10 @@ class ReingoldTilfordLayout(StaticLayout):
             children[src].append(tgt)
 
         # BFS to build tree
-        root = self._tree_nodes[root_idx]
-        root.depth = 0
+        tree_root = self._tree_nodes[root_idx]
+        tree_root.depth = 0
         visited[root_idx] = True
-        queue = deque([root])
+        queue = deque([tree_root])
 
         while queue:
             node = queue.popleft()
@@ -207,9 +253,20 @@ class ReingoldTilfordLayout(StaticLayout):
                     queue.append(child)
 
         # Number siblings
-        self._number_siblings(root)
+        self._number_siblings(tree_root)
 
-        return root
+        # Check for disconnected nodes
+        unvisited = [i for i in range(n) if not visited[i]]
+        if unvisited:
+            warnings.warn(
+                f"Found {len(unvisited)} disconnected node(s) not reachable from root. "
+                "These nodes will be placed at arbitrary positions. "
+                "Reingold-Tilford layout is designed for connected trees.",
+                TreeStructureWarning,
+                stacklevel=3,
+            )
+
+        return tree_root
 
     def _number_siblings(self, node: TreeNode) -> None:
         """Assign sibling numbers (position among siblings)."""
@@ -382,11 +439,11 @@ class ReingoldTilfordLayout(StaticLayout):
         if root_idx < 0:
             return
 
-        self._root = self._build_tree(root_idx)
+        self._tree_root = self._build_tree(root_idx)
 
         # Run Reingold-Tilford
-        self._first_walk(self._root)
-        self._second_walk(self._root)
+        self._first_walk(self._tree_root)
+        self._second_walk(self._tree_root)
 
         # Apply orientation and scale to fit canvas
         self._apply_layout()
@@ -433,4 +490,4 @@ class ReingoldTilfordLayout(StaticLayout):
                 node.y = padding + nx * canvas_h
 
 
-__all__ = ["ReingoldTilfordLayout"]
+__all__ = ["ReingoldTilfordLayout", "TreeStructureWarning"]

@@ -14,13 +14,19 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from typing import Any, Optional, Union, cast
+from typing import Any, Callable, Optional, Sequence, cast
 
 import numpy as np
-from typing_extensions import Self
 
 from ..base import IterativeLayout
-from ..types import EventType
+from ..types import (
+    Event,
+    EventType,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
 
 
 class KamadaKawaiLayout(IterativeLayout):
@@ -35,19 +41,79 @@ class KamadaKawaiLayout(IterativeLayout):
     partial derivative of energy) until convergence.
 
     Example:
-        layout = (KamadaKawaiLayout()
-            .nodes([{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}])
-            .links([{'source': 0, 'target': 1}, {'source': 1, 'target': 2}])
-            .size([800, 600])
-            .start())
+        layout = KamadaKawaiLayout(
+            nodes=[{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}],
+            links=[{'source': 0, 'target': 1}, {'source': 1, 'target': 2}],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._edge_length: float = 100.0
-        self._epsilon: float = 0.0001
-        self._max_inner_iterations: int = 30
-        self._disconnected_distance: Optional[float] = None
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # IterativeLayout parameters
+        alpha: float = 1.0,
+        alpha_min: float = 0.001,
+        alpha_decay: float = 0.99,
+        iterations: int = 300,
+        # KamadaKawai-specific parameters
+        edge_length: float = 100.0,
+        epsilon: float = 0.0001,
+        disconnected_distance: Optional[float] = None,
+        max_inner_iterations: int = 30,
+    ) -> None:
+        """
+        Initialize Kamada-Kawai layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            alpha: Initial alpha/temperature (0 to 1)
+            alpha_min: Minimum alpha for convergence threshold
+            alpha_decay: Alpha decay rate per iteration (0 to 1)
+            iterations: Maximum outer iterations
+            edge_length: Ideal length for a single edge. Multi-hop paths will have
+                ideal lengths that are multiples of this.
+            epsilon: Convergence threshold for gradient magnitude.
+            disconnected_distance: Distance for disconnected pairs. If None, uses
+                diameter * 1.5.
+            max_inner_iterations: Maximum Newton-Raphson iterations per node move.
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+            alpha=alpha,
+            alpha_min=alpha_min,
+            alpha_decay=alpha_decay,
+            iterations=iterations,
+        )
+
+        # KamadaKawai-specific configuration
+        self._edge_length: float = float(edge_length)
+        self._epsilon: float = float(epsilon)
+        self._disconnected_distance: Optional[float] = disconnected_distance
+        self._max_inner_iterations: int = int(max_inner_iterations)
 
         # Internal state
         self._dist_matrix: Optional[np.ndarray] = None
@@ -56,61 +122,48 @@ class KamadaKawaiLayout(IterativeLayout):
         self._iteration: int = 0
 
     # -------------------------------------------------------------------------
-    # Configuration Methods (Fluent API)
+    # Properties
     # -------------------------------------------------------------------------
 
-    def edge_length(self, length: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the ideal length for a single edge.
+    @property
+    def edge_length(self) -> float:
+        """Get ideal length for a single edge."""
+        return self._edge_length
 
-        Multi-hop paths will have ideal lengths that are multiples of this.
+    @edge_length.setter
+    def edge_length(self, value: float) -> None:
+        """Set ideal length for a single edge."""
+        self._edge_length = float(value)
 
-        Args:
-            length: Edge length. If None, returns current value.
+    @property
+    def epsilon(self) -> float:
+        """Get convergence threshold."""
+        return self._epsilon
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if length is None:
-            return self._edge_length
-        self._edge_length = float(length)
-        return self
+    @epsilon.setter
+    def epsilon(self, value: float) -> None:
+        """Set convergence threshold."""
+        self._epsilon = float(value)
 
-    def epsilon(self, e: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the convergence threshold.
+    @property
+    def disconnected_distance(self) -> Optional[float]:
+        """Get distance for disconnected node pairs."""
+        return self._disconnected_distance
 
-        The algorithm stops when the maximum gradient is below this value.
+    @disconnected_distance.setter
+    def disconnected_distance(self, value: Optional[float]) -> None:
+        """Set distance for disconnected node pairs."""
+        self._disconnected_distance = float(value) if value is not None else None
 
-        Args:
-            e: Epsilon threshold. If None, returns current value.
+    @property
+    def max_inner_iterations(self) -> int:
+        """Get maximum Newton-Raphson iterations per node move."""
+        return self._max_inner_iterations
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if e is None:
-            return self._epsilon
-        self._epsilon = float(e)
-        return self
-
-    def disconnected_distance(
-        self, d: Optional[float] = None
-    ) -> Union[Optional[float], Self]:
-        """
-        Get or set the distance to use for disconnected node pairs.
-
-        If None, disconnected pairs are placed at diameter * 1.5.
-
-        Args:
-            d: Distance for disconnected pairs. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if d is None:
-            return self._disconnected_distance
-        self._disconnected_distance = float(d) if d else None
-        return self
+    @max_inner_iterations.setter
+    def max_inner_iterations(self, value: int) -> None:
+        """Set maximum Newton-Raphson iterations per node move."""
+        self._max_inner_iterations = int(value)
 
     # -------------------------------------------------------------------------
     # Layout Implementation
@@ -288,12 +341,11 @@ class KamadaKawaiLayout(IterativeLayout):
             self._nodes[m].x += delta_x
             self._nodes[m].y += delta_y
 
-    def start(self, **kwargs: Any) -> Self:
+    def run(self, **kwargs: Any) -> "KamadaKawaiLayout":
         """
-        Start the layout algorithm.
+        Run the layout algorithm.
 
         Keyword Args:
-            iterations: Maximum outer iterations (default: 300)
             random_init: Initialize positions randomly (default: True)
             center_graph: Center graph after completion (default: True)
 
@@ -302,7 +354,6 @@ class KamadaKawaiLayout(IterativeLayout):
         """
         self._initialize_indices()
 
-        iterations = kwargs.get('iterations', self._iterations)
         random_init = kwargs.get('random_init', True)
         center = kwargs.get('center_graph', True)
 
@@ -316,7 +367,6 @@ class KamadaKawaiLayout(IterativeLayout):
         # Initialize matrices
         self._initialize_matrices()
         self._iteration = 0
-        self._iterations = iterations
         self._alpha = 1.0
 
         # Fire start event
@@ -342,7 +392,7 @@ class KamadaKawaiLayout(IterativeLayout):
         Returns:
             True if converged, False otherwise.
         """
-        # These are set in start() before tick() is called
+        # These are set in run() before tick() is called
         assert self._k_matrix is not None
         assert self._l_matrix is not None
 

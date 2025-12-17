@@ -87,7 +87,10 @@ warn_return_any = true
 
 # Legacy cola modules have less strict typing (ported from JavaScript)
 # These use dynamic patterns (fluent API with getter/setter overloads) that
-# don't fit well with static typing
+# don't fit well with static typing.
+# Known issues: 146 mypy errors when strict checking is enabled.
+# Main causes: Optional handling, Union types from getter/setter pattern,
+# dynamic attribute access on ported JavaScript objects.
 [[tool.mypy.overrides]]
 module = [
     "graph_layout.cola.layout",

@@ -64,9 +64,13 @@ from .types import (
     Event,
     EventType,
     Group,
+    GroupLike,
     Link,
     LinkAccessor,
+    LinkLike,
     Node,
+    NodeLike,
+    SizeType,
     is_group,
 )
 
@@ -92,6 +96,11 @@ __all__ = [
     "Event",
     "is_group",
     "LinkAccessor",
+    # Type aliases for API
+    "NodeLike",
+    "LinkLike",
+    "GroupLike",
+    "SizeType",
     # Base classes
     "BaseLayout",
     "IterativeLayout",

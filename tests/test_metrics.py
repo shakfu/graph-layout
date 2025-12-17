@@ -288,12 +288,17 @@ class TestMetricsWithRealLayout:
             {"source": 5, "target": 0},  # Cycle
         ]
 
-        layout = FruchtermanReingoldLayout()
-        layout.nodes(nodes).links(links).size([500, 500]).random_seed(42)
-        layout.start(iterations=100)
+        layout = FruchtermanReingoldLayout(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+            random_seed=42,
+            iterations=100,
+        )
+        layout.run()
 
-        result_nodes = layout.nodes()
-        result_links = layout.links()
+        result_nodes = layout.nodes
+        result_links = layout.links
 
         summary = layout_quality_summary(result_nodes, result_links)
 

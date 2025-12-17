@@ -8,81 +8,73 @@ from graph_layout.cola.adapter import ColaLayoutAdapter
 class TestColaAdapterBaseInterface:
     """Test BaseLayout interface compatibility."""
 
-    def test_fluent_api(self):
-        """Test fluent API chaining."""
+    def test_pythonic_api(self):
+        """Test Pythonic API with constructor parameters."""
         nodes = [{"x": 0, "y": 0}, {"x": 100, "y": 0}]
         links = [{"source": 0, "target": 1}]
 
-        layout = (
-            ColaLayoutAdapter()
-            .nodes(nodes)
-            .links(links)
-            .size([500, 500])
-            .iterations(50)
+        layout = ColaLayoutAdapter(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+            iterations=50,
         )
 
         assert layout is not None
-        assert len(layout.nodes()) == 2
-        assert len(layout.links()) == 1
+        assert len(layout.nodes) == 2
+        assert len(layout.links) == 1
 
-    def test_nodes_getter_setter(self):
-        """Test nodes() as both getter and setter."""
+    def test_nodes_property(self):
+        """Test nodes property getter and setter."""
         layout = ColaLayoutAdapter()
 
         # Setter
-        result = layout.nodes([{"x": 0, "y": 0}, {"x": 100, "y": 0}])
-        assert result is layout  # Returns self
+        layout.nodes = [{"x": 0, "y": 0}, {"x": 100, "y": 0}]
 
         # Getter
-        nodes = layout.nodes()
-        assert len(nodes) == 2
+        assert len(layout.nodes) == 2
 
-    def test_links_getter_setter(self):
-        """Test links() as both getter and setter."""
-        layout = ColaLayoutAdapter()
-        layout.nodes([{}, {}])
+    def test_links_property(self):
+        """Test links property getter and setter."""
+        layout = ColaLayoutAdapter(nodes=[{}, {}])
 
         # Setter
-        result = layout.links([{"source": 0, "target": 1}])
-        assert result is layout
+        layout.links = [{"source": 0, "target": 1}]
 
         # Getter
-        links = layout.links()
-        assert len(links) == 1
+        assert len(layout.links) == 1
 
-    def test_size_getter_setter(self):
-        """Test size() as both getter and setter."""
+    def test_size_property(self):
+        """Test size property getter and setter."""
         layout = ColaLayoutAdapter()
 
         # Setter
-        result = layout.size([800, 600])
-        assert result is layout
+        layout.size = (800, 600)
 
         # Getter
-        size = layout.size()
-        assert size == [800, 600]
+        assert layout.size == (800, 600)
 
     def test_size_validation(self):
         """Test that size validation is inherited."""
         from graph_layout.validation import InvalidCanvasSizeError
 
-        layout = ColaLayoutAdapter()
         with pytest.raises(InvalidCanvasSizeError):
-            layout.size([-100, 600])
+            ColaLayoutAdapter(size=(-100, 600))
 
-    def test_iterations_getter_setter(self):
-        """Test iterations() as both getter and setter."""
-        layout = ColaLayoutAdapter()
+    def test_iterations_property(self):
+        """Test iterations property getter and setter."""
+        layout = ColaLayoutAdapter(iterations=200)
+        assert layout.iterations == 200
 
-        layout.iterations(200)
-        assert layout.iterations() == 200
+        layout.iterations = 300
+        assert layout.iterations == 300
 
 
 class TestColaAdapterLayout:
     """Test layout execution."""
 
-    def test_start_runs_layout(self):
-        """Test that start() runs the layout."""
+    def test_run_executes_layout(self):
+        """Test that run() executes the layout."""
         nodes = [{"x": 0, "y": 0}, {"x": 100, "y": 0}, {"x": 50, "y": 100}]
         links = [
             {"source": 0, "target": 1},
@@ -90,14 +82,16 @@ class TestColaAdapterLayout:
             {"source": 2, "target": 0},
         ]
 
-        layout = ColaLayoutAdapter()
-        layout.nodes(nodes).links(links).size([500, 500])
-        layout.start(iterations=10, keep_running=False)
+        layout = ColaLayoutAdapter(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+        )
+        layout.run(all_constraints_iterations=10, keep_running=False)
 
-        result = layout.nodes()
-        assert len(result) == 3
+        assert len(layout.nodes) == 3
         # Nodes should have positions
-        for node in result:
+        for node in layout.nodes:
             assert hasattr(node, "x")
             assert hasattr(node, "y")
 
@@ -107,12 +101,15 @@ class TestColaAdapterLayout:
         links = [{"source": 0, "target": 1}]
         events = []
 
-        layout = ColaLayoutAdapter()
-        layout.nodes(nodes).links(links).size([500, 500])
-        layout.on("start", lambda e: events.append("start"))
-        layout.on("end", lambda e: events.append("end"))
+        layout = ColaLayoutAdapter(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+            on_start=lambda e: events.append("start"),
+            on_end=lambda e: events.append("end"),
+        )
 
-        layout.start(iterations=10, keep_running=False)
+        layout.run(all_constraints_iterations=10, keep_running=False)
 
         assert "start" in events
         assert "end" in events
@@ -123,14 +120,16 @@ class TestColaAdapterLayout:
         links = [{"source": 0, "target": 1}]
         tick_count = [0]
 
-        layout = ColaLayoutAdapter()
-        layout.nodes(nodes).links(links).size([500, 500])
-        layout.on("tick", lambda e: tick_count.__setitem__(0, tick_count[0] + 1))
+        layout = ColaLayoutAdapter(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+            convergence_threshold=0.1,
+            on_tick=lambda e: tick_count.__setitem__(0, tick_count[0] + 1),
+        )
 
         # Use keep_running=True so tick events are fired
-        # Set a low convergence threshold so it stops quickly
-        layout.convergence_threshold(0.1)
-        layout.start(iterations=10, keep_running=True)
+        layout.run(all_constraints_iterations=10, keep_running=True)
 
         # Should have at least one tick
         assert tick_count[0] > 0
@@ -140,69 +139,60 @@ class TestColaAdapterSpecificFeatures:
     """Test Cola-specific features are accessible."""
 
     def test_avoid_overlaps(self):
-        """Test avoid_overlaps() getter/setter."""
+        """Test avoid_overlaps property getter/setter."""
         layout = ColaLayoutAdapter()
-        assert layout.avoid_overlaps() is False
+        assert layout.avoid_overlaps is False
 
-        layout.avoid_overlaps(True)
-        assert layout.avoid_overlaps() is True
+        layout.avoid_overlaps = True
+        assert layout.avoid_overlaps is True
 
     def test_handle_disconnected(self):
-        """Test handle_disconnected() getter/setter."""
+        """Test handle_disconnected property getter/setter."""
         layout = ColaLayoutAdapter()
         # Default is True
-        assert layout.handle_disconnected() is True
+        assert layout.handle_disconnected is True
 
-        layout.handle_disconnected(False)
-        assert layout.handle_disconnected() is False
+        layout.handle_disconnected = False
+        assert layout.handle_disconnected is False
 
     def test_convergence_threshold(self):
-        """Test convergence_threshold() getter/setter."""
-        layout = ColaLayoutAdapter()
+        """Test convergence_threshold property getter/setter."""
+        layout = ColaLayoutAdapter(convergence_threshold=0.001)
+        assert layout.convergence_threshold == 0.001
 
-        layout.convergence_threshold(0.001)
-        assert layout.convergence_threshold() == 0.001
+        layout.convergence_threshold = 0.01
+        assert layout.convergence_threshold == 0.01
 
     def test_link_distance_fixed(self):
-        """Test link_distance() with fixed value."""
-        layout = ColaLayoutAdapter()
-
-        layout.link_distance(100)
-        assert layout.link_distance() == 100
+        """Test link_distance property with fixed value."""
+        layout = ColaLayoutAdapter(link_distance=100)
+        assert layout.link_distance == 100
 
     def test_link_distance_function(self):
-        """Test link_distance() with function."""
-        layout = ColaLayoutAdapter()
-
+        """Test link_distance property with function."""
         def distance_fn(link):
             return 50
 
-        layout.link_distance(distance_fn)
+        layout = ColaLayoutAdapter(link_distance=distance_fn)
         # Should accept function
-        result = layout.link_distance()
-        assert callable(result)
+        assert callable(layout.link_distance)
 
     def test_constraints(self):
-        """Test constraints() getter/setter."""
-        layout = ColaLayoutAdapter()
+        """Test constraints property getter/setter."""
         constraint = {"axis": "x", "left": 0, "right": 1, "gap": 50}
 
-        layout.constraints([constraint])
-        assert len(layout.constraints()) == 1
+        layout = ColaLayoutAdapter(constraints=[constraint])
+        assert len(layout.constraints) == 1
 
     def test_default_node_size(self):
-        """Test default_node_size() getter/setter."""
-        layout = ColaLayoutAdapter()
-
-        layout.default_node_size(20)
-        assert layout.default_node_size() == 20
+        """Test default_node_size property getter/setter."""
+        layout = ColaLayoutAdapter(default_node_size=20)
+        assert layout.default_node_size == 20
 
     def test_group_compactness(self):
-        """Test group_compactness() getter/setter."""
-        layout = ColaLayoutAdapter()
-
-        layout.group_compactness(0.001)
-        assert layout.group_compactness() == 0.001
+        """Test group_compactness property getter/setter."""
+        layout = ColaLayoutAdapter(group_compactness=0.001)
+        assert layout.group_compactness == 0.001
 
     def test_access_underlying_cola(self):
         """Test that underlying Cola is accessible."""
@@ -230,8 +220,7 @@ class TestColaAdapterSpecificFeatures:
             {"source": 1, "target": 2},
         ]
 
-        layout = ColaLayoutAdapter()
-        layout.nodes(nodes).links(links)
+        layout = ColaLayoutAdapter(nodes=nodes, links=links)
 
         # Should return self for chaining
         result = layout.symmetric_diff_link_lengths(100, w=1.0)
@@ -245,8 +234,7 @@ class TestColaAdapterSpecificFeatures:
             {"source": 1, "target": 2},
         ]
 
-        layout = ColaLayoutAdapter()
-        layout.nodes(nodes).links(links)
+        layout = ColaLayoutAdapter(nodes=nodes, links=links)
 
         result = layout.jaccard_link_lengths(100, w=1.0)
         assert result is layout
@@ -255,17 +243,14 @@ class TestColaAdapterSpecificFeatures:
 class TestColaAdapterWithGroups:
     """Test Cola adapter with group functionality."""
 
-    def test_groups_getter_setter(self):
-        """Test groups() as both getter and setter."""
-        layout = ColaLayoutAdapter()
-        layout.nodes([{}, {}, {}])
+    def test_groups_property(self):
+        """Test groups property getter and setter."""
+        layout = ColaLayoutAdapter(nodes=[{}, {}, {}])
 
         groups = [{"leaves": [0, 1]}]
-        result = layout.groups(groups)
-        assert result is layout
+        layout.groups = groups
 
-        retrieved = layout.groups()
-        assert len(retrieved) == 1
+        assert len(layout.groups) == 1
 
     def test_layout_with_groups(self):
         """Test layout execution with groups."""
@@ -276,12 +261,15 @@ class TestColaAdapterWithGroups:
         ]
         groups = [{"leaves": [0, 1], "padding": 10}]
 
-        layout = ColaLayoutAdapter()
-        layout.nodes(nodes).links(links).groups(groups).size([500, 500])
-        layout.start(iterations=10, keep_running=False)
+        layout = ColaLayoutAdapter(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=(500, 500),
+        )
+        layout.run(all_constraints_iterations=10, keep_running=False)
 
-        result = layout.nodes()
-        assert len(result) == 3
+        assert len(layout.nodes) == 3
 
 
 class TestColaAdapterPolymorphism:
@@ -291,13 +279,13 @@ class TestColaAdapterPolymorphism:
         """Test that ColaLayoutAdapter has same interface as force layouts."""
         from graph_layout import FruchtermanReingoldLayout
 
-        # Both should have these methods
+        # Both should have these properties/methods
         for LayoutClass in [ColaLayoutAdapter, FruchtermanReingoldLayout]:
             layout = LayoutClass()
             assert hasattr(layout, "nodes")
             assert hasattr(layout, "links")
             assert hasattr(layout, "size")
-            assert hasattr(layout, "start")
+            assert hasattr(layout, "run")
             assert hasattr(layout, "stop")
             assert hasattr(layout, "on")
             assert hasattr(layout, "iterations")
@@ -315,13 +303,22 @@ class TestColaAdapterPolymorphism:
         ]
 
         def run_layout(layout_class):
-            layout = layout_class()
-            layout.nodes(nodes).links(links).size([500, 500])
-            if isinstance(layout, ColaLayoutAdapter):
-                layout.start(iterations=10, keep_running=False)
+            if layout_class == ColaLayoutAdapter:
+                layout = layout_class(
+                    nodes=nodes,
+                    links=links,
+                    size=(500, 500),
+                )
+                layout.run(all_constraints_iterations=10, keep_running=False)
             else:
-                layout.start(iterations=10)
-            return layout.nodes()
+                layout = layout_class(
+                    nodes=nodes,
+                    links=links,
+                    size=(500, 500),
+                    iterations=10,
+                )
+                layout.run()
+            return layout.nodes
 
         # Both should produce valid results
         cola_result = run_layout(ColaLayoutAdapter)
@@ -334,18 +331,15 @@ class TestColaAdapterPolymorphism:
 class TestColaAdapterAlphaMapping:
     """Test alpha and alpha_min mapping."""
 
-    def test_alpha_min_maps_to_convergence_threshold(self):
-        """Test that alpha_min maps to convergence_threshold."""
+    def test_alpha_min_property(self):
+        """Test alpha_min property."""
+        layout = ColaLayoutAdapter(alpha_min=0.005)
+        assert layout.alpha_min == 0.005
+
+    def test_alpha_property(self):
+        """Test alpha property returns sensible value."""
         layout = ColaLayoutAdapter()
 
-        layout.alpha_min(0.005)
-        assert layout.alpha_min() == 0.005
-        assert layout.convergence_threshold() == 0.005
-
-    def test_alpha_getter(self):
-        """Test alpha getter returns sensible value."""
-        layout = ColaLayoutAdapter()
-
-        # Before start, alpha should be 0
-        alpha = layout.alpha()
-        assert alpha == 0.0
+        # Before run, alpha should be initial value
+        alpha = layout.alpha
+        assert alpha == 1.0

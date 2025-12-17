@@ -4,7 +4,7 @@ Base classes for graph layout algorithms.
 This module provides abstract base classes that define the common interface
 and shared functionality for all layout algorithms:
 
-- BaseLayout: Abstract base with event system, node/link management, fluent API
+- BaseLayout: Abstract base with event system, node/link management
 - IterativeLayout: For animated layouts with tick loop (force-directed, etc.)
 - StaticLayout: For single-pass layouts (circular, tree, etc.)
 """
@@ -13,11 +13,21 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Sequence
 
 from typing_extensions import Self
 
-from .types import Event, EventType, Group, Link, Node
+from .types import (
+    Event,
+    EventType,
+    Group,
+    GroupLike,
+    Link,
+    LinkLike,
+    Node,
+    NodeLike,
+    SizeType,
+)
 from .validation import (
     validate_canvas_size,
     validate_group_indices,
@@ -31,41 +41,88 @@ class BaseLayout(ABC):
 
     Provides shared infrastructure:
     - Event system (start/tick/end events)
-    - Fluent configuration API (method chaining)
-    - Node/link/group management
+    - Node/link/group management via properties
     - Position initialization
     - Canvas size management
+
+    Example:
+        layout = SomeLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+        )
+        layout.run()
+
+        # Access results via properties
+        for node in layout.nodes:
+            print(f"Node {node.index}: ({node.x}, {node.y})")
     """
 
-    def __init__(self) -> None:
-        """Initialize layout with default parameters."""
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+    ) -> None:
+        """
+        Initialize layout with configuration.
+
+        Args:
+            nodes: List of nodes (Node objects, dicts, or objects with attributes)
+            links: List of links (Link objects or dicts with source/target)
+            groups: List of groups (Group objects or dicts)
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event (iterative layouts)
+            on_end: Callback for end event
+        """
         self._nodes: list[Node] = []
         self._links: list[Link] = []
         self._groups: list[Group] = []
-        self._canvas_size: list[float] = [1.0, 1.0]
+        self._canvas_size: tuple[float, float] = (1.0, 1.0)
         self._events: dict[EventType, Callable[[Optional[Event]], None]] = {}
         self._random_seed: Optional[int] = None
 
+        # Set initial values via properties (triggers normalization)
+        if nodes is not None:
+            self.nodes = nodes
+        if links is not None:
+            self.links = links
+        if groups is not None:
+            self.groups = groups
+        self.size = size
+        if random_seed is not None:
+            self.random_seed = random_seed
+
+        # Register event callbacks
+        if on_start:
+            self._events[EventType.start] = on_start
+        if on_tick:
+            self._events[EventType.tick] = on_tick
+        if on_end:
+            self._events[EventType.end] = on_end
+
     # -------------------------------------------------------------------------
-    # Fluent Configuration API
+    # Properties
     # -------------------------------------------------------------------------
 
-    def nodes(self, v: Optional[list[Any]] = None) -> Union[list[Node], Self]:
-        """
-        Get or set nodes.
+    @property
+    def nodes(self) -> list[Node]:
+        """Get the list of nodes."""
+        return self._nodes
 
-        Args:
-            v: List of nodes (Node objects, dicts, or objects with attributes).
-               If None, returns current nodes.
-
-        Returns:
-            Current nodes (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._nodes
-
+    @nodes.setter
+    def nodes(self, value: Sequence[NodeLike]) -> None:
+        """Set nodes from a sequence of Node objects, dicts, or objects."""
         self._nodes = []
-        for node_data in v:
+        for node_data in value:
             if isinstance(node_data, Node):
                 self._nodes.append(node_data)
             elif isinstance(node_data, dict):
@@ -81,24 +138,17 @@ class BaseLayout(ABC):
                     if not attr.startswith('_') and not hasattr(node, attr):
                         setattr(node, attr, getattr(node_data, attr))
                 self._nodes.append(node)
-        return self
 
-    def links(self, v: Optional[list[Any]] = None) -> Union[list[Link], Self]:
-        """
-        Get or set links.
+    @property
+    def links(self) -> list[Link]:
+        """Get the list of links."""
+        return self._links
 
-        Args:
-            v: List of links (Link objects or dicts with source/target).
-               If None, returns current links.
-
-        Returns:
-            Current links (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._links
-
+    @links.setter
+    def links(self, value: Sequence[LinkLike]) -> None:
+        """Set links from a sequence of Link objects, dicts, or objects."""
         self._links = []
-        for link_data in v:
+        for link_data in value:
             if isinstance(link_data, Link):
                 self._links.append(link_data)
             elif isinstance(link_data, dict):
@@ -110,24 +160,17 @@ class BaseLayout(ABC):
                 length = getattr(link_data, 'length', None)
                 weight = getattr(link_data, 'weight', None)
                 self._links.append(Link(source, target, length, weight))
-        return self
 
-    def groups(self, v: Optional[list[Any]] = None) -> Union[list[Group], Self]:
-        """
-        Get or set groups.
+    @property
+    def groups(self) -> list[Group]:
+        """Get the list of groups."""
+        return self._groups
 
-        Args:
-            v: List of groups (Group objects or dicts).
-               If None, returns current groups.
-
-        Returns:
-            Current groups (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._groups
-
+    @groups.setter
+    def groups(self, value: Sequence[GroupLike]) -> None:
+        """Set groups from a sequence of Group objects, dicts, or objects."""
         self._groups = []
-        for group_data in v:
+        for group_data in value:
             if isinstance(group_data, Group):
                 self._groups.append(group_data)
             elif isinstance(group_data, dict):
@@ -138,42 +181,35 @@ class BaseLayout(ABC):
                     if hasattr(group_data, attr):
                         setattr(group, attr, getattr(group_data, attr))
                 self._groups.append(group)
-        return self
 
-    def size(self, v: Optional[list[float]] = None) -> Union[list[float], Self]:
+    @property
+    def size(self) -> tuple[float, float]:
+        """Get canvas size as (width, height)."""
+        return self._canvas_size
+
+    @size.setter
+    def size(self, value: SizeType) -> None:
         """
-        Get or set canvas size.
+        Set canvas size.
 
         Args:
-            v: [width, height] of the layout area.
-               If None, returns current size.
-
-        Returns:
-            Current size (if v is None) or self (for chaining).
+            value: (width, height) tuple, list, or sequence
 
         Raises:
             InvalidCanvasSizeError: If width or height is not positive.
         """
-        if v is None:
-            return self._canvas_size
-        width, height = validate_canvas_size(v)
-        self._canvas_size = [width, height]
-        return self
+        width, height = validate_canvas_size(value)
+        self._canvas_size = (width, height)
 
-    def random_seed(self, seed: Optional[int] = None) -> Union[Optional[int], Self]:
-        """
-        Get or set random seed for reproducible layouts.
+    @property
+    def random_seed(self) -> Optional[int]:
+        """Get random seed for reproducible layouts."""
+        return self._random_seed
 
-        Args:
-            seed: Random seed value. If None (getter), returns current seed.
-
-        Returns:
-            Current seed (if called as getter) or self (for chaining).
-        """
-        if seed is None:
-            return self._random_seed
-        self._random_seed = seed
-        return self
+    @random_seed.setter
+    def random_seed(self, value: Optional[int]) -> None:
+        """Set random seed for reproducible layouts."""
+        self._random_seed = value
 
     # -------------------------------------------------------------------------
     # Event System
@@ -181,7 +217,7 @@ class BaseLayout(ABC):
 
     def on(
         self,
-        event: Union[EventType, str],
+        event: EventType | str,
         callback: Callable[[Optional[Event]], None]
     ) -> Self:
         """
@@ -219,7 +255,7 @@ class BaseLayout(ABC):
         Validate current configuration.
 
         Checks that all link/group references point to valid node indices.
-        Called automatically by start() but can be called early for fail-fast
+        Called automatically by run() but can be called early for fail-fast
         behavior.
 
         Returns:
@@ -240,7 +276,7 @@ class BaseLayout(ABC):
     # -------------------------------------------------------------------------
 
     @abstractmethod
-    def start(self, **kwargs: Any) -> Self:
+    def run(self, **kwargs: Any) -> Self:
         """
         Run the layout algorithm.
 
@@ -367,75 +403,115 @@ class IterativeLayout(BaseLayout):
     - Alpha (temperature/cooling) management
     - Tick-based iteration loop
     - Convergence checking
+
+    Example:
+        layout = SomeForceLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            iterations=300,
+            alpha_min=0.001,
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._alpha: float = 1.0
-        self._alpha_min: float = 0.001
-        self._alpha_decay: float = 0.99
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # IterativeLayout-specific parameters
+        alpha: float = 1.0,
+        alpha_min: float = 0.001,
+        alpha_decay: float = 0.99,
+        iterations: int = 300,
+    ) -> None:
+        """
+        Initialize iterative layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            alpha: Initial alpha/temperature (0 to 1)
+            alpha_min: Minimum alpha for convergence threshold
+            alpha_decay: Alpha decay rate per iteration (0 to 1)
+            iterations: Maximum number of iterations
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+        )
+        self._alpha: float = max(0.0, min(1.0, float(alpha)))
+        self._alpha_min: float = float(alpha_min)
+        self._alpha_decay: float = max(0.0, min(1.0, float(alpha_decay)))
         self._running: bool = False
-        self._iterations: int = 300
+        self._iterations: int = max(1, int(iterations))
 
-    def alpha(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set alpha (temperature/energy).
+    # -------------------------------------------------------------------------
+    # Properties
+    # -------------------------------------------------------------------------
 
-        Args:
-            v: Alpha value (0 to 1). If None, returns current alpha.
+    @property
+    def alpha(self) -> float:
+        """Get current alpha (temperature/energy)."""
+        return self._alpha
 
-        Returns:
-            Current alpha (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._alpha
-        self._alpha = max(0.0, min(1.0, float(v)))
-        return self
+    @alpha.setter
+    def alpha(self, value: float) -> None:
+        """Set alpha (temperature/energy), clamped to [0, 1]."""
+        self._alpha = max(0.0, min(1.0, float(value)))
 
-    def alpha_min(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set minimum alpha (convergence threshold).
+    @property
+    def alpha_min(self) -> float:
+        """Get minimum alpha (convergence threshold)."""
+        return self._alpha_min
 
-        Args:
-            v: Minimum alpha value. If None, returns current value.
+    @alpha_min.setter
+    def alpha_min(self, value: float) -> None:
+        """Set minimum alpha (convergence threshold)."""
+        self._alpha_min = float(value)
 
-        Returns:
-            Current alpha_min (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._alpha_min
-        self._alpha_min = float(v)
-        return self
+    @property
+    def alpha_decay(self) -> float:
+        """Get alpha decay rate."""
+        return self._alpha_decay
 
-    def alpha_decay(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set alpha decay rate.
+    @alpha_decay.setter
+    def alpha_decay(self, value: float) -> None:
+        """Set alpha decay rate, clamped to [0, 1]."""
+        self._alpha_decay = max(0.0, min(1.0, float(value)))
 
-        Args:
-            v: Decay multiplier (0 to 1). If None, returns current value.
+    @property
+    def iterations(self) -> int:
+        """Get maximum iterations."""
+        return self._iterations
 
-        Returns:
-            Current alpha_decay (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._alpha_decay
-        self._alpha_decay = max(0.0, min(1.0, float(v)))
-        return self
+    @iterations.setter
+    def iterations(self, value: int) -> None:
+        """Set maximum iterations (minimum 1)."""
+        self._iterations = max(1, int(value))
 
-    def iterations(self, v: Optional[int] = None) -> Union[int, Self]:
-        """
-        Get or set maximum iterations.
-
-        Args:
-            v: Maximum iterations. If None, returns current value.
-
-        Returns:
-            Current iterations (if v is None) or self (for chaining).
-        """
-        if v is None:
-            return self._iterations
-        self._iterations = max(1, int(v))
-        return self
+    # -------------------------------------------------------------------------
+    # Lifecycle Methods
+    # -------------------------------------------------------------------------
 
     @abstractmethod
     def tick(self) -> bool:
@@ -474,13 +550,25 @@ class StaticLayout(BaseLayout):
 
     These layouts compute positions in one pass without iteration.
     Examples: circular, tree, spectral layouts.
+
+    Example:
+        layout = CircularLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            radius=200,
+        )
+        layout.run()
     """
 
-    def start(self, **kwargs: Any) -> Self:
+    def run(self, **kwargs: Any) -> Self:
         """
         Run the layout algorithm.
 
         Fires start event, computes layout, fires end event.
+
+        Args:
+            **kwargs: Additional arguments passed to _compute()
 
         Returns:
             self (for chaining)

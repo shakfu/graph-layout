@@ -333,16 +333,15 @@ class TestBarnesHutWithLayouts:
         layout = FruchtermanReingoldLayout()
 
         # Default should be disabled
-        assert layout.barnes_hut() is False
+        assert layout.use_barnes_hut is False
 
-        # Enable with default theta
-        result = layout.barnes_hut(True)
-        assert result is layout  # Fluent API
-        assert layout.barnes_hut() is True
+        # Enable
+        layout.use_barnes_hut = True
+        assert layout.use_barnes_hut is True
 
         # Set custom theta
-        layout.barnes_hut(True, theta=0.8)
-        assert layout._barnes_hut_theta == 0.8
+        layout.barnes_hut_theta = 0.8
+        assert layout.barnes_hut_theta == 0.8
 
     def test_spring_layout_barnes_hut_config(self):
         """Test Barnes-Hut configuration on Spring layout."""
@@ -351,12 +350,13 @@ class TestBarnesHutWithLayouts:
         layout = SpringLayout()
 
         # Default should be disabled
-        assert layout.barnes_hut() is False
+        assert layout.use_barnes_hut is False
 
         # Enable
-        layout.barnes_hut(True, theta=0.3)
-        assert layout.barnes_hut() is True
-        assert layout._barnes_hut_theta == 0.3
+        layout.use_barnes_hut = True
+        layout.barnes_hut_theta = 0.3
+        assert layout.use_barnes_hut is True
+        assert layout.barnes_hut_theta == 0.3
 
     def test_fruchterman_reingold_runs_with_barnes_hut(self):
         """Test FR layout runs successfully with Barnes-Hut enabled."""
@@ -367,21 +367,21 @@ class TestBarnesHutWithLayouts:
         nodes = [{"x": i * 10, "y": i * 10} for i in range(n)]
         links = [{"source": i, "target": (i + 1) % n} for i in range(n)]
 
-        layout = (
-            FruchtermanReingoldLayout()
-            .nodes(nodes)
-            .links(links)
-            .size([1000, 1000])
-            .barnes_hut(True, theta=0.5)
+        layout = FruchtermanReingoldLayout(
+            nodes=nodes,
+            links=links,
+            size=(1000, 1000),
+            use_barnes_hut=True,
+            barnes_hut_theta=0.5,
+            iterations=10,
         )
 
-        layout.start(iterations=10)
+        layout.run()
 
-        result_nodes = layout.nodes()
-        assert len(result_nodes) == n
+        assert len(layout.nodes) == n
 
         # All nodes should have been moved
-        for node in result_nodes:
+        for node in layout.nodes:
             assert hasattr(node, "x")
             assert hasattr(node, "y")
 
@@ -394,18 +394,18 @@ class TestBarnesHutWithLayouts:
         nodes = [{"x": i * 10, "y": i * 10} for i in range(n)]
         links = [{"source": i, "target": (i + 1) % n} for i in range(n)]
 
-        layout = (
-            SpringLayout()
-            .nodes(nodes)
-            .links(links)
-            .size([1000, 1000])
-            .barnes_hut(True, theta=0.5)
+        layout = SpringLayout(
+            nodes=nodes,
+            links=links,
+            size=(1000, 1000),
+            use_barnes_hut=True,
+            barnes_hut_theta=0.5,
+            iterations=10,
         )
 
-        layout.start(iterations=10)
+        layout.run()
 
-        result_nodes = layout.nodes()
-        assert len(result_nodes) == n
+        assert len(layout.nodes) == n
 
     def test_barnes_hut_produces_similar_layout(self):
         """Test that Barnes-Hut produces similar layout to naive calculation."""
@@ -420,26 +420,27 @@ class TestBarnesHutWithLayouts:
         links = [{"source": i, "target": (i + 1) % 30} for i in range(30)]
 
         # Run without Barnes-Hut (use provided positions, no random init)
-        layout1 = (
-            FruchtermanReingoldLayout()
-            .nodes([dict(n) for n in nodes])  # Copy
-            .links([dict(l) for l in links])
-            .size([500, 500])
-            .barnes_hut(False)
+        layout1 = FruchtermanReingoldLayout(
+            nodes=[dict(n) for n in nodes],  # Copy
+            links=[dict(l) for l in links],
+            size=(500, 500),
+            use_barnes_hut=False,
+            iterations=50,
         )
-        layout1.start(iterations=50, random_init=False)
-        result1 = layout1.nodes()
+        layout1.run(random_init=False)
+        result1 = layout1.nodes
 
         # Run with Barnes-Hut enabled (but n < 50 so won't actually use it)
-        layout2 = (
-            FruchtermanReingoldLayout()
-            .nodes([dict(n) for n in nodes])  # Copy
-            .links([dict(l) for l in links])
-            .size([500, 500])
-            .barnes_hut(True, theta=0.5)
+        layout2 = FruchtermanReingoldLayout(
+            nodes=[dict(n) for n in nodes],  # Copy
+            links=[dict(l) for l in links],
+            size=(500, 500),
+            use_barnes_hut=True,
+            barnes_hut_theta=0.5,
+            iterations=50,
         )
-        layout2.start(iterations=50, random_init=False)
-        result2 = layout2.nodes()
+        layout2.run(random_init=False)
+        result2 = layout2.nodes
 
         # Results should be identical since n < 50 means Barnes-Hut isn't used
         for n1, n2 in zip(result1, result2):

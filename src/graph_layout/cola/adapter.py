@@ -8,12 +8,20 @@ all Cola-specific functionality.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Union, cast
-
-from typing_extensions import Self
+from typing import Any, Callable, Optional, Sequence, Union, cast
 
 from ..base import IterativeLayout
-from ..types import Event, EventType, Group, Link, Node
+from ..types import (
+    Event,
+    EventType,
+    Group,
+    GroupLike,
+    Link,
+    LinkLike,
+    Node,
+    NodeLike,
+    SizeType,
+)
 from .layout import Layout as ColaLayout
 
 
@@ -26,27 +34,82 @@ class ColaLayoutAdapter(IterativeLayout):
     features like constraints, overlap avoidance, and groups.
 
     Example:
-        # Standard BaseLayout interface
-        layout = (ColaLayoutAdapter()
-            .nodes(nodes)
-            .links(links)
-            .size([800, 600])
-            .start())
-
-        # Cola-specific features still available
-        layout.avoid_overlaps(True)
-        layout.constraints(constraints)
+        layout = ColaLayoutAdapter(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            link_distance=100.0,
+            avoid_overlaps=True,
+        )
+        layout.run()
 
         # Access underlying Cola for advanced features
         layout.cola.power_graph_groups()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # IterativeLayout parameters
+        alpha: float = 1.0,
+        alpha_min: float = 0.001,
+        alpha_decay: float = 0.99,
+        iterations: int = 300,
+        # Cola-specific parameters
+        link_distance: Union[float, Callable[[Link], float]] = 20.0,
+        avoid_overlaps: bool = False,
+        handle_disconnected: bool = True,
+        convergence_threshold: float = 0.01,
+        default_node_size: float = 10.0,
+        group_compactness: float = 1e-6,
+        constraints: Optional[list[Any]] = None,
+    ) -> None:
+        """
+        Initialize Cola layout adapter.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            alpha: Initial alpha/temperature (0 to 1)
+            alpha_min: Minimum alpha for convergence threshold
+            alpha_decay: Alpha decay rate per iteration (0 to 1)
+            iterations: Maximum number of iterations
+            link_distance: Ideal link distance (fixed value or callable).
+            avoid_overlaps: Whether to prevent node overlaps.
+            handle_disconnected: Whether to pack disconnected components.
+            convergence_threshold: Stop when stress change falls below this.
+            default_node_size: Size for nodes without width/height.
+            group_compactness: Higher values make groups more compact.
+            constraints: List of constraint objects.
+        """
+        # Initialize base class (but don't call super init yet)
+        # We need to set up the Cola instance first
         self._cola = ColaLayout()
         self._started = False
-        # Set a default node size to avoid None errors in packing
-        self._cola.default_node_size(10)
+
+        # Configure Cola with provided parameters
+        self._cola.default_node_size(default_node_size)
+        self._cola.convergence_threshold(convergence_threshold)
+        self._cola.handle_disconnected(handle_disconnected)
+        self._cola.avoid_overlaps(avoid_overlaps)
+        self._cola.link_distance(link_distance)
+        self._cola.group_compactness(group_compactness)
+        if constraints:
+            self._cola.constraints(constraints)
 
         # Forward events from Cola to base event system
         def forward_start(e: Optional[Event]) -> None:
@@ -66,108 +129,213 @@ class ColaLayoutAdapter(IterativeLayout):
         self._cola.on(EventType.tick, forward_tick)
         self._cola.on(EventType.end, forward_end)
 
-    # -------------------------------------------------------------------------
-    # BaseLayout Interface - Delegation
-    # -------------------------------------------------------------------------
+        # Now initialize parent class
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+            alpha=alpha,
+            alpha_min=alpha_min,
+            alpha_decay=alpha_decay,
+            iterations=iterations,
+        )
 
-    def nodes(self, v: Optional[list[Any]] = None) -> Union[list[Node], Self]:
-        """Get or set nodes."""
-        if v is None:
-            return cast(list[Node], self._cola.nodes())
-        self._cola.nodes(v)
-        self._nodes = cast(list[Node], self._cola.nodes())
-        return self
-
-    def links(self, v: Optional[list[Any]] = None) -> Union[list[Link], Self]:
-        """Get or set links."""
-        if v is None:
-            return cast(list[Link], self._cola.links())
-        self._cola.links(v)
-        self._links = cast(list[Link], self._cola.links())
-        return self
-
-    def groups(self, v: Optional[list[Any]] = None) -> Union[list[Group], Self]:
-        """Get or set groups."""
-        if v is None:
-            return cast(list[Group], self._cola.groups())
-        self._cola.groups(v)
-        self._groups = cast(list[Group], self._cola.groups())
-        return self
-
-    def size(self, v: Optional[list[float]] = None) -> Union[list[float], Self]:
-        """Get or set canvas size."""
-        if v is None:
-            return cast(list[float], self._cola.size())
-        # Use parent validation
-        super().size(v)
-        self._cola.size(v)
-        return self
+        # Store Cola-specific config
+        self._link_distance: Union[float, Callable[[Link], float]] = link_distance
+        self._avoid_overlaps: bool = avoid_overlaps
+        self._handle_disconnected: bool = handle_disconnected
+        self._convergence_threshold: float = convergence_threshold
+        self._default_node_size: float = default_node_size
+        self._group_compactness: float = group_compactness
+        self._constraints: Optional[list[Any]] = constraints
 
     # -------------------------------------------------------------------------
-    # IterativeLayout Interface
+    # Override base properties to sync with Cola
     # -------------------------------------------------------------------------
 
-    def alpha(self, v: Optional[float] = None) -> Union[float, Self]:
-        """Get or set alpha (temperature)."""
-        if v is None:
-            a = cast(Optional[float], self._cola.alpha())
-            return a if a is not None else 0.0
-        self._cola.alpha(v)
-        self._alpha = v
-        return self
+    @property
+    def nodes(self) -> list[Node]:
+        """Get the list of nodes."""
+        return cast(list[Node], self._cola.nodes())
 
-    def alpha_min(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set minimum alpha (convergence threshold).
+    @nodes.setter
+    def nodes(self, value: Sequence[NodeLike]) -> None:
+        """Set nodes from a sequence."""
+        # Convert to internal format
+        super(ColaLayoutAdapter, type(self)).nodes.fset(self, value)  # type: ignore[attr-defined]
+        # Sync to Cola
+        self._cola.nodes(self._nodes)
 
-        Note: Maps to Cola's convergence_threshold().
-        """
-        if v is None:
-            return cast(float, self._cola.convergence_threshold())
-        self._cola.convergence_threshold(v)
-        self._alpha_min = v
-        return self
+    @property
+    def links(self) -> list[Link]:
+        """Get the list of links."""
+        return cast(list[Link], self._cola.links())
 
-    def iterations(self, v: Optional[int] = None) -> Union[int, Self]:
-        """
-        Get or set maximum iterations.
+    @links.setter
+    def links(self, value: Sequence[LinkLike]) -> None:
+        """Set links from a sequence."""
+        super(ColaLayoutAdapter, type(self)).links.fset(self, value)  # type: ignore[attr-defined]
+        self._cola.links(self._links)
 
-        Note: Cola uses different iteration parameters in start().
-        This sets a default that is divided among constraint phases.
+    @property
+    def groups(self) -> list[Group]:
+        """Get the list of groups."""
+        return cast(list[Group], self._cola.groups())
+
+    @groups.setter
+    def groups(self, value: Sequence[GroupLike]) -> None:
+        """Set groups from a sequence."""
+        super(ColaLayoutAdapter, type(self)).groups.fset(self, value)  # type: ignore[attr-defined]
+        self._cola.groups(self._groups)
+
+    @property
+    def size(self) -> tuple[float, float]:
+        """Get canvas size as (width, height)."""
+        return self._canvas_size
+
+    @size.setter
+    def size(self, value: SizeType) -> None:
+        """Set canvas size."""
+        super(ColaLayoutAdapter, type(self)).size.fset(self, value)  # type: ignore[attr-defined]
+        self._cola.size(list(self._canvas_size))
+
+    # -------------------------------------------------------------------------
+    # Cola-Specific Properties
+    # -------------------------------------------------------------------------
+
+    @property
+    def link_distance(self) -> Union[float, Callable[[Link], float]]:
+        """Get link distance setting."""
+        return self._link_distance
+
+    @link_distance.setter
+    def link_distance(self, value: Union[float, Callable[[Link], float]]) -> None:
+        """Set link distance."""
+        self._link_distance = value
+        self._cola.link_distance(value)
+
+    @property
+    def avoid_overlaps(self) -> bool:
+        """Get whether overlap avoidance is enabled."""
+        return self._avoid_overlaps
+
+    @avoid_overlaps.setter
+    def avoid_overlaps(self, value: bool) -> None:
+        """Enable/disable overlap avoidance."""
+        self._avoid_overlaps = bool(value)
+        self._cola.avoid_overlaps(value)
+
+    @property
+    def handle_disconnected(self) -> bool:
+        """Get whether disconnected component handling is enabled."""
+        return self._handle_disconnected
+
+    @handle_disconnected.setter
+    def handle_disconnected(self, value: bool) -> None:
+        """Enable/disable disconnected component handling."""
+        self._handle_disconnected = bool(value)
+        self._cola.handle_disconnected(value)
+
+    @property
+    def convergence_threshold(self) -> float:
+        """Get convergence threshold."""
+        return self._convergence_threshold
+
+    @convergence_threshold.setter
+    def convergence_threshold(self, value: float) -> None:
+        """Set convergence threshold."""
+        self._convergence_threshold = float(value)
+        self._cola.convergence_threshold(value)
+
+    @property
+    def default_node_size(self) -> float:
+        """Get default node size."""
+        return self._default_node_size
+
+    @default_node_size.setter
+    def default_node_size(self, value: float) -> None:
+        """Set default node size."""
+        self._default_node_size = float(value)
+        self._cola.default_node_size(value)
+
+    @property
+    def group_compactness(self) -> float:
+        """Get group compactness."""
+        return self._group_compactness
+
+    @group_compactness.setter
+    def group_compactness(self, value: float) -> None:
+        """Set group compactness."""
+        self._group_compactness = float(value)
+        self._cola.group_compactness(value)
+
+    @property
+    def constraints(self) -> Optional[list[Any]]:
+        """Get constraints."""
+        return self._constraints
+
+    @constraints.setter
+    def constraints(self, value: Optional[list[Any]]) -> None:
+        """Set constraints."""
+        self._constraints = value
+        if value:
+            self._cola.constraints(value)
+
+    @property
+    def cola(self) -> ColaLayout:
         """
-        if v is None:
-            return self._iterations
-        self._iterations = max(1, int(v))
-        return self
+        Access the underlying Cola Layout for advanced features.
+
+        Use this for features not exposed through the adapter interface,
+        such as:
+        - power_graph_groups()
+        - prepare_edge_routing() / route_edge()
+        - drag_start() / drag() / drag_end()
+        """
+        return self._cola
+
+    # -------------------------------------------------------------------------
+    # Layout Implementation
+    # -------------------------------------------------------------------------
 
     def tick(self) -> bool:
         """Perform one iteration. Returns True when converged."""
         return self._cola.tick()
 
-    def start(self, **kwargs: Any) -> Self:
+    def run(self, **kwargs: Any) -> "ColaLayoutAdapter":
         """
-        Start the layout algorithm.
+        Run the layout algorithm.
 
         Keyword Args:
-            iterations: Total iterations (default: 300), divided among phases
-            initial_unconstrained_iterations: Iterations without constraints
-            initial_user_constraint_iterations: Iterations with user constraints
-            initial_all_constraints_iterations: Iterations with all constraints
-            grid_snap_iterations: Iterations with grid snapping
+            unconstrained_iterations: Iterations without constraints (default: 0)
+            user_constraint_iterations: Iterations with user constraints (default: 0)
+            all_constraints_iterations: Iterations with all constraints (default: iterations/3)
+            grid_snap_iterations: Iterations with grid snapping (default: 0)
             keep_running: Whether to keep running until converged (default: True)
             center_graph: Center the graph after layout (default: True)
 
         Returns:
             self for chaining
         """
-        # Get iteration counts
-        total_iters = kwargs.get("iterations", self._iterations)
+        # Sync data to Cola if set via properties
+        if self._nodes:
+            self._cola.nodes(self._nodes)
+        if self._links:
+            self._cola.links(self._links)
+        if self._groups:
+            self._cola.groups(self._groups)
+        self._cola.size(list(self._canvas_size))
 
-        # Map to Cola's multi-phase iteration scheme
-        unconstrained = kwargs.get("initial_unconstrained_iterations", 0)
-        user_constraint = kwargs.get("initial_user_constraint_iterations", 0)
+        # Get iteration counts
+        unconstrained = kwargs.get("unconstrained_iterations", 0)
+        user_constraint = kwargs.get("user_constraint_iterations", 0)
         all_constraints = kwargs.get(
-            "initial_all_constraints_iterations", total_iters // 3
+            "all_constraints_iterations", self._iterations // 3
         )
         grid_snap = kwargs.get("grid_snap_iterations", 0)
         keep_running = kwargs.get("keep_running", True)
@@ -195,13 +363,13 @@ class ColaLayoutAdapter(IterativeLayout):
 
         return self
 
-    def stop(self) -> Self:
+    def stop(self) -> "ColaLayoutAdapter":
         """Stop the layout."""
         self._cola.stop()
         self._running = False
         return self
 
-    def resume(self) -> Self:
+    def resume(self) -> "ColaLayoutAdapter":
         """Resume layout after stopping."""
         self._cola.resume()
         self._running = True
@@ -212,99 +380,14 @@ class ColaLayoutAdapter(IterativeLayout):
         self._cola.kick()
 
     # -------------------------------------------------------------------------
-    # Cola-Specific Methods (Passthrough)
+    # Cola-Specific Methods
     # -------------------------------------------------------------------------
-
-    def link_distance(
-        self, v: Optional[Union[float, Callable[[Link], float]]] = None
-    ) -> Union[Union[float, Callable[[Link], float]], Self]:
-        """
-        Get or set link distance.
-
-        Args:
-            v: Fixed distance (float) or function (link) -> distance.
-               If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(Union[float, Callable[[Link], float]], self._cola.link_distance())
-        self._cola.link_distance(v)
-        return self
-
-    def avoid_overlaps(self, v: Optional[bool] = None) -> Union[bool, Self]:
-        """
-        Get or set overlap avoidance.
-
-        When enabled, nodes are constrained to not overlap.
-
-        Args:
-            v: Enable/disable overlap avoidance. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(bool, self._cola.avoid_overlaps())
-        self._cola.avoid_overlaps(v)
-        return self
-
-    def handle_disconnected(self, v: Optional[bool] = None) -> Union[bool, Self]:
-        """
-        Get or set disconnected component handling.
-
-        When enabled, disconnected components are laid out separately
-        and then packed together.
-
-        Args:
-            v: Enable/disable. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(bool, self._cola.handle_disconnected())
-        self._cola.handle_disconnected(v)
-        return self
-
-    def convergence_threshold(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set convergence threshold.
-
-        Layout stops when stress change falls below this value.
-
-        Args:
-            v: Threshold value. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(float, self._cola.convergence_threshold())
-        self._cola.convergence_threshold(v)
-        return self
-
-    def constraints(self, v: Optional[list] = None) -> Union[list, Self]:
-        """
-        Get or set constraints.
-
-        Args:
-            v: List of constraint objects. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(list, self._cola.constraints())
-        self._cola.constraints(v)
-        return self
 
     def flow_layout(
         self,
         axis: str = "y",
         min_separation: Optional[Union[float, Callable[[Link], float]]] = None,
-    ) -> Self:
+    ) -> "ColaLayoutAdapter":
         """
         Configure flow layout (directed graph layout).
 
@@ -325,7 +408,7 @@ class ColaLayoutAdapter(IterativeLayout):
 
     def symmetric_diff_link_lengths(
         self, ideal_length: float, w: float = 1.0
-    ) -> Self:
+    ) -> "ColaLayoutAdapter":
         """
         Compute link lengths using symmetric difference.
 
@@ -339,7 +422,9 @@ class ColaLayoutAdapter(IterativeLayout):
         self._cola.symmetric_diff_link_lengths(ideal_length, w)
         return self
 
-    def jaccard_link_lengths(self, ideal_length: float, w: float = 1.0) -> Self:
+    def jaccard_link_lengths(
+        self, ideal_length: float, w: float = 1.0
+    ) -> "ColaLayoutAdapter":
         """
         Compute link lengths using Jaccard coefficient.
 
@@ -352,53 +437,6 @@ class ColaLayoutAdapter(IterativeLayout):
         """
         self._cola.jaccard_link_lengths(ideal_length, w)
         return self
-
-    def default_node_size(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set default node size.
-
-        Used when nodes don't specify width/height.
-
-        Args:
-            v: Default size. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(float, self._cola.default_node_size())
-        self._cola.default_node_size(v)
-        return self
-
-    def group_compactness(self, v: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set group compactness.
-
-        Higher values make groups more compact.
-
-        Args:
-            v: Compactness value. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if v is None:
-            return cast(float, self._cola.group_compactness())
-        self._cola.group_compactness(v)
-        return self
-
-    @property
-    def cola(self) -> ColaLayout:
-        """
-        Access the underlying Cola Layout for advanced features.
-
-        Use this for features not exposed through the adapter interface,
-        such as:
-        - power_graph_groups()
-        - prepare_edge_routing() / route_edge()
-        - drag_start() / drag() / drag_end()
-        """
-        return self._cola
 
 
 __all__ = ["ColaLayoutAdapter"]

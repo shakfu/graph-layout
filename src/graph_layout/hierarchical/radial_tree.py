@@ -8,11 +8,23 @@ and children placed at increasing radii.
 from __future__ import annotations
 
 import math
-from typing import Any, Optional, Union
-
-from typing_extensions import Self
+import warnings
+from typing import Any, Callable, Optional, Sequence
 
 from ..base import StaticLayout
+from ..types import (
+    Event,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
+
+
+class TreeStructureWarning(UserWarning):
+    """Warning issued when graph structure doesn't match tree assumptions."""
+
+    pass
 
 
 class RadialTreeLayout(StaticLayout):
@@ -23,93 +35,116 @@ class RadialTreeLayout(StaticLayout):
     Each subtree is assigned an angular wedge proportional to its size.
 
     Example:
-        layout = (RadialTreeLayout()
-            .nodes([{}, {}, {}, {}, {}])
-            .links([
+        layout = RadialTreeLayout(
+            nodes=[{}, {}, {}, {}, {}],
+            links=[
                 {'source': 0, 'target': 1},
                 {'source': 0, 'target': 2},
                 {'source': 1, 'target': 3},
                 {'source': 1, 'target': 4},
-            ])
-            .size([800, 600])
-            .start())
+            ],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._root_index: Optional[int] = None
-        self._level_radius: float = 100.0  # Radius increment per level
-        self._start_angle: float = 0.0  # Starting angle in radians
-        self._sweep_angle: float = 2 * math.pi  # Total sweep angle
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # RadialTree-specific parameters
+        root: Optional[int] = None,
+        level_radius: float = 100.0,
+        start_angle: float = 0.0,
+        sweep_angle: float = 2 * math.pi,
+    ) -> None:
+        """
+        Initialize RadialTree layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            root: Root node index. If None, auto-detected.
+            level_radius: Radius increment per tree level.
+            start_angle: Starting angle in radians (default 0).
+            sweep_angle: Total sweep angle in radians (default 2*pi for full circle).
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+        )
+
+        # RadialTree-specific configuration
+        self._root_index: Optional[int] = root
+        self._level_radius: float = float(level_radius)
+        self._start_angle: float = float(start_angle)
+        self._sweep_angle: float = float(sweep_angle)
 
         # Internal state
         self._subtree_sizes: dict[int, int] = {}
 
     # -------------------------------------------------------------------------
-    # Configuration Methods
+    # Properties
     # -------------------------------------------------------------------------
 
-    def root(self, index: Optional[int] = None) -> Union[Optional[int], Self]:
-        """
-        Get or set the root node index.
+    @property
+    def root(self) -> Optional[int]:
+        """Get root node index."""
+        return self._root_index
 
-        Args:
-            index: Root node index. If None, returns current value.
+    @root.setter
+    def root(self, value: Optional[int]) -> None:
+        """Set root node index."""
+        self._root_index = value
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if index is None:
-            return self._root_index
-        self._root_index = index
-        return self
+    @property
+    def level_radius(self) -> float:
+        """Get radius increment per tree level."""
+        return self._level_radius
 
-    def level_radius(self, radius: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the radius increment per tree level.
+    @level_radius.setter
+    def level_radius(self, value: float) -> None:
+        """Set radius increment per tree level."""
+        self._level_radius = float(value)
 
-        Args:
-            radius: Radius increment. If None, returns current value.
+    @property
+    def start_angle(self) -> float:
+        """Get starting angle in radians."""
+        return self._start_angle
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if radius is None:
-            return self._level_radius
-        self._level_radius = float(radius)
-        return self
+    @start_angle.setter
+    def start_angle(self, value: float) -> None:
+        """Set starting angle in radians."""
+        self._start_angle = float(value)
 
-    def start_angle(self, angle: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the starting angle in radians.
+    @property
+    def sweep_angle(self) -> float:
+        """Get total sweep angle in radians."""
+        return self._sweep_angle
 
-        Args:
-            angle: Start angle. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if angle is None:
-            return self._start_angle
-        self._start_angle = float(angle)
-        return self
-
-    def sweep_angle(self, angle: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the total sweep angle in radians.
-
-        Default is 2*pi (full circle). Use smaller values for partial trees.
-
-        Args:
-            angle: Sweep angle. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if angle is None:
-            return self._sweep_angle
-        self._sweep_angle = float(angle)
-        return self
+    @sweep_angle.setter
+    def sweep_angle(self, value: float) -> None:
+        """Set total sweep angle in radians."""
+        self._sweep_angle = float(value)
 
     # -------------------------------------------------------------------------
     # Tree Construction
@@ -134,6 +169,13 @@ class RadialTreeLayout(StaticLayout):
             if not has_parent[i]:
                 return i
 
+        warnings.warn(
+            "No root node found (all nodes have incoming edges). "
+            "This suggests the graph is not a tree. "
+            "RadialTreeLayout is designed for trees; results may be suboptimal.",
+            TreeStructureWarning,
+            stacklevel=3,
+        )
         return 0
 
     def _build_children_map(self) -> dict[int, list[int]]:
@@ -181,7 +223,19 @@ class RadialTreeLayout(StaticLayout):
 
         # Compute subtree sizes
         self._subtree_sizes = {}
-        self._compute_subtree_sizes(root_idx, children_map, set())
+        visited: set[int] = set()
+        self._compute_subtree_sizes(root_idx, children_map, visited)
+
+        # Check for disconnected nodes
+        unvisited = [i for i in range(n) if i not in visited]
+        if unvisited:
+            warnings.warn(
+                f"Found {len(unvisited)} disconnected node(s) not reachable from root. "
+                "These nodes will be placed at arbitrary positions. "
+                "RadialTreeLayout is designed for connected trees.",
+                TreeStructureWarning,
+                stacklevel=2,
+            )
 
         # Center of layout
         cx = self._canvas_size[0] / 2
@@ -265,4 +319,4 @@ class RadialTreeLayout(StaticLayout):
             current_angle += child_sweep
 
 
-__all__ = ["RadialTreeLayout"]
+__all__ = ["RadialTreeLayout", "TreeStructureWarning"]

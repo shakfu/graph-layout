@@ -13,14 +13,20 @@ The algorithm simulates a physical system where:
 from __future__ import annotations
 
 import math
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Sequence
 
 import numpy as np
-from typing_extensions import Self
 
 from ..base import IterativeLayout
 from ..spatial.quadtree import Body, QuadTree
-from ..types import EventType
+from ..types import (
+    Event,
+    EventType,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
 
 
 class FruchtermanReingoldLayout(IterativeLayout):
@@ -33,146 +39,181 @@ class FruchtermanReingoldLayout(IterativeLayout):
     - Movement is limited by a "temperature" that cools over iterations
 
     Example:
-        layout = (FruchtermanReingoldLayout()
-            .nodes([{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}])
-            .links([{'source': 0, 'target': 1}, {'source': 1, 'target': 2}])
-            .size([800, 600])
-            .start())
+        layout = FruchtermanReingoldLayout(
+            nodes=[{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}],
+            links=[{'source': 0, 'target': 1}, {'source': 1, 'target': 2}],
+            size=(800, 600),
+        )
+        layout.run()
 
-        for node in layout.nodes():
+        for node in layout.nodes:
             print(f"Node {node.index}: ({node.x}, {node.y})")
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._k: Optional[float] = None  # Optimal distance between nodes
-        self._temperature: Optional[float] = None
-        self._cooling_factor: float = 0.95
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # IterativeLayout parameters
+        alpha: float = 1.0,
+        alpha_min: float = 0.001,
+        alpha_decay: float = 0.99,
+        iterations: int = 300,
+        # FruchtermanReingold-specific parameters
+        optimal_distance: Optional[float] = None,
+        temperature: Optional[float] = None,
+        cooling_factor: float = 0.95,
+        gravity: float = 0.1,
+        center_gravity: bool = True,
+        use_barnes_hut: bool = False,
+        barnes_hut_theta: float = 0.5,
+    ) -> None:
+        """
+        Initialize Fruchterman-Reingold layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            alpha: Initial alpha/temperature (0 to 1)
+            alpha_min: Minimum alpha for convergence threshold
+            alpha_decay: Alpha decay rate per iteration (0 to 1)
+            iterations: Maximum number of iterations
+            optimal_distance: Optimal distance between nodes. If None, computed from canvas size.
+            temperature: Initial temperature. If None, defaults to canvas width / 10.
+            cooling_factor: Temperature decay per iteration (0 to 1). Default 0.95.
+            gravity: Gravity strength toward center. Default 0.1.
+            center_gravity: Whether to apply center gravity. Default True.
+            use_barnes_hut: Enable Barnes-Hut O(n log n) approximation.
+            barnes_hut_theta: Barnes-Hut accuracy (0 = exact, 0.5 = balanced).
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+            alpha=alpha,
+            alpha_min=alpha_min,
+            alpha_decay=alpha_decay,
+            iterations=iterations,
+        )
+
+        # FruchtermanReingold-specific configuration
+        self._optimal_distance: Optional[float] = optimal_distance
+        self._temperature: Optional[float] = temperature
+        # Cooling factor: multiplicative decay per iteration. 0.95 retains 95% of
+        # temperature each step, giving ~50 iterations to reach 10% of initial temp.
+        # Standard value from simulated annealing literature.
+        self._cooling_factor: float = max(0.0, min(1.0, float(cooling_factor)))
+        self._gravity: float = float(gravity)
+        self._center_gravity: bool = bool(center_gravity)
+        # Minimum temperature threshold for convergence. When temperature falls
+        # below this, node displacement becomes negligible (<0.01% of canvas).
+        # Prevents infinite loops while allowing fine-grained final positioning.
         self._min_temperature: float = 0.0001
-        self._gravity: float = 0.1
-        self._center_gravity: bool = True
+
+        # Barnes-Hut optimization
+        self._use_barnes_hut: bool = bool(use_barnes_hut)
+        self._barnes_hut_theta: float = max(0.0, float(barnes_hut_theta))
 
         # Internal state
         self._disp_x: Optional[np.ndarray] = None
         self._disp_y: Optional[np.ndarray] = None
         self._iteration: int = 0
 
-        # Barnes-Hut optimization
-        self._use_barnes_hut: bool = False
-        self._barnes_hut_theta: float = 0.5
-
     # -------------------------------------------------------------------------
-    # Configuration Methods (Fluent API)
+    # Properties
     # -------------------------------------------------------------------------
 
-    def optimal_distance(self, k: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the optimal distance between connected nodes.
+    @property
+    def optimal_distance(self) -> float:
+        """Get optimal distance between connected nodes."""
+        if self._optimal_distance is not None:
+            return self._optimal_distance
+        return self._compute_optimal_distance()
 
-        If not set, computed as sqrt(area / n_nodes).
+    @optimal_distance.setter
+    def optimal_distance(self, value: Optional[float]) -> None:
+        """Set optimal distance between connected nodes."""
+        self._optimal_distance = float(value) if value is not None else None
 
-        Args:
-            k: Optimal distance. If None, returns current value.
+    @property
+    def temperature(self) -> float:
+        """Get current temperature."""
+        if self._temperature is not None:
+            return self._temperature
+        return self._canvas_size[0] / 10
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if k is None:
-            return self._k if self._k else self._compute_optimal_distance()
-        self._k = float(k)
-        return self
+    @temperature.setter
+    def temperature(self, value: Optional[float]) -> None:
+        """Set temperature."""
+        self._temperature = float(value) if value is not None else None
 
-    def temperature(self, t: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the initial temperature.
+    @property
+    def cooling_factor(self) -> float:
+        """Get cooling factor (temperature decay per iteration)."""
+        return self._cooling_factor
 
-        Temperature limits how far nodes can move in each iteration.
-        Higher temperature = more movement. Defaults to canvas width / 10.
+    @cooling_factor.setter
+    def cooling_factor(self, value: float) -> None:
+        """Set cooling factor (clamped to [0, 1])."""
+        self._cooling_factor = max(0.0, min(1.0, float(value)))
 
-        Args:
-            t: Temperature value. If None, returns current value.
+    @property
+    def gravity(self) -> float:
+        """Get gravity strength toward center."""
+        return self._gravity
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if t is None:
-            return self._temperature if self._temperature else self._canvas_size[0] / 10
-        self._temperature = float(t)
-        return self
+    @gravity.setter
+    def gravity(self, value: float) -> None:
+        """Set gravity strength."""
+        self._gravity = float(value)
 
-    def cooling_factor(self, c: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the cooling factor.
+    @property
+    def center_gravity(self) -> bool:
+        """Get whether center gravity is enabled."""
+        return self._center_gravity
 
-        Temperature is multiplied by this factor each iteration.
-        Values close to 1.0 cool slowly, values close to 0 cool quickly.
+    @center_gravity.setter
+    def center_gravity(self, value: bool) -> None:
+        """Set whether center gravity is enabled."""
+        self._center_gravity = bool(value)
 
-        Args:
-            c: Cooling factor (0 to 1). If None, returns current value.
+    @property
+    def use_barnes_hut(self) -> bool:
+        """Get whether Barnes-Hut approximation is enabled."""
+        return self._use_barnes_hut
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if c is None:
-            return self._cooling_factor
-        self._cooling_factor = max(0.0, min(1.0, float(c)))
-        return self
+    @use_barnes_hut.setter
+    def use_barnes_hut(self, value: bool) -> None:
+        """Enable/disable Barnes-Hut approximation."""
+        self._use_barnes_hut = bool(value)
 
-    def gravity(self, g: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the gravity strength toward the center.
+    @property
+    def barnes_hut_theta(self) -> float:
+        """Get Barnes-Hut theta parameter (accuracy)."""
+        return self._barnes_hut_theta
 
-        Gravity pulls nodes toward the canvas center, preventing drift.
-
-        Args:
-            g: Gravity strength (0 = none, higher = stronger). If None, returns current.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if g is None:
-            return self._gravity
-        self._gravity = float(g)
-        return self
-
-    def center_gravity(self, enabled: Optional[bool] = None) -> Union[bool, Self]:
-        """
-        Get or set whether center gravity is enabled.
-
-        Args:
-            enabled: Whether to enable center gravity. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if enabled is None:
-            return self._center_gravity
-        self._center_gravity = bool(enabled)
-        return self
-
-    def barnes_hut(
-        self, enabled: Optional[bool] = None, theta: Optional[float] = None
-    ) -> Union[bool, Self]:
-        """
-        Get or set Barnes-Hut approximation for repulsive forces.
-
-        Barnes-Hut reduces force calculation complexity from O(n^2) to O(n log n)
-        by approximating distant node clusters as single masses.
-
-        Args:
-            enabled: Enable/disable Barnes-Hut. If None, returns current enabled state.
-            theta: Accuracy parameter (0 = exact, 0.5 = balanced, 1.0+ = fast).
-                   Lower values are more accurate but slower.
-
-        Returns:
-            Current enabled state (bool) or self for chaining.
-        """
-        if enabled is None:
-            return self._use_barnes_hut
-        self._use_barnes_hut = bool(enabled)
-        if theta is not None:
-            self._barnes_hut_theta = max(0.0, float(theta))
-        return self
+    @barnes_hut_theta.setter
+    def barnes_hut_theta(self, value: float) -> None:
+        """Set Barnes-Hut theta parameter."""
+        self._barnes_hut_theta = max(0.0, float(value))
 
     # -------------------------------------------------------------------------
     # Layout Implementation
@@ -184,12 +225,11 @@ class FruchtermanReingoldLayout(IterativeLayout):
         n = max(1, len(self._nodes))
         return math.sqrt(area / n)
 
-    def start(self, **kwargs: Any) -> Self:
+    def run(self, **kwargs: Any) -> "FruchtermanReingoldLayout":
         """
-        Start the layout algorithm.
+        Run the layout algorithm.
 
         Keyword Args:
-            iterations: Maximum iterations (default: 300)
             random_init: Initialize positions randomly (default: True)
             center_graph: Center graph after completion (default: True)
 
@@ -199,7 +239,6 @@ class FruchtermanReingoldLayout(IterativeLayout):
         # Initialize parameters
         self._initialize_indices()
 
-        iterations = kwargs.get('iterations', self._iterations)
         random_init = kwargs.get('random_init', True)
         center = kwargs.get('center_graph', True)
 
@@ -207,8 +246,8 @@ class FruchtermanReingoldLayout(IterativeLayout):
             self._initialize_positions(random_init=True)
 
         # Compute optimal distance if not set
-        if self._k is None:
-            self._k = self._compute_optimal_distance()
+        k = self._optimal_distance if self._optimal_distance else self._compute_optimal_distance()
+        self._optimal_distance = k
 
         # Initialize temperature if not set
         if self._temperature is None:
@@ -219,9 +258,6 @@ class FruchtermanReingoldLayout(IterativeLayout):
         self._disp_x = np.zeros(n)
         self._disp_y = np.zeros(n)
         self._iteration = 0
-
-        # Set iterations
-        self._iterations = iterations
         self._alpha = 1.0
 
         # Fire start event
@@ -245,9 +281,9 @@ class FruchtermanReingoldLayout(IterativeLayout):
         Returns:
             True if converged, False otherwise.
         """
-        # These are set in start() before tick() is called
+        # These are set in run() before tick() is called
         assert self._temperature is not None
-        assert self._k is not None
+        assert self._optimal_distance is not None
         assert self._disp_x is not None
         assert self._disp_y is not None
 
@@ -261,7 +297,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
         if n == 0:
             return True
 
-        k = self._k
+        k = self._optimal_distance
         k_sq = k * k
 
         # Reset displacements

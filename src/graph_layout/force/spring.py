@@ -8,14 +8,20 @@ Simpler than Fruchterman-Reingold, useful as a baseline or for small graphs.
 from __future__ import annotations
 
 import math
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Sequence
 
 import numpy as np
-from typing_extensions import Self
 
 from ..base import IterativeLayout
 from ..spatial.quadtree import Body, QuadTree
-from ..types import EventType
+from ..types import (
+    Event,
+    EventType,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
 
 
 class SpringLayout(IterativeLayout):
@@ -30,151 +36,177 @@ class SpringLayout(IterativeLayout):
     nodes are attracted by spring forces.
 
     Example:
-        layout = (SpringLayout()
-            .nodes([{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}])
-            .links([{'source': 0, 'target': 1}, {'source': 1, 'target': 2}])
-            .size([800, 600])
-            .start())
+        layout = SpringLayout(
+            nodes=[{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}],
+            links=[{'source': 0, 'target': 1}, {'source': 1, 'target': 2}],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._spring_constant: float = 0.1
-        self._spring_length: float = 100.0
-        self._repulsion: float = 10000.0
-        self._damping: float = 0.5
-        self._gravity: float = 0.0
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # IterativeLayout parameters
+        alpha: float = 1.0,
+        alpha_min: float = 0.001,
+        alpha_decay: float = 0.99,
+        iterations: int = 300,
+        # Spring-specific parameters
+        spring_constant: float = 0.1,
+        spring_length: float = 100.0,
+        repulsion: float = 10000.0,
+        damping: float = 0.5,
+        gravity: float = 0.0,
+        use_barnes_hut: bool = False,
+        barnes_hut_theta: float = 0.5,
+    ) -> None:
+        """
+        Initialize Spring layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            alpha: Initial alpha/temperature (0 to 1)
+            alpha_min: Minimum alpha for convergence threshold
+            alpha_decay: Alpha decay rate per iteration (0 to 1)
+            iterations: Maximum number of iterations
+            spring_constant: Spring stiffness (higher = stronger attraction).
+            spring_length: Natural/rest length of springs (ideal edge distance).
+            repulsion: Repulsion strength between all node pairs.
+            damping: Velocity damping factor (0 = no damping, 1 = full damping).
+            gravity: Gravity strength toward canvas center.
+            use_barnes_hut: Enable Barnes-Hut O(n log n) approximation.
+            barnes_hut_theta: Barnes-Hut accuracy (0 = exact, 0.5 = balanced).
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+            alpha=alpha,
+            alpha_min=alpha_min,
+            alpha_decay=alpha_decay,
+            iterations=iterations,
+        )
+
+        # Spring-specific configuration
+        self._spring_constant: float = float(spring_constant)
+        self._spring_length: float = float(spring_length)
+        self._repulsion: float = float(repulsion)
+        self._damping: float = max(0.0, min(1.0, float(damping)))
+        self._gravity: float = float(gravity)
+
+        # Barnes-Hut optimization
+        self._use_barnes_hut: bool = bool(use_barnes_hut)
+        self._barnes_hut_theta: float = max(0.0, float(barnes_hut_theta))
 
         # Internal state
         self._vel_x: Optional[np.ndarray] = None
         self._vel_y: Optional[np.ndarray] = None
         self._iteration: int = 0
 
-        # Barnes-Hut optimization
-        self._use_barnes_hut: bool = False
-        self._barnes_hut_theta: float = 0.5
-
     # -------------------------------------------------------------------------
-    # Configuration Methods (Fluent API)
+    # Properties
     # -------------------------------------------------------------------------
 
-    def spring_constant(self, k: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the spring constant.
+    @property
+    def spring_constant(self) -> float:
+        """Get spring constant (stiffness)."""
+        return self._spring_constant
 
-        Higher values make springs stiffer (stronger attraction).
+    @spring_constant.setter
+    def spring_constant(self, value: float) -> None:
+        """Set spring constant."""
+        self._spring_constant = float(value)
 
-        Args:
-            k: Spring constant. If None, returns current value.
+    @property
+    def spring_length(self) -> float:
+        """Get natural/rest length of springs."""
+        return self._spring_length
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if k is None:
-            return self._spring_constant
-        self._spring_constant = float(k)
-        return self
+    @spring_length.setter
+    def spring_length(self, value: float) -> None:
+        """Set natural/rest length of springs."""
+        self._spring_length = float(value)
 
-    def spring_length(self, length: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the natural (rest) length of springs.
+    @property
+    def repulsion(self) -> float:
+        """Get repulsion strength."""
+        return self._repulsion
 
-        This is the ideal distance between connected nodes.
+    @repulsion.setter
+    def repulsion(self, value: float) -> None:
+        """Set repulsion strength."""
+        self._repulsion = float(value)
 
-        Args:
-            length: Spring rest length. If None, returns current value.
+    @property
+    def damping(self) -> float:
+        """Get damping factor."""
+        return self._damping
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if length is None:
-            return self._spring_length
-        self._spring_length = float(length)
-        return self
+    @damping.setter
+    def damping(self, value: float) -> None:
+        """Set damping factor (clamped to [0, 1])."""
+        self._damping = max(0.0, min(1.0, float(value)))
 
-    def repulsion(self, r: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the repulsion strength.
+    @property
+    def gravity(self) -> float:
+        """Get gravity strength toward center."""
+        return self._gravity
 
-        Controls how strongly all nodes repel each other.
+    @gravity.setter
+    def gravity(self, value: float) -> None:
+        """Set gravity strength."""
+        self._gravity = float(value)
 
-        Args:
-            r: Repulsion strength. If None, returns current value.
+    @property
+    def use_barnes_hut(self) -> bool:
+        """Get whether Barnes-Hut approximation is enabled."""
+        return self._use_barnes_hut
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if r is None:
-            return self._repulsion
-        self._repulsion = float(r)
-        return self
+    @use_barnes_hut.setter
+    def use_barnes_hut(self, value: bool) -> None:
+        """Enable/disable Barnes-Hut approximation."""
+        self._use_barnes_hut = bool(value)
 
-    def damping(self, d: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the damping factor.
+    @property
+    def barnes_hut_theta(self) -> float:
+        """Get Barnes-Hut theta parameter (accuracy)."""
+        return self._barnes_hut_theta
 
-        Damping reduces velocity each iteration (0 = no damping, 1 = full damping).
-
-        Args:
-            d: Damping factor (0 to 1). If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if d is None:
-            return self._damping
-        self._damping = max(0.0, min(1.0, float(d)))
-        return self
-
-    def gravity(self, g: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set gravity toward center.
-
-        Args:
-            g: Gravity strength. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if g is None:
-            return self._gravity
-        self._gravity = float(g)
-        return self
-
-    def barnes_hut(
-        self, enabled: Optional[bool] = None, theta: Optional[float] = None
-    ) -> Union[bool, Self]:
-        """
-        Get or set Barnes-Hut approximation for repulsive forces.
-
-        Barnes-Hut reduces force calculation complexity from O(n^2) to O(n log n)
-        by approximating distant node clusters as single masses.
-
-        Args:
-            enabled: Enable/disable Barnes-Hut. If None, returns current enabled state.
-            theta: Accuracy parameter (0 = exact, 0.5 = balanced, 1.0+ = fast).
-                   Lower values are more accurate but slower.
-
-        Returns:
-            Current enabled state (bool) or self for chaining.
-        """
-        if enabled is None:
-            return self._use_barnes_hut
-        self._use_barnes_hut = bool(enabled)
-        if theta is not None:
-            self._barnes_hut_theta = max(0.0, float(theta))
-        return self
+    @barnes_hut_theta.setter
+    def barnes_hut_theta(self, value: float) -> None:
+        """Set Barnes-Hut theta parameter."""
+        self._barnes_hut_theta = max(0.0, float(value))
 
     # -------------------------------------------------------------------------
     # Layout Implementation
     # -------------------------------------------------------------------------
 
-    def start(self, **kwargs: Any) -> Self:
+    def run(self, **kwargs: Any) -> "SpringLayout":
         """
-        Start the layout algorithm.
+        Run the layout algorithm.
 
         Keyword Args:
-            iterations: Maximum iterations (default: 300)
             random_init: Initialize positions randomly (default: True)
             center_graph: Center graph after completion (default: True)
 
@@ -183,7 +215,6 @@ class SpringLayout(IterativeLayout):
         """
         self._initialize_indices()
 
-        iterations = kwargs.get('iterations', self._iterations)
         random_init = kwargs.get('random_init', True)
         center = kwargs.get('center_graph', True)
 
@@ -195,7 +226,6 @@ class SpringLayout(IterativeLayout):
         self._vel_x = np.zeros(n)
         self._vel_y = np.zeros(n)
         self._iteration = 0
-        self._iterations = iterations
         self._alpha = 1.0
 
         # Fire start event
@@ -219,7 +249,7 @@ class SpringLayout(IterativeLayout):
         Returns:
             True if converged, False otherwise.
         """
-        # These are set in start() before tick() is called
+        # These are set in run() before tick() is called
         assert self._vel_x is not None
         assert self._vel_y is not None
 

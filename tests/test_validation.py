@@ -229,28 +229,27 @@ class TestBaseLayoutValidation:
     """Tests for BaseLayout validation integration."""
 
     def test_size_validation_rejects_negative(self):
-        """BaseLayout.size() rejects negative dimensions."""
+        """BaseLayout size property rejects negative dimensions."""
         from graph_layout import FruchtermanReingoldLayout
 
-        layout = FruchtermanReingoldLayout()
         with pytest.raises(InvalidCanvasSizeError):
-            layout.size([-100, 600])
+            FruchtermanReingoldLayout(size=(-100, 600))
 
     def test_size_validation_rejects_zero(self):
-        """BaseLayout.size() rejects zero dimensions."""
+        """BaseLayout size property rejects zero dimensions."""
         from graph_layout import CircularLayout
 
-        layout = CircularLayout()
         with pytest.raises(InvalidCanvasSizeError):
-            layout.size([0, 600])
+            CircularLayout(size=(0, 600))
 
     def test_validate_method_catches_bad_links(self):
         """BaseLayout.validate() catches invalid link indices."""
         from graph_layout import FruchtermanReingoldLayout
 
-        layout = FruchtermanReingoldLayout()
-        layout.nodes([{}, {}])  # 2 nodes
-        layout.links([{"source": 0, "target": 99}])  # Invalid target
+        layout = FruchtermanReingoldLayout(
+            nodes=[{}, {}],  # 2 nodes
+            links=[{"source": 0, "target": 99}],  # Invalid target
+        )
 
         with pytest.raises(InvalidLinkError):
             layout.validate()
@@ -259,9 +258,10 @@ class TestBaseLayoutValidation:
         """BaseLayout.validate() passes valid configuration."""
         from graph_layout import FruchtermanReingoldLayout
 
-        layout = FruchtermanReingoldLayout()
-        layout.nodes([{}, {}, {}])
-        layout.links([{"source": 0, "target": 1}, {"source": 1, "target": 2}])
+        layout = FruchtermanReingoldLayout(
+            nodes=[{}, {}, {}],
+            links=[{"source": 0, "target": 1}, {"source": 1, "target": 2}],
+        )
 
         # Should not raise
         result = layout.validate()

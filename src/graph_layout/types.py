@@ -12,7 +12,7 @@ This module provides the fundamental types used across all layout algorithms:
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Any, Callable, Generic, Optional, TypedDict, TypeVar, Union
+from typing import Any, Callable, Generic, Optional, Sequence, TypedDict, TypeVar, Union
 
 
 class EventType(IntEnum):
@@ -203,6 +203,21 @@ class LinkAccessor(Generic[LinkT]):
         return link.target.index  # type: ignore
 
 
+# Type aliases for Pythonic API
+# These allow flexible input types while maintaining type safety
+NodeLike = Union[Node, dict[str, Any], Any]
+"""Input type for nodes: Node objects, dicts, or objects with node attributes."""
+
+LinkLike = Union[Link, dict[str, Any], Any]
+"""Input type for links: Link objects, dicts, or objects with source/target."""
+
+GroupLike = Union[Group, dict[str, Any], Any]
+"""Input type for groups: Group objects, dicts, or objects with leaves/groups."""
+
+SizeType = Union[tuple[float, float], list[float], Sequence[float]]
+"""Canvas size: (width, height) tuple, list, or sequence."""
+
+
 __all__ = [
     "EventType",
     "Event",
@@ -214,4 +229,9 @@ __all__ = [
     "NodeT",
     "LinkT",
     "LinkAccessor",
+    # Pythonic API type aliases
+    "NodeLike",
+    "LinkLike",
+    "GroupLike",
+    "SizeType",
 ]

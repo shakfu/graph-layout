@@ -80,7 +80,15 @@ class Descent:
     w is matrix of weights for those separations (wij = 1/(Dij^2))
     """
 
+    # Threshold for treating distances as effectively zero.
+    # Used to detect coincident nodes and avoid division by zero.
+    # Value chosen to be well below typical graph distances while
+    # remaining above floating-point noise (~1e-15).
     ZERO_DISTANCE = 1e-10
+
+    # Squared distance epsilon for numerical stability in vectorized operations.
+    # Slightly larger than ZERO_DISTANCE^2 to provide robust sqrt() behavior.
+    MIN_DIST_SQ = 1e-9
 
     def __init__(
         self,
@@ -199,11 +207,10 @@ class Descent:
 
         # Create mask for diagonal (self-pairs) and near-zero distances
         diagonal_mask = np.eye(n, dtype=bool)
-        min_dist_sq = 1e-9
 
         # Distances: (n, n)
-        # Add small epsilon to avoid sqrt(0), but we'll mask diagonal later
-        distances = np.sqrt(np.maximum(dist_squared, min_dist_sq))
+        # Use MIN_DIST_SQ to avoid sqrt(0) and ensure numerical stability
+        distances = np.sqrt(np.maximum(dist_squared, self.MIN_DIST_SQ))
 
         # Get weights from G matrix
         if self.G is None:

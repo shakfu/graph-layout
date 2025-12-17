@@ -15,12 +15,24 @@ with the following phases:
 
 from __future__ import annotations
 
+import warnings
 from collections import deque
-from typing import Any, Optional, Union
-
-from typing_extensions import Self
+from typing import Any, Callable, Optional, Sequence
 
 from ..base import StaticLayout
+from ..types import (
+    Event,
+    GroupLike,
+    LinkLike,
+    NodeLike,
+    SizeType,
+)
+
+
+class GraphStructureWarning(UserWarning):
+    """Warning issued when graph structure doesn't match algorithm assumptions."""
+
+    pass
 
 
 class SugiyamaLayout(StaticLayout):
@@ -31,25 +43,76 @@ class SugiyamaLayout(StaticLayout):
     Minimizes edge crossings and produces aesthetically pleasing layouts.
 
     Example:
-        layout = (SugiyamaLayout()
-            .nodes([{}, {}, {}, {}, {}])
-            .links([
+        layout = SugiyamaLayout(
+            nodes=[{}, {}, {}, {}, {}],
+            links=[
                 {'source': 0, 'target': 1},
                 {'source': 0, 'target': 2},
                 {'source': 1, 'target': 3},
                 {'source': 2, 'target': 3},
                 {'source': 3, 'target': 4},
-            ])
-            .size([800, 600])
-            .start())
+            ],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._layer_separation: float = 100.0
-        self._node_separation: float = 50.0
-        self._orientation: str = 'top-to-bottom'
-        self._crossing_iterations: int = 24
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # Sugiyama-specific parameters
+        layer_separation: float = 100.0,
+        node_separation: float = 50.0,
+        orientation: str = 'top-to-bottom',
+        crossing_iterations: int = 24,
+    ) -> None:
+        """
+        Initialize Sugiyama layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            layer_separation: Vertical separation between layers.
+            node_separation: Horizontal separation between nodes in same layer.
+            orientation: Layout direction - 'top-to-bottom', 'bottom-to-top',
+                'left-to-right', or 'right-to-left'.
+            crossing_iterations: Number of iterations for crossing minimization.
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+        )
+
+        # Sugiyama-specific configuration
+        self._layer_separation: float = float(layer_separation)
+        self._node_separation: float = float(node_separation)
+        valid_orientations = {
+            'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'
+        }
+        if orientation not in valid_orientations:
+            raise ValueError(f"orientation must be one of {valid_orientations}")
+        self._orientation: str = orientation
+        self._crossing_iterations: int = max(1, int(crossing_iterations))
 
         # Internal state
         self._layers: list[list[int]] = []
@@ -57,73 +120,51 @@ class SugiyamaLayout(StaticLayout):
         self._node_position: dict[int, int] = {}
 
     # -------------------------------------------------------------------------
-    # Configuration Methods
+    # Properties
     # -------------------------------------------------------------------------
 
-    def layer_separation(self, sep: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set vertical separation between layers.
+    @property
+    def layer_separation(self) -> float:
+        """Get vertical separation between layers."""
+        return self._layer_separation
 
-        Args:
-            sep: Separation value. If None, returns current value.
+    @layer_separation.setter
+    def layer_separation(self, value: float) -> None:
+        """Set vertical separation between layers."""
+        self._layer_separation = float(value)
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if sep is None:
-            return self._layer_separation
-        self._layer_separation = float(sep)
-        return self
+    @property
+    def node_separation(self) -> float:
+        """Get horizontal separation between nodes in same layer."""
+        return self._node_separation
 
-    def node_separation(self, sep: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set horizontal separation between nodes in the same layer.
+    @node_separation.setter
+    def node_separation(self, value: float) -> None:
+        """Set horizontal separation between nodes in same layer."""
+        self._node_separation = float(value)
 
-        Args:
-            sep: Separation value. If None, returns current value.
+    @property
+    def orientation(self) -> str:
+        """Get layout orientation."""
+        return self._orientation
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if sep is None:
-            return self._node_separation
-        self._node_separation = float(sep)
-        return self
-
-    def orientation(self, orient: Optional[str] = None) -> Union[str, Self]:
-        """
-        Get or set layout orientation.
-
-        Options: 'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'
-
-        Args:
-            orient: Orientation string. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if orient is None:
-            return self._orientation
+    @orientation.setter
+    def orientation(self, value: str) -> None:
+        """Set layout orientation."""
         valid = {'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'}
-        if orient not in valid:
+        if value not in valid:
             raise ValueError(f"orientation must be one of {valid}")
-        self._orientation = orient
-        return self
+        self._orientation = value
 
-    def crossing_iterations(self, iters: Optional[int] = None) -> Union[int, Self]:
-        """
-        Get or set number of crossing minimization iterations.
+    @property
+    def crossing_iterations(self) -> int:
+        """Get number of crossing minimization iterations."""
+        return self._crossing_iterations
 
-        Args:
-            iters: Number of iterations. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if iters is None:
-            return self._crossing_iterations
-        self._crossing_iterations = max(1, int(iters))
-        return self
+    @crossing_iterations.setter
+    def crossing_iterations(self, value: int) -> None:
+        """Set number of crossing minimization iterations."""
+        self._crossing_iterations = max(1, int(value))
 
     # -------------------------------------------------------------------------
     # Phase 1: Layer Assignment (Longest Path)
@@ -148,6 +189,13 @@ class SugiyamaLayout(StaticLayout):
         # Find sources (nodes with no incoming edges)
         sources = [i for i in range(n) if not incoming[i]]
         if not sources:
+            warnings.warn(
+                "No source nodes found (all nodes have incoming edges). "
+                "This suggests the graph contains cycles. "
+                "Sugiyama layout is designed for DAGs; results may be suboptimal.",
+                GraphStructureWarning,
+                stacklevel=3,
+            )
             sources = [0]  # Fallback
 
         # Compute longest path from any source
@@ -167,8 +215,15 @@ class SugiyamaLayout(StaticLayout):
                     queue.append(child)
 
         # Handle disconnected nodes
-        for i in range(n):
-            if layers[i] < 0:
+        disconnected = [i for i in range(n) if layers[i] < 0]
+        if disconnected:
+            warnings.warn(
+                f"Found {len(disconnected)} disconnected node(s) unreachable from sources. "
+                "These will be placed in layer 0.",
+                GraphStructureWarning,
+                stacklevel=3,
+            )
+            for i in disconnected:
                 layers[i] = 0
 
         # Group nodes by layer
@@ -332,4 +387,4 @@ class SugiyamaLayout(StaticLayout):
         self._assign_coordinates()
 
 
-__all__ = ["SugiyamaLayout"]
+__all__ = ["SugiyamaLayout", "GraphStructureWarning"]

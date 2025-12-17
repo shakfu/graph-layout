@@ -8,11 +8,15 @@ This module provides algorithms for laying out trees and DAGs:
 """
 
 from .radial_tree import RadialTreeLayout
-from .reingold_tilford import ReingoldTilfordLayout
-from .sugiyama import SugiyamaLayout
+from .radial_tree import TreeStructureWarning as RadialTreeStructureWarning
+from .reingold_tilford import ReingoldTilfordLayout, TreeStructureWarning
+from .sugiyama import GraphStructureWarning, SugiyamaLayout
 
 __all__ = [
     "ReingoldTilfordLayout",
     "RadialTreeLayout",
     "SugiyamaLayout",
+    "GraphStructureWarning",
+    "TreeStructureWarning",
+    "RadialTreeStructureWarning",
 ]

@@ -7,12 +7,17 @@ Places all nodes evenly distributed on a circle.
 from __future__ import annotations
 
 import math
-from typing import Any, Callable, Optional, Union
-
-from typing_extensions import Self
+from typing import Any, Callable, Optional, Sequence, Union
 
 from ..base import StaticLayout
-from ..types import Node
+from ..types import (
+    Event,
+    GroupLike,
+    LinkLike,
+    Node,
+    NodeLike,
+    SizeType,
+)
 
 
 class CircularLayout(StaticLayout):
@@ -23,76 +28,98 @@ class CircularLayout(StaticLayout):
     customized using a sort function.
 
     Example:
-        layout = (CircularLayout()
-            .nodes([{}, {}, {}, {}, {}])
-            .links([...])
-            .size([800, 600])
-            .start())
+        layout = CircularLayout(
+            nodes=[{}, {}, {}, {}, {}],
+            links=[...],
+            size=(800, 600),
+        )
+        layout.run()
     """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._radius: Optional[float] = None  # Auto-computed if None
-        self._start_angle: float = 0.0
-        self._sort_by: Optional[Union[str, Callable[[Node], Any]]] = None
+    def __init__(
+        self,
+        *,
+        nodes: Optional[Sequence[NodeLike]] = None,
+        links: Optional[Sequence[LinkLike]] = None,
+        groups: Optional[Sequence[GroupLike]] = None,
+        size: SizeType = (1.0, 1.0),
+        random_seed: Optional[int] = None,
+        on_start: Optional[Callable[[Optional[Event]], None]] = None,
+        on_tick: Optional[Callable[[Optional[Event]], None]] = None,
+        on_end: Optional[Callable[[Optional[Event]], None]] = None,
+        # Circular-specific parameters
+        radius: Optional[float] = None,
+        start_angle: float = 0.0,
+        sort_by: Optional[Union[str, Callable[[Node], Any]]] = None,
+    ) -> None:
+        """
+        Initialize Circular layout.
+
+        Args:
+            nodes: List of nodes
+            links: List of links
+            groups: List of groups
+            size: Canvas size as (width, height)
+            random_seed: Random seed for reproducible layouts
+            on_start: Callback for start event
+            on_tick: Callback for tick event
+            on_end: Callback for end event
+            radius: Circle radius. If None, auto-computed from canvas size.
+            start_angle: Starting angle in radians (default 0).
+            sort_by: Sort key for node ordering. Options:
+                - None: Keep original order
+                - 'degree': Sort by node degree (connections)
+                - callable: Custom function taking a Node and returning a sort key
+        """
+        super().__init__(
+            nodes=nodes,
+            links=links,
+            groups=groups,
+            size=size,
+            random_seed=random_seed,
+            on_start=on_start,
+            on_tick=on_tick,
+            on_end=on_end,
+        )
+
+        # Circular-specific configuration
+        self._radius: Optional[float] = radius
+        self._start_angle: float = float(start_angle)
+        self._sort_by: Optional[Union[str, Callable[[Node], Any]]] = sort_by
 
     # -------------------------------------------------------------------------
-    # Configuration Methods
+    # Properties
     # -------------------------------------------------------------------------
 
-    def radius(self, r: Optional[float] = None) -> Union[Optional[float], Self]:
-        """
-        Get or set the circle radius.
+    @property
+    def radius(self) -> Optional[float]:
+        """Get circle radius (None = auto-computed)."""
+        return self._radius
 
-        If None, radius is computed automatically based on canvas size.
+    @radius.setter
+    def radius(self, value: Optional[float]) -> None:
+        """Set circle radius."""
+        self._radius = float(value) if value is not None else None
 
-        Args:
-            r: Radius value. If None, returns current value.
+    @property
+    def start_angle(self) -> float:
+        """Get starting angle in radians."""
+        return self._start_angle
 
-        Returns:
-            Current value or self for chaining.
-        """
-        if r is None:
-            return self._radius
-        self._radius = float(r) if r else None
-        return self
+    @start_angle.setter
+    def start_angle(self, value: float) -> None:
+        """Set starting angle in radians."""
+        self._start_angle = float(value)
 
-    def start_angle(self, angle: Optional[float] = None) -> Union[float, Self]:
-        """
-        Get or set the starting angle in radians.
+    @property
+    def sort_by(self) -> Optional[Union[str, Callable[[Node], Any]]]:
+        """Get sort key for node ordering."""
+        return self._sort_by
 
-        Args:
-            angle: Start angle. If None, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if angle is None:
-            return self._start_angle
-        self._start_angle = float(angle)
-        return self
-
-    def sort_by(
-        self, key: Optional[Union[str, Callable[[Node], Any]]] = None
-    ) -> Union[Optional[Union[str, Callable]], Self]:
-        """
-        Get or set the sort key for node ordering.
-
-        Options:
-        - None: Keep original order
-        - 'degree': Sort by node degree (connections)
-        - callable: Custom function taking a Node and returning a sort key
-
-        Args:
-            key: Sort key. If None when called as getter, returns current value.
-
-        Returns:
-            Current value or self for chaining.
-        """
-        if key is None:
-            return self._sort_by
-        self._sort_by = key
-        return self
+    @sort_by.setter
+    def sort_by(self, value: Optional[Union[str, Callable[[Node], Any]]]) -> None:
+        """Set sort key for node ordering."""
+        self._sort_by = value
 
     # -------------------------------------------------------------------------
     # Layout Computation

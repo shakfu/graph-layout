@@ -12,6 +12,7 @@ A collection of graph layout algorithms in Python.
 | | `SpringLayout` | Simple Hooke's law spring forces |
 | **Hierarchical** | `SugiyamaLayout` | Layered DAG drawing (Sugiyama method) |
 | | `ReingoldTilfordLayout` | Classic tree layout |
+| | `RadialTreeLayout` | Radial tree with root at center |
 | **Circular** | `CircularLayout` | Nodes arranged on a circle |
 | | `ShellLayout` | Concentric circles by degree or grouping |
 | **Spectral** | `SpectralLayout` | Laplacian eigenvector embedding |
@@ -36,9 +37,9 @@ uv sync
 ### Force-Directed Layout
 
 ```python
-from graph_layout.force import FruchtermanReingoldLayout
+from graph_layout import FruchtermanReingoldLayout
 
-nodes = [{'x': 0, 'y': 0} for _ in range(6)]
+nodes = [{} for _ in range(6)]
 links = [
     {'source': 0, 'target': 1},
     {'source': 1, 'target': 2},
@@ -48,20 +49,22 @@ links = [
     {'source': 2, 'target': 3},
 ]
 
-layout = (FruchtermanReingoldLayout()
-    .nodes(nodes)
-    .links(links)
-    .size([800, 600])
-    .start())
+layout = FruchtermanReingoldLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    iterations=300,
+)
+layout.run()
 
-for i, node in enumerate(layout.nodes()):
+for i, node in enumerate(layout.nodes):
     print(f"Node {i}: ({node.x:.1f}, {node.y:.1f})")
 ```
 
 ### Cola (Constraint-Based) Layout
 
 ```python
-from graph_layout.cola import Layout
+from graph_layout import ColaLayoutAdapter
 
 nodes = [
     {'x': 0, 'y': 0, 'width': 50, 'height': 30},
@@ -73,21 +76,22 @@ links = [
     {'source': 1, 'target': 2},
 ]
 
-layout = (Layout()
-    .nodes(nodes)
-    .links(links)
-    .avoid_overlaps(True)
-    .link_distance(100)
-    .start())
+layout = ColaLayoutAdapter(
+    nodes=nodes,
+    links=links,
+    avoid_overlaps=True,
+    link_distance=100,
+)
+layout.run()
 ```
 
 ### Hierarchical Layout (Trees/DAGs)
 
 ```python
-from graph_layout.hierarchical import SugiyamaLayout
+from graph_layout import SugiyamaLayout
 
 # Tree structure
-nodes = [{'x': 0, 'y': 0} for _ in range(7)]
+nodes = [{} for _ in range(7)]
 links = [
     {'source': 0, 'target': 1},
     {'source': 0, 'target': 2},
@@ -97,39 +101,45 @@ links = [
     {'source': 2, 'target': 6},
 ]
 
-layout = (SugiyamaLayout()
-    .nodes(nodes)
-    .links(links)
-    .layer_separation(80)
-    .node_separation(50)
-    .start())
+layout = SugiyamaLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    layer_separation=80,
+    node_separation=50,
+)
+layout.run()
 ```
 
 ### Circular Layout
 
 ```python
-from graph_layout.circular import CircularLayout, ShellLayout
+from graph_layout import CircularLayout, ShellLayout
 
-nodes = [{'x': 0, 'y': 0} for _ in range(10)]
+nodes = [{} for _ in range(10)]
 links = [{'source': i, 'target': (i + 1) % 10} for i in range(10)]
 
 # Simple circular
-layout = CircularLayout().nodes(nodes).links(links).start()
+layout = CircularLayout(nodes=nodes, links=links, size=(800, 600))
+layout.run()
 
 # Concentric shells by degree
-layout = ShellLayout().nodes(nodes).links(links).auto_shells(2).start()
+layout = ShellLayout(nodes=nodes, links=links, size=(800, 600), auto_shells=2)
+layout.run()
 ```
 
 ### Spectral Layout
 
 ```python
-from graph_layout.spectral import SpectralLayout
+from graph_layout import SpectralLayout
 
-layout = (SpectralLayout()
-    .nodes(nodes)
-    .links(links)
-    .normalized(True)
-    .start())
+layout = SpectralLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    normalized=True,
+)
+layout.run()
 ```
 
 ## Visualization
@@ -161,34 +171,57 @@ This creates images in `./build/` showing each algorithm's output.
 ### Cola: Overlap Avoidance & Constraints
 
 ```python
-from graph_layout.cola import Layout, Group
+from graph_layout import ColaLayoutAdapter
 from graph_layout.cola.linklengths import SeparationConstraint
 
 # Overlap avoidance
-layout = Layout().nodes(nodes).links(links).avoid_overlaps(True).start()
+layout = ColaLayoutAdapter(
+    nodes=nodes,
+    links=links,
+    avoid_overlaps=True,
+)
+layout.run()
 
 # Hierarchical groups
-groups = [Group(leaves=[0, 1], padding=10), Group(leaves=[2, 3], padding=10)]
-layout = Layout().nodes(nodes).links(links).groups(groups).start()
+groups = [{'leaves': [0, 1], 'padding': 10}, {'leaves': [2, 3], 'padding': 10}]
+layout = ColaLayoutAdapter(
+    nodes=nodes,
+    links=links,
+    groups=groups,
+)
+layout.run()
 
 # Separation constraints
 constraint = SeparationConstraint(axis='x', left=0, right=1, gap=50)
-layout = Layout().nodes(nodes).links(links).constraints([constraint]).start()
+layout = ColaLayoutAdapter(
+    nodes=nodes,
+    links=links,
+    constraints=[constraint],
+)
+layout.run()
 ```
 
 ### Event System (Animation)
 
 ```python
-from graph_layout.force import FruchtermanReingoldLayout
+from graph_layout import FruchtermanReingoldLayout
 from graph_layout.types import EventType
-
-layout = FruchtermanReingoldLayout().nodes(nodes).links(links)
 
 def on_tick(event):
     print(f"Alpha: {event['alpha']:.3f}")
 
+layout = FruchtermanReingoldLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    on_tick=on_tick,
+)
+layout.run()
+
+# Or register events after construction
+layout = FruchtermanReingoldLayout(nodes=nodes, links=links)
 layout.on(EventType.tick, on_tick)
-layout.start()
+layout.run()
 ```
 
 ### 3D Layout
@@ -203,6 +236,36 @@ layout = Layout3D(nodes, links, ideal_link_length=1.0)
 layout.start(iterations=100)
 ```
 
+### Configuration via Properties
+
+All layout algorithms support configuration via constructor parameters and properties:
+
+```python
+from graph_layout import FruchtermanReingoldLayout
+
+# Configure via constructor
+layout = FruchtermanReingoldLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    iterations=300,
+    temperature=100.0,
+    cooling_factor=0.95,
+)
+
+# Or modify properties after construction
+layout = FruchtermanReingoldLayout()
+layout.nodes = nodes
+layout.links = links
+layout.size = (800, 600)
+layout.temperature = 50.0
+layout.run()
+
+# Access results via properties
+for node in layout.nodes:
+    print(f"({node.x}, {node.y})")
+```
+
 ## Module Structure
 
 ```
@@ -213,6 +276,7 @@ graph_layout/
     cola/                    # Constraint-based layout (WebCola port)
         layout.py            # Main 2D layout
         layout3d.py          # 3D layout
+        adapter.py           # ColaLayoutAdapter (Pythonic API)
         descent.py           # Gradient descent optimizer
         vpsc.py              # VPSC constraint solver
         ...
@@ -223,6 +287,7 @@ graph_layout/
     hierarchical/            # Tree and DAG layouts
         sugiyama.py
         reingold_tilford.py
+        radial_tree.py
     circular/                # Circular layouts
         circular.py
         shell.py

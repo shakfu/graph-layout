@@ -39,6 +39,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Falls back to pure Python implementation seamlessly
   - Both naive O(n^2) and Barnes-Hut O(n log n) modes accelerated
 
+- **Graph preprocessing utilities** (`preprocessing.py`):
+  - `detect_cycle()` / `has_cycle()` - Detect cycles in directed graphs
+  - `remove_cycles()` - Make graph acyclic by reversing back edges
+  - `topological_sort()` - Kahn's algorithm for DAG ordering
+  - `connected_components()` / `is_connected()` - Find graph connectivity
+  - `assign_layers_longest_path()` - Layer assignment for hierarchical layouts
+  - `minimize_crossings_barycenter()` - Reduce edge crossings between layers
+  - `count_crossings()` - Count edge crossings in layered layouts
+
 - **Python 3.14 support** in wheel builds (cibuildwheel v3.3.0)
 
 - **QEMU support** for aarch64 Linux wheel builds in CI
@@ -48,6 +57,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `MANIFEST.in` for source distribution
   - Trusted Publishing workflow for GitHub Actions
   - Wheel collection job in CI workflow
+
+- **Documentation**:
+  - `docs/algorithms-guide.md` - Comprehensive guide to all layout algorithms with images, parameters, and decision guide
+  - `docs/preprocessing-guide.md` - Guide to graph preprocessing utilities with examples and complete pipeline
 
 ### Changed
 - Moved Cython extensions from `cola/` subdirectory to package root for use by all algorithms

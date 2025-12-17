@@ -74,6 +74,19 @@ from .types import (
     is_group,
 )
 
+# Preprocessing utilities
+from .preprocessing import (
+    assign_layers_longest_path,
+    connected_components,
+    count_crossings,
+    detect_cycle,
+    has_cycle,
+    is_connected,
+    minimize_crossings_barycenter,
+    remove_cycles,
+    topological_sort,
+)
+
 # Validation utilities
 from .validation import (
     InvalidCanvasSizeError,
@@ -141,4 +154,14 @@ __all__ = [
     "validate_canvas_size",
     "validate_link_indices",
     "validate_group_indices",
+    # Preprocessing
+    "detect_cycle",
+    "has_cycle",
+    "remove_cycles",
+    "topological_sort",
+    "connected_components",
+    "is_connected",
+    "assign_layers_longest_path",
+    "minimize_crossings_barycenter",
+    "count_crossings",
 ]

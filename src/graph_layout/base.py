@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
-from typing_extensions import Self
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 from .types import (
     Event,

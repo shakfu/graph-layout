@@ -41,17 +41,54 @@ Consider CuPy backend for large graphs:
 
 ---
 
+## Potential New Layout Algorithms
+
+### High Value (commonly requested)
+
+| Algorithm | Description | Use Case |
+|-----------|-------------|----------|
+| **ForceAtlas2** | Gephi's force-directed algorithm with LinLog mode | Large networks, community visualization |
+| **Yifan Hu** | Multilevel force-directed, fast for large graphs | Medium-large graphs (1K-100K nodes) |
+| **Stress Majorization** | Better optimized stress minimization than KK | When KK quality is needed but faster |
+| **Pivot MDS** | Fast MDS approximation using pivots | Large graphs where spectral is too slow |
+
+### Specialized Layouts
+
+| Algorithm | Description | Use Case |
+|-----------|-------------|----------|
+| **Bipartite** | Two parallel rows for bipartite graphs | User-item, author-paper networks |
+| **Arc Diagram** | Nodes on line, arcs above/below | Sequence data, timelines |
+| **Orthogonal** | Edges as horizontal/vertical only | Circuit diagrams, flowcharts |
+| **Grid** | Nodes on regular grid | When uniform spacing needed |
+| **Random** | Random positions | Baseline, starting point |
+
+### Tree Variants
+
+| Algorithm | Description | Use Case |
+|-----------|-------------|----------|
+| **Dendrogram** | Hierarchical clustering tree | Clustering results |
+| **Icicle/Sunburst** | Space-filling tree | File systems, hierarchies with size |
+| **Balloon Tree** | Circular subtree packing | Dense trees |
+
+### Modern/Research
+
+| Algorithm | Description | Use Case |
+|-----------|-------------|----------|
+| **UMAP layout** | Graph from UMAP embedding | High-dimensional data |
+| **t-SNE layout** | Graph from t-SNE embedding | Cluster visualization |
+| **CoSE** | Compound Spring Embedder | Nested/grouped graphs |
+
+---
+
 ## Missing Features
 
-Features common in other graph layout libraries that are not yet implemented:
+Other features common in graph layout libraries that are not yet implemented:
 
 | Feature | Description |
 |---------|-------------|
 | Hierarchical Edge Bundling | Reduce visual clutter in dense graphs |
 | Multi-level Layout | Coarsening/refinement for very large graphs |
 | Layout Blending/Morphing | Animation between layout states |
-| Bipartite Layout | Specialized layout for bipartite graphs |
-| Force Atlas 2 | Popular algorithm from Gephi |
 | Node Label Placement | Automatic label positioning to avoid overlaps |
 
 ---

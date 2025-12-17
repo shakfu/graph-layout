@@ -15,6 +15,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [0.2.0] - Multi-Algorithm Layout Library
+
+### Added
+- **New layout algorithm families** expanding beyond Cola:
+  - **Force-Directed**: `FruchtermanReingoldLayout`, `KamadaKawaiLayout`, `SpringLayout`
+  - **Hierarchical**: `SugiyamaLayout`, `ReingoldTilfordLayout`
+  - **Circular**: `CircularLayout`, `ShellLayout`
+  - **Spectral**: `SpectralLayout`
+- **Shared infrastructure** (`base.py`, `types.py`):
+  - `BaseLayout` - Abstract base for all layout algorithms
+  - `IterativeLayout` - Base for iterative/animated layouts (force-directed)
+  - `StaticLayout` - Base for single-pass layouts (circular, hierarchical)
+  - Common `Node`, `Link`, `Group`, `EventType` types
+- **Visualization script** (`scripts/visualize.py`):
+  - Generates images for all algorithms to `./build/`
+  - Individual layout images and comparison images
+- **Comprehensive test suite** for all new algorithms (409 tests total)
+
+### Changed
+- Reorganized package structure with algorithm families as subpackages
+- Renamed package from `pycola` to `graph_layout`
+- All layouts now use consistent fluent API pattern
+- Updated README with documentation for all algorithms
+- Updated pyproject.toml with new package structure
+
+### Algorithm Details
+
+| Algorithm | Module | Description |
+|-----------|--------|-------------|
+| `FruchtermanReingoldLayout` | `force/` | Classic force-directed with temperature cooling |
+| `KamadaKawaiLayout` | `force/` | Stress minimization using graph-theoretic distances |
+| `SpringLayout` | `force/` | Simple Hooke's law spring forces |
+| `SugiyamaLayout` | `hierarchical/` | Layered DAG drawing with crossing minimization |
+| `ReingoldTilfordLayout` | `hierarchical/` | Compact tree layout |
+| `CircularLayout` | `circular/` | Nodes on a single circle |
+| `ShellLayout` | `circular/` | Concentric circles by degree/grouping |
+| `SpectralLayout` | `spectral/` | Laplacian eigenvector embedding |
+
+---
+
 ## [0.1.2] - Cython Shortest Paths Optimization
 
 ### Added

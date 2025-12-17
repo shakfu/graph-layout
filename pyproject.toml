@@ -46,6 +46,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.13.3",
     "Cython>=3.0.0",
+    "matplotlib>=3.9.4",
 ]
 
 [project.urls]
@@ -116,6 +117,8 @@ select = ["E", "F", "I", "N", "W"]
 "src/graph_layout/hierarchical/*.py" = ["N806"]
 # Tests: allow mathematical names, lambdas, explicit boolean comparisons, unused setup vars, class args
 "tests/*.py" = ["N803", "N806", "E741", "E731", "E712", "F841"]
+# Scripts: allow class variable names
+"scripts/*.py" = ["N803", "N806", "E741"]
 
 [tool.ruff.format]
 quote-style = "double"

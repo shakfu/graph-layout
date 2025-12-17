@@ -280,11 +280,11 @@ except ImportError:
 
 | Scenario | Implementation | Performance |
 |----------|---------------|-------------|
-| **Standard install from PyPI** | Cython (wheel) | ⚡⚡⚡ Fastest |
-| **Install with `[fast]` extra** | scipy | ⚡⚡⚡ Fastest (similar) |
-| **Source install, no compiler** | Pure Python | ⚡ Slowest (100x slower) |
-| **PyPy interpreter** | Pure Python | ⚡ Slowest |
-| **Unsupported platform** | Pure Python | ⚡ Slowest |
+| **Standard install from PyPI** | Cython (wheel) |  Fastest |
+| **Install with `[fast]` extra** | scipy |  Fastest (similar) |
+| **Source install, no compiler** | Pure Python |  Slowest (100x slower) |
+| **PyPy interpreter** | Pure Python |  Slowest |
+| **Unsupported platform** | Pure Python |  Slowest |
 
 ### Advanced Features
 
@@ -378,9 +378,9 @@ if impl == "python":
     print("WARNING: Running in pure Python mode (slow)")
     print("Install scipy: pip install graph-layout[fast]")
 elif impl == "cython":
-    print("✓ Using Cython (optimal)")
+    print("[x] Using Cython (optimal)")
 elif impl == "scipy":
-    print("✓ Using scipy (optimal)")
+    print("[x] Using scipy (optimal)")
 ```
 
 **Benchmark**:

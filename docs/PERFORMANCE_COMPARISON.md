@@ -144,9 +144,9 @@ def compute_derivatives_numba(...):
 ## Conclusion
 
 The vectorization optimization was a **major success**:
-- ✅ 20-170x speedup achieved
-- ✅ All tests still pass (numerical correctness maintained)
-- ✅ Bottleneck identified: shortest paths
-- ✅ Clear path forward for additional 10-50x improvements
+- [x] 20-170x speedup achieved
+- [x] All tests still pass (numerical correctness maintained)
+- [x] Bottleneck identified: shortest paths
+- [x] Clear path forward for additional 10-50x improvements
 
 PyCola is now **competitive with optimized implementations** for medium-sized graphs, and large graphs that previously took 2 minutes now complete in ~6 seconds.

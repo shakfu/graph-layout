@@ -1,0 +1,17 @@
+# Include essential files
+include LICENSE
+include README.md
+include pyproject.toml
+include setup.py
+
+# Include Cython source files for building from source
+recursive-include src/graph_layout/cola *.pyx *.pxd
+
+# Include type stubs
+include src/graph_layout/py.typed
+
+# Exclude build artifacts
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store

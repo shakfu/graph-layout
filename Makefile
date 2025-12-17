@@ -1,10 +1,7 @@
 # graph-layout Makefile
 # Build system for graph layout algorithms in Python
 
-.PHONY: help install install-dev clean test test-watch test-coverage lint format check typecheck all dev sync
-
-UV := uv
-UV_RUN := $(UV) run
+.PHONY: help install install-dev clean test test-watch test-coverage lint format check typecheck all dev sync build publish publish-test
 
 # Source and test directories
 SRC_DIR := src/graph_layout
@@ -40,82 +37,85 @@ help:
 	@echo "Development:"
 	@echo "  make all          - Run full CI pipeline (sync + verify)"
 	@echo "  make fix          - Auto-fix formatting and linting issues"
+	@echo ""
+	@echo "Publishing:"
+	@echo "  make build        - Build sdist and wheel"
+	@echo "  make publish-test - Upload to TestPyPI"
+	@echo "  make publish      - Upload to PyPI"
 
 # Sync all dependencies from lockfile (runtime + dev)
 sync:
-	$(UV) sync
+	@uv sync
 
 # Install runtime dependencies only
 install:
-	$(UV) sync --no-dev
+	@uv sync --no-dev
 
 # Install dev dependencies (alias for sync)
 dev: sync
 
 # Run tests
 test:
-	$(UV_RUN) pytest
+	@uv run pytest
 
 # Run tests in watch mode
 test-watch:
-	$(UV_RUN) pytest-watch -- -v
+	@uv run pytest-watch -- -v
 
 # Run tests with coverage
 test-coverage:
-	$(UV_RUN) pytest --cov=$(SRC_DIR) --cov-report=term-missing
+	@uv run pytest --cov=$(SRC_DIR) --cov-report=term-missing
 
 # Run tests with HTML coverage report
 test-html:
-	$(UV_RUN) pytest --cov=$(SRC_DIR) --cov-report=html
+	@uv run pytest --cov=$(SRC_DIR) --cov-report=html
 	@echo "Coverage report generated in htmlcov/index.html"
 
 # Format code with ruff
 format:
-	$(UV_RUN) ruff format $(ALL_DIRS)
+	@uv run ruff format $(ALL_DIRS)
 
 # Lint code with ruff
 lint:
-	$(UV_RUN) ruff check --fix $(ALL_DIRS)
+	@uv run ruff check --fix $(ALL_DIRS)
 
 # Check formatting and linting without fixing
 check:
 	@echo "Checking code formatting..."
-	$(UV_RUN) ruff format --check $(ALL_DIRS)
+	@uv run ruff format --check $(ALL_DIRS)
 	@echo "Running linter..."
-	$(UV_RUN) ruff check $(ALL_DIRS)
+	@uv run ruff check $(ALL_DIRS)
 
 # Run mypy type checking
 typecheck:
-	$(UV_RUN) mypy $(SRC_DIR)
+	@uv run mypy $(SRC_DIR)
 
 # Fix formatting and linting issues automatically
 fix:
-	$(UV_RUN) ruff format $(ALL_DIRS)
-	$(UV_RUN) ruff check --fix $(ALL_DIRS)
+	@uv run ruff format $(ALL_DIRS)
+	@uv run ruff check --fix $(ALL_DIRS)
 
 # Run all verification steps
 verify: check typecheck test
 
 # Clean build artifacts and cache
 clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
-	find . -type f -name "*.pyd" -delete
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name "*.egg" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-	rm -rf htmlcov/
-	rm -rf dist/
-	rm -rf build/
-	rm -f .coverage
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete
+	@find . -type f -name "*.pyo" -delete
+	@find . -type f -name "*.pyd" -delete
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name "*.egg" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".*_cache" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf htmlcov/
+	@rm -rf dist/
+	@rm -rf build/
+	@rm -f .coverage
 
 # Deep clean including virtualenv
 distclean: clean
-	rm -rf venv/
-	rm -rf .venv/
+	@rm -rf venv/
+	@rm -rf .venv/
 
 # Full CI pipeline
 all: sync verify
@@ -126,10 +126,22 @@ pre-commit: fix verify
 # Show Python and package versions
 version:
 	@echo "uv version:"
-	@$(UV) --version
+	@uv --version
 	@echo ""
 	@echo "Python version:"
-	@$(UV_RUN) python --version
+	@uv run python --version
 	@echo ""
 	@echo "Installed packages:"
-	@$(UV) pip list | grep -E "(numpy|sortedcontainers|pytest|mypy|ruff)" || echo "No packages installed yet"
+	@uv pip list | grep -E "(numpy|sortedcontainers|pytest|mypy|ruff)" || echo "No packages installed yet"
+
+# Build sdist and wheel
+build: clean
+	@uv run python -m build
+
+# Upload to TestPyPI
+publish-test: build
+	@uv run twine upload --repository testpypi dist/*
+
+# Upload to PyPI
+publish: build
+	@uv run twine upload dist/*

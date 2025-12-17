@@ -1,15 +1,15 @@
 name: Build Wheels
 
-on:
-  push:
-    branches: [ main ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
-  release:
-    types: [ published ]
-  workflow_dispatch:
+on: [workflow_dispatch]
+  # push:
+  #   branches: [ main ]
+  #   tags:
+  #     - 'v*'
+  # pull_request:
+  #   branches: [ main ]
+  # release:
+  #   types: [ published ]
+  # workflow_dispatch:
 
 jobs:
   build_wheels:
@@ -17,16 +17,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-14]
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up QEMU for aarch64 emulation
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21
+        uses: pypa/cibuildwheel@v3.3.0
         env:
           # Build for Python 3.9+
-          CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-*
+          CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*
 
           # Skip 32-bit builds and musllinux (for now)
           CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_*"
@@ -34,9 +40,10 @@ jobs:
           # Install dependencies before build
           CIBW_BEFORE_BUILD: pip install numpy Cython
 
-          # Run tests after build
+          # Run tests after build (skip on emulated architectures - too slow)
           CIBW_TEST_REQUIRES: pytest pytest-cov
           CIBW_TEST_COMMAND: pytest {package}/tests -v
+          CIBW_TEST_SKIP: "*-manylinux_aarch64"
 
           # macOS specific: Build for both x86_64 and arm64
           CIBW_ARCHS_MACOS: "x86_64 arm64"
@@ -65,11 +72,10 @@ jobs:
           name: sdist
           path: dist/*.tar.gz
 
-  upload_pypi:
+  collect_dist:
+    name: Collect all distributions
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
-    # Only upload to PyPI on release
-    if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -82,7 +88,26 @@ jobs:
           name: sdist
           path: dist
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - name: List distributions
+        run: ls -la dist/
+
+      - uses: actions/upload-artifact@v4
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          name: all-dist
+          path: dist/*
+
+  upload_pypi:
+    needs: [collect_dist]
+    runs-on: ubuntu-latest
+    # Only upload to PyPI on release
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: all-dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

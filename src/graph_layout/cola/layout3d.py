@@ -6,16 +6,16 @@ This module extends the force-directed layout to 3D space.
 
 from __future__ import annotations
 
-from typing import Optional
-import numpy as np
 import math
 import random
+from typing import Optional
 
-from .shortestpaths import Calculator
+import numpy as np
+
 from .descent import Descent
-from .rectangle import Projection, GraphNode, Rectangle
-from .vpsc import Variable
-from .linklengths import jaccard_link_lengths, LinkLengthAccessor
+from .linklengths import LinkLengthAccessor, jaccard_link_lengths
+from .rectangle import GraphNode, Projection
+from .shortestpaths import Calculator
 
 
 class Link3D:
@@ -63,8 +63,8 @@ class _LinkAccessor3D(LinkLengthAccessor[Link3D]):
     def get_target_index(self, e: Link3D) -> int:
         return e.target
 
-    def set_length(self, e: Link3D, l: float) -> None:
-        e.length = l
+    def set_length(self, l: Link3D, value: float) -> None:
+        l.length = value
 
 
 class Layout3D:
@@ -162,8 +162,9 @@ class Layout3D:
 
         # Add constraints if specified
         if self.constraints:
+            from typing import cast
             self.descent.project = Projection(
-                self.nodes,
+                cast(list[GraphNode], self.nodes),
                 [],
                 constraints=self.constraints
             ).project_functions()

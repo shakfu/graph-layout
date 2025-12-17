@@ -11,18 +11,23 @@ The implementation is selected automatically at import time based on availabilit
 
 from __future__ import annotations
 
-from typing import Callable, TypeVar, Optional
 import warnings
+from typing import Any, Callable, Optional, TypeVar, cast
+
+
+class PerformanceWarning(UserWarning):
+    """Warning about performance-related issues."""
+    pass
 
 T = TypeVar("T")
 
 # Determine which implementation to use
 _IMPLEMENTATION = "unknown"
-_Calculator = None
+_Calculator: Optional[Any] = None
 
 # Try Cython implementation first
 try:
-    from . import _shortestpaths_cy
+    from . import _shortestpaths_cy  # type: ignore[attr-defined]
     _Calculator = _shortestpaths_cy.Calculator
     _IMPLEMENTATION = "cython"
 except ImportError as e:
@@ -79,7 +84,8 @@ class Calculator:
 
         if _IMPLEMENTATION in ("cython", "python"):
             # Use Cython or pure Python Calculator directly
-            self._calc = _Calculator(n, edges, get_source_index, get_target_index, get_length)
+            assert _Calculator is not None
+            self._calc: Any = _Calculator(n, edges, get_source_index, get_target_index, get_length)
             self._scipy_mode = False
         else:
             # Build adjacency matrix for scipy
@@ -96,7 +102,6 @@ class Calculator:
 
     def _build_scipy_graph(self) -> None:
         """Build scipy sparse graph representation."""
-        import numpy as np
         from scipy.sparse import csr_matrix
 
         # Build edge lists
@@ -133,7 +138,6 @@ class Calculator:
         """
         if self._scipy_mode:
             from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-            import numpy as np
 
             # Compute all-pairs shortest paths
             dist_matrix = scipy_shortest_path(
@@ -144,9 +148,9 @@ class Calculator:
             )
 
             # Convert to list of lists
-            return dist_matrix.tolist()
+            return cast(list[list[float]], dist_matrix.tolist())
         else:
-            return self._calc.distance_matrix()
+            return cast(list[list[float]], self._calc.distance_matrix())
 
     def distances_from_node(self, start: int) -> list[float]:
         """
@@ -160,7 +164,6 @@ class Calculator:
         """
         if self._scipy_mode:
             from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-            import numpy as np
 
             # Compute shortest paths from single source
             distances = scipy_shortest_path(
@@ -171,9 +174,9 @@ class Calculator:
                 return_predecessors=False
             )
 
-            return distances.tolist()
+            return cast(list[float], distances.tolist())
         else:
-            return self._calc.distances_from_node(start)
+            return cast(list[float], self._calc.distances_from_node(start))
 
     def path_from_node_to_node(self, start: int, end: int) -> list[int]:
         """
@@ -188,7 +191,6 @@ class Calculator:
         """
         if self._scipy_mode:
             from scipy.sparse.csgraph import shortest_path as scipy_shortest_path
-            import numpy as np
 
             # Get predecessors for path reconstruction
             _, predecessors = scipy_shortest_path(
@@ -208,7 +210,7 @@ class Calculator:
 
             return path
         else:
-            return self._calc.path_from_node_to_node(start, end)
+            return cast(list[int], self._calc.path_from_node_to_node(start, end))
 
     def path_from_node_to_node_with_prev_cost(
         self, start: int, end: int, prev_cost: Callable[[int, int, int], float]
@@ -241,7 +243,6 @@ def get_implementation() -> str:
 
 
 # Re-export classes from pure Python implementation for compatibility
-from ._shortestpaths_py import Neighbour, Node, QueueEntry
 
 
 # Warn user about implementation choice
@@ -256,8 +257,3 @@ if _IMPLEMENTATION == "python":
 elif _IMPLEMENTATION == "scipy":
     # Scipy is good, but let user know Cython would be better if they build from source
     pass  # Silent - scipy is fast enough
-
-
-class PerformanceWarning(UserWarning):
-    """Warning about performance-related issues."""
-    pass

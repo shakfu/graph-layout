@@ -7,9 +7,10 @@ to minimize stress in graph layouts with ideal edge lengths.
 
 from __future__ import annotations
 
-from typing import Optional, Callable
-import numpy as np
 import math
+from typing import Callable, Optional
+
+import numpy as np
 
 
 class Locks:
@@ -131,7 +132,7 @@ class Descent:
         self.min_d = float('inf')
         for i in range(self.n):
             for j in range(i + 1, self.n):
-                d = D[i, j]
+                d = float(D[i, j])
                 if d > 0 and d < self.min_d:
                     self.min_d = d
         if self.min_d == float('inf'):
@@ -219,27 +220,31 @@ class Descent:
         # Filter out diagonal, non-finite ideal distances, and P-stress cases
         valid_mask = ~diagonal_mask & np.isfinite(self.D) & ~p_stress_mask
 
-        # Ideal distances
-        ideal_dist = np.where(valid_mask, self.D, 1.0)  # Use 1.0 as safe default
+        # Ideal distances - use 1.0 as safe default to avoid division by zero
+        # Note: we must set safe defaults BEFORE computing derived values
+        ideal_dist = np.where(valid_mask & (self.D > 0), self.D, 1.0)
         ideal_dist_sq = ideal_dist ** 2
 
         # Safe distances for division (use 1.0 where invalid to avoid div-by-zero)
-        safe_distances = np.where(valid_mask, distances, 1.0)
-        safe_dist_sq = np.where(valid_mask, dist_squared, 1.0)
+        safe_distances = np.where(valid_mask & (distances > 0), distances, 1.0)
+        safe_dist_sq = np.where(valid_mask & (dist_squared > 0), dist_squared, 1.0)
         safe_dist_cubed = safe_dist_sq * safe_distances
 
         # Gradient scalar: gs = 2 * weight * (distance - ideal) / (ideal^2 * distance)
         # Shape: (n, n)
+        # Compute safely then mask - avoids numpy computing invalid values
+        gs_denom = ideal_dist_sq * safe_distances
         gs = np.where(
             valid_mask,
-            2 * weights * (safe_distances - ideal_dist) / (ideal_dist_sq * safe_distances),
+            2 * weights * (safe_distances - ideal_dist) / gs_denom,
             0.0
         )
 
         # Hessian scalar: hs = -2 * weight / (ideal^2 * distance^3)
+        hs_denom = ideal_dist_sq * safe_dist_cubed
         hs = np.where(
             valid_mask,
-            -2 * weights / (ideal_dist_sq * safe_dist_cubed),
+            -2 * weights / hs_denom,
             0.0
         )
 
@@ -409,7 +414,7 @@ class Descent:
         # Compute weighted average
         new_x = (self.a + 2.0 * self.b + 2.0 * self.c + self.d) / 6.0
         diff = self.x - new_x
-        disp = np.sum(diff * diff)
+        disp: float = float(np.sum(diff * diff))
         self.x[:] = new_x
 
         return disp

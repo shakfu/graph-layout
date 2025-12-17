@@ -1,7 +1,6 @@
 """Tests for shortest paths calculator."""
 
-import pytest
-from pycola.shortestpaths import Calculator
+from graph_layout.cola.shortestpaths import Calculator
 
 
 class Edge:

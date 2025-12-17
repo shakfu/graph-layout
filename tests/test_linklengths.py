@@ -1,11 +1,16 @@
 """Tests for linklengths module."""
 
-import pytest
-from pycola.linklengths import (
-    LinkAccessor, LinkLengthAccessor, LinkSepAccessor,
-    symmetric_diff_link_lengths, jaccard_link_lengths,
-    SeparationConstraint, AlignmentConstraint, AlignmentSpecification,
-    generate_directed_edge_constraints, strongly_connected_components
+from graph_layout.cola.linklengths import (
+    AlignmentConstraint,
+    AlignmentSpecification,
+    LinkAccessor,
+    LinkLengthAccessor,
+    LinkSepAccessor,
+    SeparationConstraint,
+    generate_directed_edge_constraints,
+    jaccard_link_lengths,
+    strongly_connected_components,
+    symmetric_diff_link_lengths,
 )
 
 

@@ -1,14 +1,14 @@
 [project]
-name = "pycola"
+name = "graph-layout"
 version = "0.1.0"
-description = "Python port of WebCola: constraint-based graph layout library"
+description = "A collection of graph layout algorithms in Python"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "WebCola Contributors"}
+    {name = "graph-layout Contributors"}
 ]
-keywords = ["graph", "layout", "constraints", "optimization", "visualization"]
+keywords = ["graph", "layout", "constraints", "optimization", "visualization", "cola", "force-directed"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -49,9 +49,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/shakfu/pycola"
-Repository = "https://github.com/shakfu/pycola"
-Documentation = "https://github.com/shakfu/pycola"
+Homepage = "https://github.com/shakfu/graph-layout"
+Repository = "https://github.com/shakfu/graph-layout"
+Documentation = "https://github.com/shakfu/graph-layout"
 
 
 [tool.pytest.ini_options]
@@ -62,29 +62,71 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short --strict-markers"
 
 [tool.coverage.run]
-source = ["pycola"]
+source = ["graph_layout"]
 
 [tool.mypy]
 python_version = "3.9"
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = true
+disallow_untyped_defs = false
 ignore_missing_imports = true
+
+# Strict typing for new algorithm modules
+[[tool.mypy.overrides]]
+module = [
+    "graph_layout.base",
+    "graph_layout.types",
+    "graph_layout.force.*",
+    "graph_layout.hierarchical.*",
+    "graph_layout.circular.*",
+    "graph_layout.spectral.*",
+]
+disallow_untyped_defs = true
+warn_return_any = true
+
+# Legacy cola modules have less strict typing (ported from JavaScript)
+# These use dynamic patterns (fluent API with getter/setter overloads) that
+# don't fit well with static typing
+[[tool.mypy.overrides]]
+module = [
+    "graph_layout.cola.layout",
+    "graph_layout.cola.batch",
+    "graph_layout.cola.gridrouter",
+]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "graph_layout.cola.*"
+disallow_untyped_defs = false
+warn_return_any = false
 
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
+
+# Ignore naming conventions in modules using mathematical notation
+[tool.ruff.lint.per-file-ignores]
+"src/graph_layout/cola/*.py" = ["N803", "N806", "E741", "E731", "F841", "F401", "E501"]
+# Spectral/force/hierarchical use matrix notation (A, D, L, H for matrices)
+"src/graph_layout/spectral/*.py" = ["N806"]
+"src/graph_layout/force/*.py" = ["N806"]
+"src/graph_layout/hierarchical/*.py" = ["N806"]
+# Tests: allow mathematical names, lambdas, explicit boolean comparisons, unused setup vars, class args
+"tests/*.py" = ["N803", "N806", "E741", "E731", "E712", "F841"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 
 [tool.setuptools]
-packages = ["pycola"]
+packages = ["graph_layout", "graph_layout.cola"]
 
 [tool.setuptools.package-dir]
-pycola = "src/pycola"
+graph_layout = "src/graph_layout"
+"graph_layout.cola" = "src/graph_layout/cola"
 
 [tool.setuptools.package-data]
-pycola = ["*.pxd", "*.pyx"]
+"graph_layout.cola" = ["*.pxd", "*.pyx"]

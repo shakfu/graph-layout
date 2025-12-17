@@ -1,7 +1,6 @@
 """Tests for handledisconnected module."""
 
-import pytest
-from pycola.handledisconnected import separate_graphs, apply_packing
+from graph_layout.cola.handledisconnected import apply_packing, separate_graphs
 
 
 class SimpleNode:

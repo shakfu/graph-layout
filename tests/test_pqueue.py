@@ -1,7 +1,6 @@
 """Tests for priority queue (pairing heap) implementation."""
 
-import pytest
-from pycola.pqueue import PairingHeap, PriorityQueue
+from graph_layout.cola.pqueue import PairingHeap, PriorityQueue
 
 
 class TestPairingHeap:

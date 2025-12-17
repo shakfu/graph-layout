@@ -7,9 +7,8 @@ structure and generating constraints for directed graphs.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar, Callable, Literal, Optional, Any
 import math
-
+from typing import Callable, Generic, Literal, Optional, TypeVar
 
 T = TypeVar("T")
 Axis = Literal['x', 'y']
@@ -279,10 +278,12 @@ def strongly_connected_components(
             if w.index is None:
                 # Successor w has not yet been visited; recurse on it
                 strong_connect(w)
-                v.lowlink = min(v.lowlink, w.lowlink)
+                if v.lowlink is not None and w.lowlink is not None:
+                    v.lowlink = min(v.lowlink, w.lowlink)
             elif w.on_stack:
                 # Successor w is in stack and hence in the current SCC
-                v.lowlink = min(v.lowlink, w.index)
+                if v.lowlink is not None and w.index is not None:
+                    v.lowlink = min(v.lowlink, w.index)
 
         # If v is a root node, pop the stack and generate an SCC
         if v.lowlink == v.index:

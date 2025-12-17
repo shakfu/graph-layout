@@ -7,14 +7,13 @@ avoiding obstacles and minimizing crossings.
 
 from __future__ import annotations
 
-from typing import TypeVar, Generic, Protocol, Optional, Callable
 import math
+from typing import Callable, Generic, Optional, Protocol, TypeVar
 
 from .geom import Point
 from .rectangle import Rectangle
-from .vpsc import Variable, Constraint, Solver
 from .shortestpaths import Calculator
-
+from .vpsc import Constraint, Solver, Variable
 
 T = TypeVar('T')
 

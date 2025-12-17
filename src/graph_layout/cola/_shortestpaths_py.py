@@ -7,8 +7,9 @@ using Dijkstra's algorithm with a pairing heap priority queue.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar, Callable, Optional
-from .pqueue import PriorityQueue, PairingHeap
+from typing import Callable, Generic, Optional, TypeVar, cast
+
+from .pqueue import PairingHeap, PriorityQueue
 
 T = TypeVar("T")
 
@@ -86,9 +87,9 @@ class Calculator(Generic[T]):
         Returns:
             Matrix of shortest distances between all pairs of nodes
         """
-        D = []
+        D: list[list[float]] = []
         for i in range(self.n):
-            D.append(self._dijkstra_neighbours(i))
+            D.append(cast(list[float], self._dijkstra_neighbours(i)))
         return D
 
     def distances_from_node(self, start: int) -> list[float]:
@@ -101,7 +102,7 @@ class Calculator(Generic[T]):
         Returns:
             Array of shortest distances from start to all other nodes
         """
-        return self._dijkstra_neighbours(start)
+        return cast(list[float], self._dijkstra_neighbours(start))
 
     def path_from_node_to_node(self, start: int, end: int) -> list[int]:
         """
@@ -114,7 +115,7 @@ class Calculator(Generic[T]):
         Returns:
             List of node indices in the path (excluding start, including end)
         """
-        return self._dijkstra_neighbours(start, end)
+        return cast(list[int], self._dijkstra_neighbours(start, end))
 
     def path_from_node_to_node_with_prev_cost(
         self, start: int, end: int, prev_cost: Callable[[int, int, int], float]
@@ -139,7 +140,9 @@ class Calculator(Generic[T]):
         q.push(qu)
 
         while not q.empty():
-            qu = q.pop()
+            popped = q.pop()
+            assert popped is not None  # Queue not empty
+            qu = popped
             u = qu.node
 
             if u.id == end:
@@ -194,6 +197,7 @@ class Calculator(Generic[T]):
 
         while not q.empty():
             u = q.pop()
+            assert u is not None  # Queue not empty
             d[u.id] = u.d
 
             # If we reached destination, reconstruct path
@@ -213,6 +217,7 @@ class Calculator(Generic[T]):
                 if u.d != float('inf') and v.d > t:
                     v.d = t
                     v.prev = u
+                    assert v.q is not None  # Node was added to queue
                     q.reduce_key(v.q, v, lambda e, heap_q: setattr(e, 'q', heap_q))
 
         return d

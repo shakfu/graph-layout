@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 - **Cython-compiled shortest paths (Dijkstra's algorithm)** - 5x additional speedup
-- Optional scipy integration for even better performance (`pip install pycola[fast]`)
+- Optional scipy integration for even better performance (`pip install graph-layout[fast]`)
 - Priority cascade implementation: Cython → scipy → pure Python
 - Pre-built wheels for Linux, macOS (x86_64, arm64), and Windows
 - GitHub Actions workflow for multi-platform wheel building with cibuildwheel
@@ -40,8 +40,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Large graphs (500 nodes)**: ~1.1s (was ~115.8s) - **105x faster**
 
 ### Installation
-- **With Cython extensions** (recommended): `pip install pycola` or `uv pip install pycola`
-- **With scipy** (fastest): `pip install pycola[fast]`
+- **With Cython extensions** (recommended): `pip install graph-layout` or `uv pip install graph-layout`
+- **With scipy** (fastest): `pip install graph-layout[fast]`
 - **From source** (for development): `pip install -e .` (requires C compiler)
 
 ### Testing

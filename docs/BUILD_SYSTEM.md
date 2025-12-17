@@ -1,15 +1,15 @@
-# PyCola Build System Documentation
+# graph-layout Build System Documentation
 
-This document describes how PyCola's Cython extensions are built, distributed, and loaded.
+This document describes how graph-layout's Cython extensions are built, distributed, and loaded.
 
 ## Overview
 
-PyCola uses a **hybrid build system** with performance-optimized Cython extensions and automatic fallbacks:
+graph-layout uses a **hybrid build system** with performance-optimized Cython extensions and automatic fallbacks:
 
 ```
 Priority Cascade:
 1. Cython-compiled C extensions (fastest, default)
-2. scipy (fast, optional via pip install pycola[fast])
+2. scipy (fast, optional via pip install graph-layout[fast])
 3. Pure Python (slowest, always available)
 ```
 
@@ -24,18 +24,20 @@ Priority Cascade:
 ### File Structure
 
 ```
-src/pycola/
-├── _pqueue_cy.pyx          # Cython priority queue source
-├── _pqueue_cy.pxd          # Cython header (for cross-module imports)
-├── _shortestpaths_cy.pyx   # Cython shortest paths source
-├── _shortestpaths_py.py    # Pure Python fallback
-└── shortestpaths.py        # Wrapper with priority cascade
+src/graph_layout/
+├── __init__.py             # Main package exports
+└── cola/                   # Cola algorithm subpackage
+    ├── _pqueue_cy.pyx          # Cython priority queue source
+    ├── _pqueue_cy.pxd          # Cython header (for cross-module imports)
+    ├── _shortestpaths_cy.pyx   # Cython shortest paths source
+    ├── _shortestpaths_py.py    # Pure Python fallback
+    └── shortestpaths.py        # Wrapper with priority cascade
 
-# Generated during build:
-├── _pqueue_cy.c            # Cython-generated C code (~627KB)
-├── _shortestpaths_cy.c     # Cython-generated C code (~692KB)
-├── _pqueue_cy.cpython-313-darwin.so           # Compiled extension (macOS)
-└── _shortestpaths_cy.cpython-313-darwin.so    # Compiled extension (macOS)
+    # Generated during build:
+    ├── _pqueue_cy.c            # Cython-generated C code (~627KB)
+    ├── _shortestpaths_cy.c     # Cython-generated C code (~692KB)
+    ├── _pqueue_cy.cpython-313-darwin.so           # Compiled extension (macOS)
+    └── _shortestpaths_cy.cpython-313-darwin.so    # Compiled extension (macOS)
 ```
 
 ### Build Flow
@@ -91,13 +93,13 @@ When you run `uv sync`:
    ```python
    extensions = [
        Extension(
-           "pycola._pqueue_cy",
-           sources=["src/pycola/_pqueue_cy.pyx"],
+           "graph_layout.cola._pqueue_cy",
+           sources=["src/graph_layout/cola/_pqueue_cy.pyx"],
            extra_compile_args=["-O3", "-std=c99"],
        ),
        Extension(
-           "pycola._shortestpaths_cy",
-           sources=["src/pycola/_shortestpaths_cy.pyx"],
+           "graph_layout.cola._shortestpaths_cy",
+           sources=["src/graph_layout/cola/_shortestpaths_cy.pyx"],
            extra_compile_args=["-O3", "-std=c99"],
        ),
    ]
@@ -140,7 +142,7 @@ When you run `uv sync`:
    ```
 
 7. **Install in Editable Mode**:
-   - Extensions built in `src/pycola/` directory
+   - Extensions built in `src/graph_layout/cola/` directory
    - Python imports directly from source tree
    - Changes to `.py` files take effect immediately
    - Changes to `.pyx` files require rebuild: `uv sync`
@@ -164,17 +166,17 @@ Check if extensions are built:
 
 ```bash
 # List compiled extensions
-ls -lh src/pycola/*.so src/pycola/*.pyd 2>/dev/null
+ls -lh src/graph_layout/cola/*.so src/graph_layout/cola/*.pyd 2>/dev/null
 
 # Verify they're loaded
 uv run python -c "
-from pycola import shortestpaths
+from graph_layout.cola import shortestpaths
 print(f'Implementation: {shortestpaths.get_implementation()}')
 "
 # Expected output: "cython"
 
 # Check extension details
-file src/pycola/_pqueue_cy.cpython-313-darwin.so
+file src/graph_layout/cola/_pqueue_cy.cpython-313-darwin.so
 # macOS output: Mach-O 64-bit bundle arm64
 ```
 
@@ -217,9 +219,9 @@ cibuildwheel builds **~40 wheel files**:
 
 **Example wheel names**:
 ```
-pycola-0.1.2-cp313-cp313-macosx_11_0_arm64.whl
-pycola-0.1.2-cp313-cp313-manylinux_2_17_x86_64.whl
-pycola-0.1.2-cp313-cp313-win_amd64.whl
+graph_layout-0.1.2-cp313-cp313-macosx_11_0_arm64.whl
+graph_layout-0.1.2-cp313-cp313-manylinux_2_17_x86_64.whl
+graph_layout-0.1.2-cp313-cp313-win_amd64.whl
 ```
 
 ### Wheel Contents
@@ -229,7 +231,7 @@ Each wheel contains:
 - Pure Python `.py` files
 - Metadata in `*.dist-info/`
 
-**Advantage**: Users don't need a C compiler! Just `pip install pycola`.
+**Advantage**: Users don't need a C compiler! Just `pip install graph-layout`.
 
 ### Release Process
 
@@ -246,13 +248,13 @@ Each wheel contains:
 
 3. **On GitHub Release**:
    - Publishes to PyPI
-   - Users can `pip install pycola`
+   - Users can `pip install graph-layout`
 
 ## Priority Cascade Implementation
 
 ### Runtime Selection Logic
 
-**File**: `src/pycola/shortestpaths.py`
+**File**: `src/graph_layout/cola/shortestpaths.py`
 
 ```python
 # Try Cython implementation first
@@ -319,10 +321,10 @@ class Calculator:
 **Diagnosis**:
 ```bash
 # Check if extensions exist
-ls src/pycola/*.so
+ls src/graph_layout/cola/*.so
 
 # Check current implementation
-uv run python -c "from pycola.shortestpaths import get_implementation; print(get_implementation())"
+uv run python -c "from graph_layout.cola.shortestpaths import get_implementation; print(get_implementation())"
 ```
 
 **Solutions**:
@@ -347,19 +349,19 @@ uv run python -c "from pycola.shortestpaths import get_implementation; print(get
 
 3. **Force rebuild**:
    ```bash
-   rm -rf build/ src/pycola/*.so src/pycola/*.c
+   rm -rf build/ src/graph_layout/cola/*.so src/graph_layout/cola/*.c
    uv sync
    ```
 
 4. **Use scipy instead**:
    ```bash
-   pip install pycola[fast]
+   pip install graph-layout[fast]
    ```
 
 5. **Disable Cython** (development only):
    ```python
    # Temporarily rename .pyx files
-   mv src/pycola/_pqueue_cy.pyx src/pycola/_pqueue_cy.pyx.bak
+   mv src/graph_layout/cola/_pqueue_cy.pyx src/graph_layout/cola/_pqueue_cy.pyx.bak
    ```
 
 ### Performance Issues
@@ -367,14 +369,14 @@ uv run python -c "from pycola.shortestpaths import get_implementation; print(get
 **Check which implementation is active**:
 
 ```python
-from pycola import shortestpaths
+from graph_layout.cola import shortestpaths
 
 impl = shortestpaths.get_implementation()
 print(f"Using: {impl}")
 
 if impl == "python":
     print("WARNING: Running in pure Python mode (slow)")
-    print("Install scipy: pip install pycola[fast]")
+    print("Install scipy: pip install graph-layout[fast]")
 elif impl == "cython":
     print("✓ Using Cython (optimal)")
 elif impl == "scipy":
@@ -385,7 +387,7 @@ elif impl == "scipy":
 
 ```python
 import time
-from pycola.layout import Layout
+from graph_layout.cola.layout import Layout
 
 nodes = [{'x': 0, 'y': 0} for _ in range(100)]
 edges = [{'source': i, 'target': (i+1)%100} for i in range(100)]
@@ -424,7 +426,7 @@ conda install -c conda-forge cython numpy
 # Wheels not available for musllinux
 # Build from source with:
 apk add gcc musl-dev python3-dev
-pip install --no-binary :all: pycola
+pip install --no-binary :all: graph-layout
 ```
 
 ## Development Workflow
@@ -433,14 +435,14 @@ pip install --no-binary :all: pycola
 
 1. **Edit `.pyx` file**:
    ```bash
-   vim src/pycola/_pqueue_cy.pyx
+   vim src/graph_layout/cola/_pqueue_cy.pyx
    ```
 
 2. **Rebuild extension**:
    ```bash
    uv sync
    # Or force rebuild:
-   rm src/pycola/_pqueue_cy.c src/pycola/_pqueue_cy.*.so
+   rm src/graph_layout/cola/_pqueue_cy.c src/graph_layout/cola/_pqueue_cy.*.so
    uv sync
    ```
 
@@ -462,15 +464,15 @@ Changes to `.py` files (including `_shortestpaths_py.py`) take effect immediatel
 
 1. **Create `.pyx` file**:
    ```bash
-   vim src/pycola/_newmodule.pyx
+   vim src/graph_layout/cola/_newmodule.pyx
    ```
 
 2. **Add to `setup.py`**:
    ```python
    extensions = [
        Extension(
-           "pycola._newmodule",
-           sources=["src/pycola/_newmodule.pyx"],
+           "graph_layout.cola._newmodule",
+           sources=["src/graph_layout/cola/_newmodule.pyx"],
            extra_compile_args=extra_compile_args,
        ),
        # ... existing extensions

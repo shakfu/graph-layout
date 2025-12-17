@@ -1,12 +1,8 @@
 """Tests for 2D layout module."""
 
-import pytest
 import numpy as np
-from pycola.layout import (
-    EventType, Node, Link, Group, Layout,
-    is_group
-)
-from pycola.linklengths import SeparationConstraint
+
+from graph_layout.cola.layout import EventType, Group, Layout, Link, Node, is_group
 
 
 class TestEventType:

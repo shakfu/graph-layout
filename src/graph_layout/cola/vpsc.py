@@ -7,8 +7,7 @@ between variables while minimizing a quadratic cost function.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
-import math
+from typing import Any, Callable, Optional
 
 
 class PositionStats:
@@ -77,6 +76,7 @@ class Variable:
 
     def position(self) -> float:
         """Compute current position of this variable."""
+        assert self.block is not None, "Variable must be in a block to get position"
         return (self.block.ps.scale * self.block.posn + self.offset) / self.scale
 
     def visit_neighbours(
@@ -175,8 +175,8 @@ class Block:
 
     def traverse(
         self,
-        visit: Callable[[Constraint], any],
-        acc: list,
+        visit: Callable[[Constraint], Any],
+        acc: list[Any],
         v: Optional[Variable] = None,
         prev: Optional[Variable] = None,
     ) -> None:
@@ -289,7 +289,7 @@ class Block:
 
     def split_between(
         self, vl: Variable, vr: Variable
-    ) -> Optional[dict[str, any]]:
+    ) -> Optional[dict[str, Any]]:
         """
         Find a split point between two variables.
 
@@ -364,6 +364,7 @@ class Blocks:
         """
         left_block = c.left.block
         right_block = c.right.block
+        assert left_block is not None and right_block is not None
         dist = c.right.offset - c.left.offset - c.gap
 
         if len(left_block.vars) < len(right_block.vars):
@@ -391,10 +392,11 @@ class Blocks:
         for b in blocks_to_process:
             v = b.find_min_lm()
             if v is not None and v.lm < Solver.LAGRANGIAN_TOLERANCE:
-                b = v.left.block
+                old_block = v.left.block
+                assert old_block is not None
                 for nb in Block.split(v):
                     self.insert(nb)
-                self.remove(b)
+                self.remove(old_block)
                 inactive.append(v)
 
 
@@ -431,6 +433,7 @@ class Solver:
 
     def cost(self) -> float:
         """Get current cost."""
+        assert self.bs is not None
         return self.bs.cost()
 
     def set_starting_positions(self, ps: list[float]) -> None:
@@ -470,7 +473,7 @@ class Solver:
                     break
 
         # Remove from inactive list if it should become active
-        if delete_point < len(self.inactive):
+        if delete_point < len(self.inactive) and v is not None:
             if (min_slack < Solver.ZERO_UPPERBOUND and not v.active) or v.equality:
                 self.inactive[delete_point] = self.inactive[-1]
                 self.inactive.pop()
@@ -488,6 +491,7 @@ class Solver:
         while v is not None and (v.equality or (v.slack() < Solver.ZERO_UPPERBOUND and not v.active)):
             lb = v.left.block
             rb = v.right.block
+            assert lb is not None and rb is not None
 
             if lb is not rb:
                 # Blocks are different, merge them
@@ -529,6 +533,7 @@ class Solver:
             Final cost
         """
         self.satisfy()
+        assert self.bs is not None
         last_cost = float('inf')
         cost = self.bs.cost()
 
@@ -544,7 +549,7 @@ def remove_overlap_in_one_dimension(
     spans: list[dict[str, float]],
     lower_bound: Optional[float] = None,
     upper_bound: Optional[float] = None,
-) -> dict[str, any]:
+) -> dict[str, Any]:
     """
     Remove overlap between spans while keeping centers close to desired positions.
 

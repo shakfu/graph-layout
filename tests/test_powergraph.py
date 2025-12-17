@@ -1,9 +1,12 @@
 """Tests for powergraph module."""
 
-import pytest
-from pycola.powergraph import (
-    PowerEdge, Module, ModuleSet, LinkSets,
-    Configuration, get_groups, LinkTypeAccessor
+from graph_layout.cola.powergraph import (
+    Configuration,
+    LinkSets,
+    Module,
+    ModuleSet,
+    PowerEdge,
+    get_groups,
 )
 
 

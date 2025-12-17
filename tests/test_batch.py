@@ -1,9 +1,7 @@
 """Tests for batch module."""
 
-import pytest
-from pycola.batch import power_graph_grid_layout
-from pycola.layout import Node, Link
-from pycola.rectangle import Rectangle
+from graph_layout.cola.batch import power_graph_grid_layout
+from graph_layout.cola.layout import Link, Node
 
 
 class TestPowerGraphGridLayout:

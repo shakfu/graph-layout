@@ -1,5 +1,5 @@
-# PyCola Python Makefile
-# Build system for the Python port of WebCola
+# graph-layout Makefile
+# Build system for graph layout algorithms in Python
 
 .PHONY: help install install-dev clean test test-watch test-coverage lint format check typecheck all dev sync
 
@@ -7,13 +7,13 @@ UV := uv
 UV_RUN := $(UV) run
 
 # Source and test directories
-SRC_DIR := src/pycola
+SRC_DIR := src/graph_layout
 TEST_DIR := tests
 ALL_DIRS := $(SRC_DIR) $(TEST_DIR)
 
 # Default target
 help:
-	@echo "PyCola Python Build Commands:"
+	@echo "graph-layout Build Commands:"
 	@echo ""
 	@echo "Setup:"
 	@echo "  make sync         - Sync all dependencies from lockfile (recommended)"

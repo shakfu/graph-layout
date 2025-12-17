@@ -1,14 +1,19 @@
 """Tests for rectangle module."""
 
-import pytest
-from pycola.rectangle import (
-    Rectangle, make_edge_between, make_edge_to,
-    generate_x_constraints, generate_y_constraints,
-    remove_overlaps, Projection, GraphNode, ProjectionGroup,
-    compute_group_bounds
+from graph_layout.cola.geom import Point
+from graph_layout.cola.rectangle import (
+    GraphNode,
+    Projection,
+    ProjectionGroup,
+    Rectangle,
+    compute_group_bounds,
+    generate_x_constraints,
+    generate_y_constraints,
+    make_edge_between,
+    make_edge_to,
+    remove_overlaps,
 )
-from pycola.vpsc import Variable
-from pycola.geom import Point
+from graph_layout.cola.vpsc import Variable
 
 
 class TestRectangle:

@@ -1,14 +1,23 @@
 """Tests for geometry utilities."""
 
-import pytest
-import math
-from pycola.geom import (
-    Point, LineSegment, PolyPoint,
-    is_left, above, below,
-    convex_hull, clockwise_radial_sweep,
-    BiTangent, BiTangents, TVGPoint, VisibilityVertex, VisibilityEdge,
-    TangentVisibilityGraph, tangents, polys_overlap,
-    _tangent_point_poly_c, _line_intersection
+from graph_layout.cola.geom import (
+    BiTangent,
+    BiTangents,
+    LineSegment,
+    Point,
+    TangentVisibilityGraph,
+    TVGPoint,
+    VisibilityEdge,
+    VisibilityVertex,
+    _line_intersection,
+    _tangent_point_poly_c,
+    above,
+    below,
+    clockwise_radial_sweep,
+    convex_hull,
+    is_left,
+    polys_overlap,
+    tangents,
 )
 
 

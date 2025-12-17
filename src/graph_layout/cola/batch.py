@@ -7,10 +7,11 @@ power graph layouts with edge routing.
 
 from __future__ import annotations
 
-from typing import Any, Callable
-from .layout import Layout, Node, Link
-from .gridrouter import GridRouter
+from typing import Any
+
 from .geom import Point
+from .gridrouter import GridRouter
+from .layout import Layout, Node
 
 
 def gridify(

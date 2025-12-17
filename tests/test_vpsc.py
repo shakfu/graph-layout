@@ -1,7 +1,13 @@
 """Tests for VPSC constraint solver."""
 
-import pytest
-from pycola.vpsc import Variable, Constraint, Solver, Block, Blocks, remove_overlap_in_one_dimension
+from graph_layout.cola.vpsc import (
+    Block,
+    Blocks,
+    Constraint,
+    Solver,
+    Variable,
+    remove_overlap_in_one_dimension,
+)
 
 
 def round_to(v: float, precision: int = 4) -> float:

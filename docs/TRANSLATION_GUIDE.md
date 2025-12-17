@@ -402,7 +402,7 @@ describe('VPSC Solver', () => {
 **Python (pytest):**
 ```python
 import pytest
-from pycola.vpsc import Variable, Constraint, Solver
+from graph_layout.cola.vpsc import Variable, Constraint, Solver
 
 class TestVPSCSolver:
     def test_simple_constraint(self):

@@ -1,9 +1,8 @@
 """Tests for gradient descent stress minimization."""
 
-import pytest
 import numpy as np
-import math
-from pycola.descent import Locks, PseudoRandom, Descent
+
+from graph_layout.cola.descent import Descent, Locks, PseudoRandom
 
 
 class TestLocks:

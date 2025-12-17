@@ -1,13 +1,14 @@
 """Tests for gridrouter module."""
 
-import pytest
-import math
-from pycola.gridrouter import (
-    NodeWrapper, Vert, LongestCommonSubsequence, GridLine,
-    GridRouter, NodeAccessor
+from graph_layout.cola.geom import Point
+from graph_layout.cola.gridrouter import (
+    GridLine,
+    GridRouter,
+    LongestCommonSubsequence,
+    NodeWrapper,
+    Vert,
 )
-from pycola.geom import Point
-from pycola.rectangle import Rectangle
+from graph_layout.cola.rectangle import Rectangle
 
 
 class SimpleNode:

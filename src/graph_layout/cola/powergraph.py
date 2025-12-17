@@ -7,9 +7,9 @@ based on edge intersection patterns.
 
 from __future__ import annotations
 
-from typing import Any, TypeVar, Generic, Optional
-from .linklengths import LinkAccessor
+from typing import Any, Callable, Generic, Optional, TypeVar
 
+from .linklengths import LinkAccessor
 
 T = TypeVar('T')
 
@@ -34,7 +34,7 @@ class PowerEdge:
 class ModuleSet:
     """Set of modules indexed by ID."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.table: dict[int, Module] = {}
 
     def count(self) -> int:
@@ -66,7 +66,7 @@ class ModuleSet:
         if m.id in self.table:
             del self.table[m.id]
 
-    def for_all(self, func) -> None:
+    def for_all(self, func: Callable[['Module'], None]) -> None:
         """Apply function to all modules."""
         for module in self.table.values():
             func(module)
@@ -83,7 +83,7 @@ class ModuleSet:
 class LinkSets:
     """Links organized by type."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.sets: dict[int, ModuleSet] = {}
         self.n: int = 0
 
@@ -114,14 +114,14 @@ class LinkSets:
                 del self.sets[linktype]
             self.n -= 1
 
-    def for_all(self, func) -> None:
+    def for_all(self, func: Callable[[ModuleSet, int], None]) -> None:
         """Apply function to all (ModuleSet, linktype) pairs."""
         for linktype, module_set in self.sets.items():
             func(module_set, linktype)
 
-    def for_all_modules(self, func) -> None:
+    def for_all_modules(self, func: Callable[['Module'], None]) -> None:
         """Apply function to all modules across all link types."""
-        def wrapper(ms, lt):
+        def wrapper(ms: ModuleSet, lt: int) -> None:
             ms.for_all(func)
         self.for_all(wrapper)
 
@@ -158,8 +158,8 @@ class Module:
 
     def get_edges(self, es: list[PowerEdge]) -> None:
         """Add this module's edges to list."""
-        def add_edges(ms: ModuleSet, edgetype: int):
-            def add_edge(target: Module):
+        def add_edges(ms: ModuleSet, edgetype: int) -> None:
+            def add_edge(target: Module) -> None:
                 es.append(PowerEdge(self.id, target.id, edgetype))
             ms.for_all(add_edge)
 
@@ -186,7 +186,7 @@ class Configuration(Generic[T]):
         n: int,
         edges: list[T],
         link_accessor: LinkTypeAccessor[T],
-        root_group: Optional[list] = None
+        root_group: Optional[dict[str, Any]] = None
     ):
         """
         Initialize configuration.
@@ -267,9 +267,9 @@ class Configuration(Generic[T]):
         m = Module(len(self.modules), out_int, in_int, children)
         self.modules.append(m)
 
-        def update(s: LinkSets, incoming_attr: str, outgoing_attr: str):
-            def process_linktype(ms: ModuleSet, linktype: int):
-                def process_node(n: Module):
+        def update(s: LinkSets, incoming_attr: str, outgoing_attr: str) -> None:
+            def process_linktype(ms: ModuleSet, linktype: int) -> None:
+                def process_node(n: Module) -> None:
                     nls = getattr(n, incoming_attr)
                     nls.add(linktype, m)
                     nls.remove(linktype, a)
@@ -380,27 +380,27 @@ class Configuration(Generic[T]):
     @staticmethod
     def _get_edges(modules: ModuleSet, es: list[PowerEdge]) -> None:
         """Recursively collect edges from modules."""
-        def process_module(m: Module):
+        def process_module(m: Module) -> None:
             m.get_edges(es)
             Configuration._get_edges(m.children, es)
 
         modules.for_all(process_module)
 
 
-def _to_groups(modules: ModuleSet, group: dict, groups: list[dict]) -> None:
+def _to_groups(modules: ModuleSet, group: dict[str, Any], groups: list[dict[str, Any]]) -> None:
     """Convert module hierarchy to group structure."""
-    def process_module(m: Module):
+    def process_module(m: Module) -> None:
         if m.is_leaf():
             if 'leaves' not in group:
                 group['leaves'] = []
             group['leaves'].append(m.id)
         else:
-            g = group
+            g: dict[str, Any] = group
             m.gid = len(groups)
 
             if not m.is_island() or m.is_predefined():
                 g = {'id': m.gid}
-                if m.is_predefined():
+                if m.is_predefined() and m.definition is not None:
                     # Apply original group properties
                     for prop, value in m.definition.items():
                         g[prop] = value
@@ -419,7 +419,7 @@ def get_groups(
     nodes: list[Any],
     links: list[T],
     link_accessor: LinkTypeAccessor[T],
-    root_group: Optional[list] = None
+    root_group: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     """
     Generate power graph groups from node and link structure.

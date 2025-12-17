@@ -7,7 +7,8 @@ a full Red-Black Tree from scratch.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar, Callable, Optional
+from typing import Callable, Generic, Optional, TypeVar, cast
+
 from sortedcontainers import SortedList
 
 T = TypeVar("T")
@@ -24,14 +25,14 @@ class RBTreeIterator(Generic[T]):
         """Get next element in sorted order."""
         self.index += 1
         if 0 <= self.index < len(self.tree._data):
-            return self.tree._data[self.index]
+            return cast(T, self.tree._data[self.index])
         return None
 
     def prev(self) -> Optional[T]:
         """Get previous element in sorted order."""
         self.index -= 1
         if 0 <= self.index < len(self.tree._data):
-            return self.tree._data[self.index]
+            return cast(T, self.tree._data[self.index])
         return None
 
 
@@ -52,7 +53,15 @@ class RBTree(Generic[T]):
         if compare is not None:
             # SortedList expects a key function, so we wrap the comparator
             from functools import cmp_to_key
-            self._data = SortedList(key=cmp_to_key(compare))
+            # Wrap float comparator to return int for cmp_to_key
+            def int_compare(a: T, b: T) -> int:
+                result = compare(a, b)
+                if result < 0:
+                    return -1
+                elif result > 0:
+                    return 1
+                return 0
+            self._data: SortedList[T] = SortedList(key=cmp_to_key(int_compare))
         else:
             self._data = SortedList()
 

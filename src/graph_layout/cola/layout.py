@@ -14,50 +14,37 @@ This module implements the Layout class which provides:
 
 from __future__ import annotations
 
-from typing import Optional, Callable, Union, Any, Literal, TypedDict
-from enum import IntEnum
+from typing import Callable, Optional, TypedDict, Union
+
 import numpy as np
 
-from .powergraph import get_groups, LinkTypeAccessor
-from .linklengths import (
-    LinkLengthAccessor,
-    symmetric_diff_link_lengths,
-    jaccard_link_lengths,
-    generate_directed_edge_constraints,
-    SeparationConstraint,
-    AlignmentConstraint
+from ..types import (
+    Event,
+    EventType,
+    Group,
+    Link,
+    LinkNumericPropertyAccessor,
+    Node,
+    is_group,
 )
 from .descent import Descent
-from .rectangle import Rectangle, Projection, make_edge_to, make_edge_between
+from .geom import Point, TangentVisibilityGraph
+from .handledisconnected import apply_packing, separate_graphs
+from .linklengths import (
+    AlignmentConstraint,
+    SeparationConstraint,
+    generate_directed_edge_constraints,
+    jaccard_link_lengths,
+    symmetric_diff_link_lengths,
+)
+from .powergraph import LinkTypeAccessor, get_groups
+from .rectangle import Projection, make_edge_between, make_edge_to
 from .shortestpaths import Calculator
-from .geom import TangentVisibilityGraph, Point
-from .handledisconnected import separate_graphs, apply_packing
-from .vpsc import Variable, Constraint
-
-
-class EventType(IntEnum):
-    """
-    The layout process fires three events:
-    - start: layout iterations started
-    - tick: fired once per iteration, listen to this to animate
-    - end: layout converged, you might like to zoom-to-fit or something at notification of this event
-    """
-    start = 0
-    tick = 1
-    end = 2
-
-
-class Event(TypedDict, total=False):
-    """Event dictionary passed to event listeners."""
-    type: EventType
-    alpha: float
-    stress: Optional[float]
-    listener: Optional[Callable[[], None]]
 
 
 class InputNode(TypedDict, total=False):
     """
-    Input node specification.
+    Input node specification (TypedDict for documentation).
 
     Attributes:
         index: Index in nodes array, initialized by Layout.start()
@@ -73,101 +60,6 @@ class InputNode(TypedDict, total=False):
     width: float
     height: float
     fixed: int
-
-
-class Node:
-    """
-    Layout node with position and properties.
-
-    Client-passed nodes may be missing some properties which will be set
-    upon ingestion by the layout.
-    """
-
-    def __init__(self, **kwargs):
-        """Initialize node with optional properties."""
-        self.index: Optional[int] = kwargs.get('index')
-        self.x: float = kwargs.get('x', 0.0)
-        self.y: float = kwargs.get('y', 0.0)
-        self.width: Optional[float] = kwargs.get('width')
-        self.height: Optional[float] = kwargs.get('height')
-        self.fixed: int = kwargs.get('fixed', 0)
-        self.bounds: Optional[Rectangle] = kwargs.get('bounds')
-        self.innerBounds: Optional[Rectangle] = kwargs.get('innerBounds')
-
-        # Internal properties used during drag
-        self.px: Optional[float] = None
-        self.py: Optional[float] = None
-        self.parent: Optional[Group] = None
-
-        # Copy over any additional properties
-        for key, value in kwargs.items():
-            if not hasattr(self, key):
-                setattr(self, key, value)
-
-
-class Group:
-    """
-    Hierarchical group of nodes.
-
-    Attributes:
-        bounds: Bounding rectangle for the group
-        leaves: List of nodes in this group
-        groups: List of child groups
-        padding: Padding around group contents
-    """
-
-    def __init__(self, **kwargs):
-        """Initialize group with optional properties."""
-        self.bounds: Optional[Rectangle] = kwargs.get('bounds')
-        self.leaves: Optional[list[Union[Node, int]]] = kwargs.get('leaves')
-        self.groups: Optional[list[Union[Group, int]]] = kwargs.get('groups')
-        self.padding: float = kwargs.get('padding', 1.0)
-        self.parent: Optional[Group] = None
-        self.index: Optional[int] = None
-
-        # Copy over any additional properties
-        for key, value in kwargs.items():
-            if not hasattr(self, key):
-                setattr(self, key, value)
-
-
-def is_group(g: Any) -> bool:
-    """Check if an object is a Group."""
-    return hasattr(g, 'leaves') or hasattr(g, 'groups')
-
-
-class Link:
-    """
-    Link between two nodes.
-
-    Attributes:
-        source: Source node (or node index)
-        target: Target node (or node index)
-        length: Ideal length the layout should try to achieve for this link
-        weight: How hard to try to satisfy this link's ideal length (0 < weight <= 1)
-    """
-
-    def __init__(
-        self,
-        source: Union[Node, int],
-        target: Union[Node, int],
-        length: Optional[float] = None,
-        weight: Optional[float] = None,
-        **kwargs
-    ):
-        """Initialize link."""
-        self.source = source
-        self.target = target
-        self.length = length
-        self.weight = weight
-
-        # Copy over any additional properties
-        for key, value in kwargs.items():
-            if not hasattr(self, key):
-                setattr(self, key, value)
-
-
-LinkNumericPropertyAccessor = Callable[[Link], float]
 
 
 class Layout:

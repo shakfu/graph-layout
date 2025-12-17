@@ -1,5 +1,5 @@
 """
-Profiling script for PyCola layout performance analysis.
+Profiling script for graph-layout performance analysis.
 
 This script profiles various graph layout scenarios to identify bottlenecks.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
-from src.pycola.layout import Layout
+from src.graph_layout.cola.layout import Layout
 
 
 def create_graph(n_nodes, n_edges, with_size=True):
@@ -88,7 +88,7 @@ def profile_with_constraints():
 
 def profile_with_groups():
     """Profile layout with hierarchical groups."""
-    from src.pycola.layout import Group
+    from src.graph_layout.cola.layout import Group
 
     nodes, edges = create_graph(60, 100)
 
@@ -139,7 +139,7 @@ def benchmark_scenario(name, func):
 
 def main():
     """Run all profiling scenarios."""
-    print("PyCola Performance Profiling")
+    print("graph-layout Performance Profiling")
     print("=" * 60)
 
     scenarios = [

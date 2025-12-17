@@ -1,4 +1,4 @@
-# PyCola Performance Optimization Analysis
+# graph-layout Performance Optimization Analysis
 
 Based on profiling results from various graph sizes and configurations.
 
@@ -13,7 +13,7 @@ Based on profiling results from various graph sizes and configurations.
 - ✅ **Phase 1 Complete**: NumPy vectorization implemented (20-65x speedup)
 - ✅ **Phase 2 Complete**: Cython shortest paths implemented (5x additional speedup)
 - 📈 **Overall improvement**: **80-105x faster** compared to original v0.1.0
-- 🎯 **Optional**: scipy integration available for additional performance (`pip install pycola[fast]`)
+- 🎯 **Optional**: scipy integration available for additional performance (`pip install graph-layout[fast]`)
 
 **Original Findings**:
 1. Gradient descent stress minimization dominated execution time (FIXED ✅)
@@ -196,7 +196,7 @@ def compute_derivatives(self, x: np.ndarray) -> None:
 
 **Implementation**: Priority cascade (Cython → scipy → pure Python)
 1. **Cython-compiled Dijkstra** - Compiles priority queue and shortest paths to C
-2. **scipy fallback** - Available with `pip install pycola[fast]`
+2. **scipy fallback** - Available with `pip install graph-layout[fast]`
 3. **Pure Python fallback** - Always available
 
 **Achieved Speedup**: 4-5x on top of vectorization
@@ -326,7 +326,7 @@ def compute_derivatives(self, x: np.ndarray) -> None:
 
 ### 🎯 Potential (With scipy instead of Cython)
 - Similar performance to Cython for most use cases
-- Available via `pip install pycola[fast]`
+- Available via `pip install graph-layout[fast]`
 - Slightly faster for very large graphs (>1000 nodes)
 
 ### Future Enhancements (Numba + Parallelization)

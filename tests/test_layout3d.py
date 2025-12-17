@@ -1,7 +1,6 @@
 """Tests for 3D layout module."""
 
-import pytest
-from pycola.layout3d import Node3D, Link3D, Layout3D
+from graph_layout.cola.layout3d import Layout3D, Link3D, Node3D
 
 
 class TestNode3D:

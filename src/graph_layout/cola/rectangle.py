@@ -7,17 +7,18 @@ operations for constrained graph layout.
 
 from __future__ import annotations
 
-from typing import Optional, Callable, Any
-from .vpsc import Variable, Constraint, Solver
-from .rbtree import RBTree
-from .geom import Point
 import math
+from typing import Any, Callable, Optional
+
+from .geom import Point
+from .rbtree import RBTree
+from .vpsc import Constraint, Solver, Variable
 
 
 class Leaf:
     """Leaf node with bounds and variable."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.bounds: Optional[Rectangle] = None
         self.variable: Optional[Variable] = None
 
@@ -25,7 +26,7 @@ class Leaf:
 class ProjectionGroup:
     """Group of nodes for hierarchical projection."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.bounds: Optional[Rectangle] = None
         self.padding: float = 0.0
         self.stiffness: float = 0.01
@@ -48,7 +49,8 @@ def compute_group_bounds(g: ProjectionGroup) -> Rectangle:
     if g.leaves is not None:
         g.bounds = Rectangle.empty()
         for leaf in g.leaves:
-            g.bounds = leaf.bounds.union(g.bounds)
+            if leaf.bounds is not None:
+                g.bounds = leaf.bounds.union(g.bounds)
     else:
         g.bounds = Rectangle.empty()
 
@@ -489,7 +491,7 @@ def remove_overlaps(rs: list[Rectangle]) -> None:
 class GraphNode(Leaf):
     """Graph node for layout."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.fixed: bool = False
         self.fixed_weight: Optional[float] = None
@@ -598,9 +600,9 @@ class Projection:
             v = self.nodes[o['node']].variable
             cs.append(Constraint(u, v, o['offset'], True))
 
-    def _create_constraints(self, constraints: list[dict]) -> None:
+    def _create_constraints(self, constraints: list[dict[str, Any]]) -> None:
         """Create constraints from specifications."""
-        def is_sep(c):
+        def is_sep(c: dict[str, Any]) -> bool:
             return 'type' not in c or c['type'] == 'separation'
 
         self.x_constraints = [

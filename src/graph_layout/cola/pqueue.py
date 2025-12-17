@@ -56,6 +56,7 @@ class PairingHeap(Generic[T]):
             f: Function to apply to each (element, heap_node) pair
         """
         if not self.empty():
+            assert self.elem is not None
             f(self.elem, self)
             for subheap in self.subheaps:
                 subheap.for_each(f)
@@ -98,9 +99,14 @@ class PairingHeap(Generic[T]):
         Returns:
             True if heap property is satisfied
         """
-        return all(
-            less_than(self.elem, h.elem) and h.is_heap(less_than) for h in self.subheaps
-        )
+        if self.elem is None:
+            return True
+        for h in self.subheaps:
+            if h.elem is None:
+                continue
+            if not less_than(self.elem, h.elem) or not h.is_heap(less_than):
+                return False
+        return True
 
     def insert(self, obj: T, less_than: Callable[[T, T], bool]) -> "PairingHeap[T]":
         """
@@ -132,12 +138,15 @@ class PairingHeap(Generic[T]):
             return heap2
         elif heap2.empty():
             return self
-        elif less_than(self.elem, heap2.elem):
-            self.subheaps.append(heap2)
-            return self
         else:
-            heap2.subheaps.append(self)
-            return heap2
+            # Both heaps non-empty, so both elem values are not None
+            assert self.elem is not None and heap2.elem is not None
+            if less_than(self.elem, heap2.elem):
+                self.subheaps.append(heap2)
+                return self
+            else:
+                heap2.subheaps.append(self)
+                return heap2
 
     def remove_min(self, less_than: Callable[[T, T], bool]) -> Optional["PairingHeap[T]"]:
         """
@@ -196,10 +205,15 @@ class PairingHeap(Generic[T]):
         new_heap = subheap.remove_min(less_than)
 
         # Reassign subheap values to preserve tree structure
-        subheap.elem = new_heap.elem
-        subheap.subheaps = new_heap.subheaps
-        if set_heap_node is not None and new_heap.elem is not None:
-            set_heap_node(subheap.elem, subheap)
+        if new_heap is not None:
+            subheap.elem = new_heap.elem
+            subheap.subheaps = new_heap.subheaps
+            if set_heap_node is not None and new_heap.elem is not None:
+                assert subheap.elem is not None
+                set_heap_node(subheap.elem, subheap)
+        else:
+            subheap.elem = None
+            subheap.subheaps = []
 
         # Create new node with decreased value
         pairing_node = PairingHeap(new_value)
@@ -236,6 +250,7 @@ class PriorityQueue(Generic[T]):
         """
         if self.empty():
             return None
+        assert self.root is not None
         return self.root.elem
 
     def push(self, *args: T) -> Optional[PairingHeap[T]]:
@@ -254,6 +269,7 @@ class PriorityQueue(Generic[T]):
             if self.empty():
                 self.root = pairing_node
             else:
+                assert self.root is not None
                 self.root = self.root.merge(pairing_node, self.less_than)
         return pairing_node
 
@@ -273,6 +289,8 @@ class PriorityQueue(Generic[T]):
         Returns:
             True if queue is in valid state
         """
+        if self.root is None:
+            return True
         return self.root.is_heap(self.less_than)
 
     def for_each(self, f: Callable[[T, PairingHeap[T]], None]) -> None:
@@ -294,6 +312,7 @@ class PriorityQueue(Generic[T]):
         """
         if self.empty():
             return None
+        assert self.root is not None
         obj = self.root.min()
         self.root = self.root.remove_min(self.less_than)
         return obj
@@ -312,6 +331,7 @@ class PriorityQueue(Generic[T]):
             new_key: New (smaller) key value
             set_heap_node: Optional callback to update element's heap reference
         """
+        assert self.root is not None
         self.root = self.root.decrease_key(heap_node, new_key, set_heap_node, self.less_than)
 
     def to_string(self, selector: Callable[[T], str]) -> str:

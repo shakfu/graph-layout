@@ -7,8 +7,8 @@ tangent computation, and visibility graph construction.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
 import math
+from typing import Callable, Optional, Sequence
 
 
 class Point:
@@ -171,7 +171,7 @@ def _prev_poly_point(p: PolyPoint, ps: list[PolyPoint]) -> PolyPoint:
     return ps[p.polyIndex - 1]
 
 
-def _tangent_point_poly_c(P: Point, V: list[Point]) -> dict[str, int]:
+def _tangent_point_poly_c(P: Point, V: Sequence[Point]) -> dict[str, int]:
     """
     Fast binary search for tangents to a convex polygon.
 
@@ -184,7 +184,7 @@ def _tangent_point_poly_c(P: Point, V: list[Point]) -> dict[str, int]:
     """
     # Rtangent_PointPolyC and Ltangent_PointPolyC require polygon to be
     # "closed" with the first vertex duplicated at end, so V[n-1] = V[0].
-    V_closed = V.copy()
+    V_closed = list(V)
     V_closed.append(V[0])
 
     return {
@@ -380,7 +380,7 @@ class BiTangent:
 class BiTangents:
     """All bitangents between two polygons."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.rl: Optional[BiTangent] = None
         self.lr: Optional[BiTangent] = None
         self.ll: Optional[BiTangent] = None
@@ -445,10 +445,15 @@ class TangentVisibilityGraph:
                     # For every iteration but the first, generate an
                     # edge from the previous visibility vertex to the current one.
                     if j > 0:
-                        self.E.append(VisibilityEdge(p[j - 1].vv, vv))
+                        prev_vv = p[j - 1].vv
+                        assert prev_vv is not None
+                        self.E.append(VisibilityEdge(prev_vv, vv))
                 # Add a visibility edge from the first vertex to the last.
                 if len(p) > 1:
-                    self.E.append(VisibilityEdge(p[0].vv, p[len(p) - 1].vv))
+                    first_vv = p[0].vv
+                    last_vv = p[len(p) - 1].vv
+                    assert first_vv is not None and last_vv is not None
+                    self.E.append(VisibilityEdge(first_vv, last_vv))
 
             for i in range(n - 1):
                 Pi = P[i]
@@ -468,6 +473,7 @@ class TangentVisibilityGraph:
     def add_edge_if_visible(self, u: TVGPoint, v: TVGPoint, i1: int, i2: int) -> None:
         """Add edge if visible (not intersecting polygons)."""
         if not self._intersects_polys(LineSegment(u.x, u.y, v.x, v.y), i1, i2):
+            assert u.vv is not None and v.vv is not None
             self.E.append(VisibilityEdge(u.vv, v.vv))
 
     def add_point(self, p: TVGPoint, i1: int) -> VisibilityVertex:
@@ -481,6 +487,7 @@ class TangentVisibilityGraph:
             t = _tangent_point_poly_c(p, poly)
             self.add_edge_if_visible(p, poly[t['ltan']], i1, i)
             self.add_edge_if_visible(p, poly[t['rtan']], i1, i)
+        assert p.vv is not None
         return p.vv
 
     def _intersects_polys(self, l: LineSegment, i1: int, i2: int) -> bool:
@@ -515,7 +522,7 @@ def _line_intersection(
     return None
 
 
-def _intersects(l: LineSegment, P: list[Point]) -> list[Point]:
+def _intersects(l: LineSegment, P: Sequence[Point]) -> list[Point]:
     """Find intersections between line segment and polygon."""
     ints = []
     for i in range(1, len(P)):
@@ -536,7 +543,7 @@ def _intersects(l: LineSegment, P: list[Point]) -> list[Point]:
     return ints
 
 
-def tangents(V: list[Point], W: list[Point]) -> BiTangents:
+def tangents(V: Sequence[Point], W: Sequence[Point]) -> BiTangents:
     """
     Compute all bitangents between two convex polygons.
 

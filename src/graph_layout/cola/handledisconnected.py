@@ -7,9 +7,8 @@ and packing them efficiently in the layout space.
 
 from __future__ import annotations
 
-from typing import Any, Optional
 import math
-
+from typing import Any
 
 # Packing configuration
 PADDING = 10
@@ -29,9 +28,9 @@ def separate_graphs(nodes: list[Any], links: list[Any]) -> list[dict]:
     Returns:
         List of components, each with 'array' containing nodes
     """
-    marks = {}
-    ways = {}
-    graphs = []
+    marks: dict[int, int] = {}
+    ways: dict[int, list[Any]] = {}
+    graphs: list[dict[str, list[Any]]] = []
     clusters = 0
 
     # Build adjacency list
@@ -246,10 +245,10 @@ def _step(graphs: list[dict], max_width: float, desired_ratio: float) -> tuple[f
     Returns:
         Tuple of (real_width, real_height, cost)
     """
-    line = []
-    real_width = 0
-    real_height = 0
-    global_bottom = 0
+    line: list[dict[str, Any]] = []
+    real_width: float = 0.0
+    real_height: float = 0.0
+    global_bottom: float = 0.0
 
     for g in graphs:
         real_width, real_height, global_bottom = _put_rect(
@@ -315,6 +314,6 @@ def _put_rect(
     return real_width, real_height, global_bottom
 
 
-def _get_entire_width(graphs: list[dict]) -> float:
+def _get_entire_width(graphs: list[dict[str, Any]]) -> float:
     """Calculate total width if all graphs placed in a line."""
-    return sum(g['width'] + PADDING for g in graphs)
+    return float(sum(g['width'] + PADDING for g in graphs))

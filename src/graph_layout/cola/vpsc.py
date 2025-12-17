@@ -53,9 +53,12 @@ class Constraint:
             Positive if constraint is satisfied, negative if violated
         """
         if self.unsatisfiable:
-            return float('inf')
-        return (self.right.scale * self.right.position() - self.gap
-                - self.left.scale * self.left.position())
+            return float("inf")
+        return (
+            self.right.scale * self.right.position()
+            - self.gap
+            - self.left.scale * self.left.position()
+        )
 
 
 class Variable:
@@ -89,6 +92,7 @@ class Variable:
             prev: Previous variable (to avoid backtracking)
             f: Function to call for each (constraint, next_variable) pair
         """
+
         def visitor(c: Constraint, next_var: Variable) -> None:
             if c.active and prev is not next_var:
                 f(c, next_var)
@@ -166,6 +170,7 @@ class Block:
             v: Starting variable
             prev: Previous variable (to avoid backtracking)
         """
+
         def process_neighbour(c: Constraint, next_var: Variable) -> None:
             next_var.offset = v.offset + (c.gap if next_var is c.right else -c.gap)
             self._add_variable(next_var)
@@ -287,9 +292,7 @@ class Block:
         b._populate_split_block(start_var, None)
         return b
 
-    def split_between(
-        self, vl: Variable, vr: Variable
-    ) -> Optional[dict[str, Any]]:
+    def split_between(self, vl: Variable, vr: Variable) -> Optional[dict[str, Any]]:
         """
         Find a split point between two variables.
 
@@ -442,7 +445,7 @@ class Solver:
         for c in self.cs:
             c.active = False
         self.bs = Blocks(self.vs)
-        self.bs.for_each(lambda b, i: setattr(b, 'posn', ps[i]))
+        self.bs.for_each(lambda b, i: setattr(b, "posn", ps[i]))
 
     def set_desired_positions(self, ps: list[float]) -> None:
         """Update desired positions for variables."""
@@ -456,7 +459,7 @@ class Solver:
         Returns:
             Most violated constraint, or None if all are satisfied
         """
-        min_slack = float('inf')
+        min_slack = float("inf")
         v: Optional[Constraint] = None
         delete_point = len(self.inactive)
 
@@ -488,7 +491,9 @@ class Solver:
         self.bs.split(self.inactive)
         v = self._most_violated()
 
-        while v is not None and (v.equality or (v.slack() < Solver.ZERO_UPPERBOUND and not v.active)):
+        while v is not None and (
+            v.equality or (v.slack() < Solver.ZERO_UPPERBOUND and not v.active)
+        ):
             lb = v.left.block
             rb = v.right.block
             assert lb is not None and rb is not None
@@ -534,7 +539,7 @@ class Solver:
         """
         self.satisfy()
         assert self.bs is not None
-        last_cost = float('inf')
+        last_cost = float("inf")
         cost = self.bs.cost()
 
         while abs(last_cost - cost) > 0.0001:

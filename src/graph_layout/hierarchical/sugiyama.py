@@ -71,7 +71,7 @@ class SugiyamaLayout(StaticLayout):
         # Sugiyama-specific parameters
         layer_separation: float = 100.0,
         node_separation: float = 50.0,
-        orientation: str = 'top-to-bottom',
+        orientation: str = "top-to-bottom",
         crossing_iterations: int = 24,
     ) -> None:
         """
@@ -106,9 +106,7 @@ class SugiyamaLayout(StaticLayout):
         # Sugiyama-specific configuration
         self._layer_separation: float = float(layer_separation)
         self._node_separation: float = float(node_separation)
-        valid_orientations = {
-            'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'
-        }
+        valid_orientations = {"top-to-bottom", "bottom-to-top", "left-to-right", "right-to-left"}
         if orientation not in valid_orientations:
             raise ValueError(f"orientation must be one of {valid_orientations}")
         self._orientation: str = orientation
@@ -151,7 +149,7 @@ class SugiyamaLayout(StaticLayout):
     @orientation.setter
     def orientation(self, value: str) -> None:
         """Set layout orientation."""
-        valid = {'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'}
+        valid = {"top-to-bottom", "bottom-to-top", "left-to-right", "right-to-left"}
         if value not in valid:
             raise ValueError(f"orientation must be one of {valid}")
         self._orientation = value
@@ -265,21 +263,14 @@ class SugiyamaLayout(StaticLayout):
             if iteration % 2 == 0:
                 # Sweep down
                 for layer_idx in range(1, len(self._layers)):
-                    self._order_layer_by_barycenter(
-                        layer_idx, incoming, direction='down'
-                    )
+                    self._order_layer_by_barycenter(layer_idx, incoming, direction="down")
             else:
                 # Sweep up
                 for layer_idx in range(len(self._layers) - 2, -1, -1):
-                    self._order_layer_by_barycenter(
-                        layer_idx, outgoing, direction='up'
-                    )
+                    self._order_layer_by_barycenter(layer_idx, outgoing, direction="up")
 
     def _order_layer_by_barycenter(
-        self,
-        layer_idx: int,
-        adj: list[list[int]],
-        direction: str
+        self, layer_idx: int, adj: list[list[int]], direction: str
     ) -> None:
         """Reorder a layer based on barycenter of adjacent layer."""
         layer = self._layers[layer_idx]
@@ -354,16 +345,16 @@ class SugiyamaLayout(StaticLayout):
                 layer_pos = layer_idx * layer_sep if n_layers > 1 else canvas_h / 2
 
                 # Apply orientation
-                if self._orientation == 'top-to-bottom':
+                if self._orientation == "top-to-bottom":
                     node.x = padding + within_pos
                     node.y = padding + layer_pos
-                elif self._orientation == 'bottom-to-top':
+                elif self._orientation == "bottom-to-top":
                     node.x = padding + within_pos
                     node.y = self._canvas_size[1] - padding - layer_pos
-                elif self._orientation == 'left-to-right':
+                elif self._orientation == "left-to-right":
                     node.x = padding + layer_pos
                     node.y = padding + within_pos
-                elif self._orientation == 'right-to-left':
+                elif self._orientation == "right-to-left":
                     node.x = self._canvas_size[0] - padding - layer_pos
                     node.y = padding + within_pos
 

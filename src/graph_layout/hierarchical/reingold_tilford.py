@@ -94,7 +94,7 @@ class ReingoldTilfordLayout(StaticLayout):
         root: Optional[int] = None,
         node_separation: float = 1.0,
         level_separation: float = 1.0,
-        orientation: str = 'top-to-bottom',
+        orientation: str = "top-to-bottom",
     ) -> None:
         """
         Initialize Reingold-Tilford layout.
@@ -129,9 +129,7 @@ class ReingoldTilfordLayout(StaticLayout):
         self._root_index: Optional[int] = root
         self._node_separation: float = float(node_separation)
         self._level_separation: float = float(level_separation)
-        valid_orientations = {
-            'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'
-        }
+        valid_orientations = {"top-to-bottom", "bottom-to-top", "left-to-right", "right-to-left"}
         if orientation not in valid_orientations:
             raise ValueError(f"orientation must be one of {valid_orientations}")
         self._orientation: str = orientation
@@ -182,7 +180,7 @@ class ReingoldTilfordLayout(StaticLayout):
     @orientation.setter
     def orientation(self, value: str) -> None:
         """Set tree orientation."""
-        valid = {'top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left'}
+        valid = {"top-to-bottom", "bottom-to-top", "left-to-right", "right-to-left"}
         if value not in valid:
             raise ValueError(f"orientation must be one of {valid}")
         self._orientation = value
@@ -348,9 +346,11 @@ class ReingoldTilfordLayout(StaticLayout):
 
                 v_outer_right.ancestor = v
 
-                shift = (v_inner_left.prelim + s_inner_left) - \
-                        (v_inner_right.prelim + s_inner_right) + \
-                        self._node_separation
+                shift = (
+                    (v_inner_left.prelim + s_inner_left)
+                    - (v_inner_right.prelim + s_inner_right)
+                    + self._node_separation
+                )
 
                 if shift > 0:
                     ancestor = self._ancestor(v_inner_left, v, default_ancestor)
@@ -386,9 +386,7 @@ class ReingoldTilfordLayout(StaticLayout):
             return v.children[-1]
         return v.thread
 
-    def _ancestor(
-        self, v_inner_left: TreeNode, v: TreeNode, default: TreeNode
-    ) -> TreeNode:
+    def _ancestor(self, v_inner_left: TreeNode, v: TreeNode, default: TreeNode) -> TreeNode:
         """Find ancestor of v_inner_left that is a sibling of v."""
         if v_inner_left.ancestor.parent == v.parent:
             return v_inner_left.ancestor
@@ -476,16 +474,16 @@ class ReingoldTilfordLayout(StaticLayout):
             ny = (tn.y - min_y) / height if height > 0 else 0.5
 
             # Apply orientation
-            if self._orientation == 'top-to-bottom':
+            if self._orientation == "top-to-bottom":
                 node.x = padding + nx * canvas_w
                 node.y = padding + ny * canvas_h
-            elif self._orientation == 'bottom-to-top':
+            elif self._orientation == "bottom-to-top":
                 node.x = padding + nx * canvas_w
                 node.y = self._canvas_size[1] - padding - ny * canvas_h
-            elif self._orientation == 'left-to-right':
+            elif self._orientation == "left-to-right":
                 node.x = padding + ny * canvas_w
                 node.y = padding + nx * canvas_h
-            elif self._orientation == 'right-to-left':
+            elif self._orientation == "right-to-left":
                 node.x = self._canvas_size[0] - padding - ny * canvas_w
                 node.y = padding + nx * canvas_h
 

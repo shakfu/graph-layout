@@ -130,11 +130,7 @@ class TestGridRouter:
 
     def test_simple_grid(self):
         """Test simple grid creation."""
-        nodes = [
-            SimpleNode(0, 0, 10, 10),
-            SimpleNode(20, 0, 10, 10),
-            SimpleNode(0, 20, 10, 10)
-        ]
+        nodes = [SimpleNode(0, 0, 10, 10), SimpleNode(20, 0, 10, 10), SimpleNode(0, 20, 10, 10)]
 
         accessor = SimpleNodeAccessor()
         router = GridRouter(nodes, accessor)
@@ -148,9 +144,9 @@ class TestGridRouter:
     def test_grid_with_groups(self):
         """Test grid with group hierarchy."""
         nodes = [
-            SimpleNode(0, 0, 10, 10),      # 0: leaf
-            SimpleNode(20, 0, 10, 10),     # 1: leaf
-            SimpleNode(0, 0, 50, 50, [0, 1])  # 2: group
+            SimpleNode(0, 0, 10, 10),  # 0: leaf
+            SimpleNode(20, 0, 10, 10),  # 1: leaf
+            SimpleNode(0, 0, 50, 50, [0, 1]),  # 2: group
         ]
 
         accessor = SimpleNodeAccessor()
@@ -164,9 +160,9 @@ class TestGridRouter:
     def test_depth_calculation(self):
         """Test depth calculation."""
         nodes = [
-            SimpleNode(0, 0, 10, 10),          # 0: leaf
-            SimpleNode(0, 0, 20, 20, [0]),     # 1: group
-            SimpleNode(0, 0, 30, 30, [1])      # 2: group
+            SimpleNode(0, 0, 10, 10),  # 0: leaf
+            SimpleNode(0, 0, 20, 20, [0]),  # 1: group
+            SimpleNode(0, 0, 30, 30, [1]),  # 2: group
         ]
 
         accessor = SimpleNodeAccessor()
@@ -178,10 +174,7 @@ class TestGridRouter:
 
     def test_route_between_nodes(self):
         """Test routing between two nodes."""
-        nodes = [
-            SimpleNode(0, 0, 10, 10),
-            SimpleNode(50, 50, 10, 10)
-        ]
+        nodes = [SimpleNode(0, 0, 10, 10), SimpleNode(50, 50, 10, 10)]
 
         accessor = SimpleNodeAccessor()
         router = GridRouter(nodes, accessor)
@@ -191,15 +184,15 @@ class TestGridRouter:
         # Should have at least one point in the path
         assert len(path) >= 1
         # Path should be list of Points or Verts
-        assert all(hasattr(p, 'x') and hasattr(p, 'y') for p in path)
+        assert all(hasattr(p, "x") and hasattr(p, "y") for p in path)
 
     def test_sibling_obstacles(self):
         """Test sibling obstacle detection."""
         nodes = [
-            SimpleNode(0, 0, 10, 10),      # 0
-            SimpleNode(20, 0, 10, 10),     # 1
-            SimpleNode(40, 0, 10, 10),     # 2
-            SimpleNode(0, 0, 70, 20, [0, 1, 2])  # 3: parent
+            SimpleNode(0, 0, 10, 10),  # 0
+            SimpleNode(20, 0, 10, 10),  # 1
+            SimpleNode(40, 0, 10, 10),  # 2
+            SimpleNode(0, 0, 70, 20, [0, 1, 2]),  # 3: parent
         ]
 
         accessor = SimpleNodeAccessor()
@@ -217,7 +210,7 @@ class TestGridRouter:
             Point(0, 0),
             Point(10, 0),
             Point(20, 0),  # straight continuation
-            Point(20, 10)
+            Point(20, 10),
         ]
 
         segments = GridRouter.make_segments(path)
@@ -254,28 +247,23 @@ class TestGridRouter:
 
     def test_get_route_path_simple(self):
         """Test SVG path generation."""
-        route = [
-            [Point(0, 0), Point(10, 0)],
-            [Point(10, 0), Point(10, 10)]
-        ]
+        route = [[Point(0, 0), Point(10, 0)], [Point(10, 0), Point(10, 10)]]
 
         result = GridRouter.get_route_path(route, 2.0, 3.0, 5.0)
 
-        assert 'routepath' in result
-        assert 'arrowpath' in result
-        assert result['routepath'].startswith('M')
-        assert 'L' in result['routepath']
+        assert "routepath" in result
+        assert "arrowpath" in result
+        assert result["routepath"].startswith("M")
+        assert "L" in result["routepath"]
 
     def test_get_route_path_single_segment(self):
         """Test path generation for single segment."""
-        route = [
-            [Point(0, 0), Point(10, 0)]
-        ]
+        route = [[Point(0, 0), Point(10, 0)]]
 
         result = GridRouter.get_route_path(route, 0, 2.0, 5.0)
 
-        assert 'M' in result['routepath']
-        assert 'L' in result['routepath']
+        assert "M" in result["routepath"]
+        assert "L" in result["routepath"]
 
     def test_order_edges(self):
         """Test edge ordering."""
@@ -293,18 +281,18 @@ class TestGridRouter:
         # Segments are lists of two points (dicts with x, y)
         routes = [
             [  # route 0
-                [{'x': 0, 'y': 0}, {'x': 0, 'y': 10}]  # vertical segment
+                [{"x": 0, "y": 0}, {"x": 0, "y": 10}]  # vertical segment
             ],
             [  # route 1
-                [{'x': 0, 'y': 5}, {'x': 0, 'y': 15}]  # vertical segment
-            ]
+                [{"x": 0, "y": 5}, {"x": 0, "y": 15}]  # vertical segment
+            ],
         ]
 
-        sets = GridRouter.get_segment_sets(routes, 'x', 'y')
+        sets = GridRouter.get_segment_sets(routes, "x", "y")
 
         # Should group segments at same x position
         assert len(sets) >= 1
-        assert all('pos' in s and 'segments' in s for s in sets)
+        assert all("pos" in s and "segments" in s for s in sets)
 
     def test_mid_points_single(self):
         """Test midpoint calculation with single value."""
@@ -330,10 +318,7 @@ class TestGridRouter:
     def test_grid_lines_overlapping(self):
         """Test grid line detection with overlapping nodes."""
         # Two nodes overlapping in x
-        nodes = [
-            SimpleNode(0, 0, 10, 10),
-            SimpleNode(5, 20, 10, 10)
-        ]
+        nodes = [SimpleNode(0, 0, 10, 10), SimpleNode(5, 20, 10, 10)]
 
         accessor = SimpleNodeAccessor()
         router = GridRouter(nodes, accessor)
@@ -348,26 +333,14 @@ class TestRouteEdges:
 
     def test_route_edges_simple(self):
         """Test routing multiple edges."""
-        nodes = [
-            SimpleNode(0, 0, 10, 10),
-            SimpleNode(50, 0, 10, 10),
-            SimpleNode(100, 0, 10, 10)
-        ]
+        nodes = [SimpleNode(0, 0, 10, 10), SimpleNode(50, 0, 10, 10), SimpleNode(100, 0, 10, 10)]
 
         accessor = SimpleNodeAccessor()
         router = GridRouter(nodes, accessor)
 
-        edges = [
-            {'source': 0, 'target': 1},
-            {'source': 1, 'target': 2}
-        ]
+        edges = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
 
-        routes = router.route_edges(
-            edges,
-            2.0,
-            lambda e: e['source'],
-            lambda e: e['target']
-        )
+        routes = router.route_edges(edges, 2.0, lambda e: e["source"], lambda e: e["target"])
 
         assert len(routes) == 2
         # Each route should be list of segments

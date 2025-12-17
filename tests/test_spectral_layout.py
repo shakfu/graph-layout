@@ -10,17 +10,18 @@ from graph_layout.spectral import SpectralLayout
 # Test Fixtures
 # =============================================================================
 
+
 def create_path_graph(n=5):
     """Create a path graph: 0-1-2-...-n-1."""
     nodes = [{} for _ in range(n)]
-    links = [{'source': i, 'target': i + 1} for i in range(n - 1)]
+    links = [{"source": i, "target": i + 1} for i in range(n - 1)]
     return nodes, links
 
 
 def create_cycle_graph(n=5):
     """Create a cycle graph."""
     nodes = [{} for _ in range(n)]
-    links = [{'source': i, 'target': (i + 1) % n} for i in range(n)]
+    links = [{"source": i, "target": (i + 1) % n} for i in range(n)]
     return nodes, links
 
 
@@ -35,15 +36,15 @@ def create_two_cliques():
     # Clique 1
     for i in range(4):
         for j in range(i + 1, 4):
-            links.append({'source': i, 'target': j})
+            links.append({"source": i, "target": j})
 
     # Clique 2
     for i in range(4, 8):
         for j in range(i + 1, 8):
-            links.append({'source': i, 'target': j})
+            links.append({"source": i, "target": j})
 
     # Bridge
-    links.append({'source': 3, 'target': 4})
+    links.append({"source": 3, "target": 4})
 
     return nodes, links
 
@@ -51,6 +52,7 @@ def create_two_cliques():
 # =============================================================================
 # Spectral Layout Tests
 # =============================================================================
+
 
 class TestSpectralLayout:
     """Tests for Spectral layout."""
@@ -67,8 +69,8 @@ class TestSpectralLayout:
 
         assert len(layout.nodes) == 5
         for node in layout.nodes:
-            assert hasattr(node, 'x')
-            assert hasattr(node, 'y')
+            assert hasattr(node, "x")
+            assert hasattr(node, "y")
 
     def test_path_graph_ordering(self):
         """Test that path graph maintains approximate ordering."""
@@ -83,8 +85,8 @@ class TestSpectralLayout:
         # Adjacent nodes in path should be relatively close
         for i in range(len(layout.nodes) - 1):
             dist = math.sqrt(
-                (layout.nodes[i].x - layout.nodes[i + 1].x) ** 2 +
-                (layout.nodes[i].y - layout.nodes[i + 1].y) ** 2
+                (layout.nodes[i].x - layout.nodes[i + 1].x) ** 2
+                + (layout.nodes[i].y - layout.nodes[i + 1].y) ** 2
             )
             # Distance should not be too large
             assert dist < 500
@@ -118,7 +120,7 @@ class TestSpectralLayout:
         layout1.run()
 
         nodes2 = [{} for _ in range(5)]
-        links2 = [{'source': i, 'target': i + 1} for i in range(4)]
+        links2 = [{"source": i, "target": i + 1} for i in range(4)]
 
         layout2 = SpectralLayout(
             nodes=nodes2,
@@ -149,10 +151,7 @@ class TestSpectralLayout:
         clique2_y = sum(layout.nodes[i].y for i in range(4, 8)) / 4
 
         # Cliques should be somewhat separated
-        separation = math.sqrt(
-            (clique1_x - clique2_x) ** 2 +
-            (clique1_y - clique2_y) ** 2
-        )
+        separation = math.sqrt((clique1_x - clique2_x) ** 2 + (clique1_y - clique2_y) ** 2)
         # There should be some separation (not identical positions)
         assert separation > 10
 
@@ -185,7 +184,7 @@ class TestSpectralLayout:
     def test_two_nodes(self):
         """Test layout with two connected nodes."""
         nodes = [{}, {}]
-        links = [{'source': 0, 'target': 1}]
+        links = [{"source": 0, "target": 1}]
 
         layout = SpectralLayout(
             nodes=nodes,
@@ -199,7 +198,7 @@ class TestSpectralLayout:
     def test_disconnected_nodes(self):
         """Test layout with disconnected nodes."""
         nodes = [{} for _ in range(4)]
-        links = [{'source': 0, 'target': 1}]  # Only 0-1 connected
+        links = [{"source": 0, "target": 1}]  # Only 0-1 connected
 
         layout = SpectralLayout(
             nodes=nodes,
@@ -224,9 +223,9 @@ class TestSpectralLayout:
         """Test layout with weighted edges."""
         nodes = [{} for _ in range(4)]
         links = [
-            {'source': 0, 'target': 1, 'weight': 10.0},  # Strong
-            {'source': 2, 'target': 3, 'weight': 10.0},  # Strong
-            {'source': 1, 'target': 2, 'weight': 0.1},   # Weak bridge
+            {"source": 0, "target": 1, "weight": 10.0},  # Strong
+            {"source": 2, "target": 3, "weight": 10.0},  # Strong
+            {"source": 1, "target": 2, "weight": 0.1},  # Weak bridge
         ]
 
         layout = SpectralLayout(

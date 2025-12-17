@@ -90,12 +90,7 @@ class Descent:
     # Slightly larger than ZERO_DISTANCE^2 to provide robust sqrt() behavior.
     MIN_DIST_SQ = 1e-9
 
-    def __init__(
-        self,
-        x: np.ndarray,
-        D: np.ndarray,
-        G: Optional[np.ndarray] = None
-    ):
+    def __init__(self, x: np.ndarray, D: np.ndarray, G: Optional[np.ndarray] = None):
         """
         Initialize gradient descent.
 
@@ -137,13 +132,13 @@ class Descent:
         self.locks = Locks()
 
         # Find minimum distance
-        self.min_d = float('inf')
+        self.min_d = float("inf")
         for i in range(self.n):
             for j in range(i + 1, self.n):
                 d = float(D[i, j])
                 if d > 0 and d < self.min_d:
                     self.min_d = d
-        if self.min_d == float('inf'):
+        if self.min_d == float("inf"):
             self.min_d = 1.0
 
         # Grid snap parameters
@@ -200,7 +195,7 @@ class Descent:
         diff = x[:, :, np.newaxis] - x[:, np.newaxis, :]  # (k, n, n)
 
         # Squared differences per dimension: (k, n, n)
-        diff_squared = diff ** 2
+        diff_squared = diff**2
 
         # Sum over dimensions to get squared distances: (n, n)
         dist_squared = np.sum(diff_squared, axis=0)
@@ -230,7 +225,7 @@ class Descent:
         # Ideal distances - use 1.0 as safe default to avoid division by zero
         # Note: we must set safe defaults BEFORE computing derived values
         ideal_dist = np.where(valid_mask & (self.D > 0), self.D, 1.0)
-        ideal_dist_sq = ideal_dist ** 2
+        ideal_dist_sq = ideal_dist**2
 
         # Safe distances for division (use 1.0 where invalid to avoid div-by-zero)
         safe_distances = np.where(valid_mask & (distances > 0), distances, 1.0)
@@ -241,19 +236,11 @@ class Descent:
         # Shape: (n, n)
         # Compute safely then mask - avoids numpy computing invalid values
         gs_denom = ideal_dist_sq * safe_distances
-        gs = np.where(
-            valid_mask,
-            2 * weights * (safe_distances - ideal_dist) / gs_denom,
-            0.0
-        )
+        gs = np.where(valid_mask, 2 * weights * (safe_distances - ideal_dist) / gs_denom, 0.0)
 
         # Hessian scalar: hs = -2 * weight / (ideal^2 * distance^3)
         hs_denom = ideal_dist_sq * safe_dist_cubed
-        hs = np.where(
-            valid_mask,
-            -2 * weights / hs_denom,
-            0.0
-        )
+        hs = np.where(valid_mask, -2 * weights / hs_denom, 0.0)
 
         # Compute gradients: sum over all v for each u
         # g[i, u] = sum_v(diff[i, u, v] * gs[u, v])
@@ -263,13 +250,10 @@ class Descent:
         # Compute Hessian off-diagonal elements
         # H[i, u, v] = hs[u, v] * (2 * dist^3 + ideal * (diff^2[i] - dist^2))
         # Shape: (k, n, n)
-        hessian_term = (2 * safe_dist_cubed[np.newaxis, :, :] +
-                        ideal_dist[np.newaxis, :, :] * (diff_squared - safe_dist_sq[np.newaxis, :, :]))
-        self.H = np.where(
-            valid_mask[np.newaxis, :, :],
-            hs[np.newaxis, :, :] * hessian_term,
-            0.0
+        hessian_term = 2 * safe_dist_cubed[np.newaxis, :, :] + ideal_dist[np.newaxis, :, :] * (
+            diff_squared - safe_dist_sq[np.newaxis, :, :]
         )
+        self.H = np.where(valid_mask[np.newaxis, :, :], hs[np.newaxis, :, :] * hessian_term, 0.0)
 
         # Compute diagonal elements: Huu[i] = -sum_v(H[i, u, v])
         Huu = -np.sum(self.H, axis=2)  # (k, n)
@@ -310,10 +294,12 @@ class Descent:
 
         # Apply locks
         if not self.locks.is_empty():
+
             def apply_lock(u: int, p: np.ndarray) -> None:
                 for i in range(self.k):
                     self.H[i, u, u] += max_h
                     self.g[i, u] -= max_h * (p[i] - x[i, u])
+
             self.locks.apply(apply_lock)
 
     def compute_step_size(self, d: np.ndarray) -> float:
@@ -351,11 +337,7 @@ class Descent:
         x -= step_size * d
 
     def step_and_project(
-        self,
-        x0: np.ndarray,
-        r: np.ndarray,
-        d: np.ndarray,
-        step_size: float
+        self, x0: np.ndarray, r: np.ndarray, d: np.ndarray, step_size: float
     ) -> None:
         """
         Take a step and project against constraints.
@@ -436,7 +418,7 @@ class Descent:
         Returns:
             Final stress value
         """
-        stress = float('inf')
+        stress = float("inf")
         converged = False
 
         while not converged and iterations > 0:

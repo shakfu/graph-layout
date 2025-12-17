@@ -57,10 +57,10 @@ def separate_graphs(nodes: list[Any], links: list[Any]) -> list[dict]:
 
         if is_new:
             clusters += 1
-            graphs.append({'array': []})
+            graphs.append({"array": []})
 
         marks[n.index] = clusters
-        graphs[clusters - 1]['array'].append(n)
+        graphs[clusters - 1]["array"].append(n)
 
         adjacent = ways.get(n.index)
         if not adjacent:
@@ -83,7 +83,7 @@ def apply_packing(
     h: float,
     node_size: float = 0,
     desired_ratio: float = 1.0,
-    center_graph: bool = True
+    center_graph: bool = True,
 ) -> None:
     """
     Apply box packing algorithm to position disconnected graph components.
@@ -123,48 +123,44 @@ def _calculate_bb(graphs: list[dict], node_size: float) -> None:
 
 def _calculate_single_bb(graph: dict, node_size: float) -> None:
     """Calculate bounding box for a single graph component."""
-    min_x = float('inf')
-    min_y = float('inf')
-    max_x = -float('inf')
-    max_y = -float('inf')
+    min_x = float("inf")
+    min_y = float("inf")
+    max_x = -float("inf")
+    max_y = -float("inf")
 
-    for v in graph['array']:
+    for v in graph["array"]:
         # Use node's width/height if available and not None, else use node_size
-        w = (getattr(v, 'width', None) or node_size) / 2
-        h = (getattr(v, 'height', None) or node_size) / 2
+        w = (getattr(v, "width", None) or node_size) / 2
+        h = (getattr(v, "height", None) or node_size) / 2
 
         max_x = max(v.x + w, max_x)
         min_x = min(v.x - w, min_x)
         max_y = max(v.y + h, max_y)
         min_y = min(v.y - h, min_y)
 
-    graph['width'] = max_x - min_x
-    graph['height'] = max_y - min_y
+    graph["width"] = max_x - min_x
+    graph["height"] = max_y - min_y
 
 
 def _put_nodes_to_positions(
-    graphs: list[dict],
-    svg_width: float,
-    svg_height: float,
-    real_width: float,
-    real_height: float
+    graphs: list[dict], svg_width: float, svg_height: float, real_width: float, real_height: float
 ) -> None:
     """Position nodes in their final locations."""
     for g in graphs:
         # Calculate current graph center
-        center_x = sum(node.x for node in g['array']) / len(g['array'])
-        center_y = sum(node.y for node in g['array']) / len(g['array'])
+        center_x = sum(node.x for node in g["array"]) / len(g["array"])
+        center_y = sum(node.y for node in g["array"]) / len(g["array"])
 
         # Calculate top-left corner
-        corner_x = center_x - g['width'] / 2
-        corner_y = center_y - g['height'] / 2
+        corner_x = center_x - g["width"] / 2
+        corner_y = center_y - g["height"] / 2
 
         # Calculate offset to center everything
-        offset_x = g['x'] - corner_x + svg_width / 2 - real_width / 2
-        offset_y = g['y'] - corner_y + svg_height / 2 - real_height / 2
+        offset_x = g["x"] - corner_x + svg_width / 2 - real_width / 2
+        offset_y = g["y"] - corner_y + svg_height / 2 - real_height / 2
 
         # Apply offset to all nodes
-        for node in g['array']:
+        for node in g["array"]:
             node.x += offset_x
             node.y += offset_y
 
@@ -177,17 +173,17 @@ def _apply_packing_algorithm(graphs: list[dict], desired_ratio: float) -> tuple[
         Tuple of (real_width, real_height)
     """
     # Sort by height (descending)
-    graphs.sort(key=lambda g: g['height'], reverse=True)
+    graphs.sort(key=lambda g: g["height"], reverse=True)
 
     # Find minimum width
-    min_width = min(g['width'] for g in graphs)
+    min_width = min(g["width"] for g in graphs)
 
     # Binary search bounds
     left = min_width
     right = _get_entire_width(graphs)
 
     # Golden section search
-    curr_best_f = float('inf')
+    curr_best_f = float("inf")
     curr_best = 0
     iteration_counter = 0
 
@@ -198,8 +194,8 @@ def _apply_packing_algorithm(graphs: list[dict], desired_ratio: float) -> tuple[
 
     flag = -1  # which to recompute
 
-    dx = float('inf')
-    df = float('inf')
+    dx = float("inf")
+    df = float("inf")
 
     while (dx > min_width or df > FLOAT_EPSILON) and iteration_counter < MAX_ITERATIONS:
         if flag != 1:
@@ -256,7 +252,7 @@ def _step(graphs: list[dict], max_width: float, desired_ratio: float) -> tuple[f
             g, max_width, line, real_width, real_height, global_bottom
         )
 
-    ratio = real_width / real_height if real_height > 0 else float('inf')
+    ratio = real_width / real_height if real_height > 0 else float("inf")
     cost = abs(ratio - desired_ratio)
 
     return real_width, real_height, cost
@@ -268,7 +264,7 @@ def _put_rect(
     line: list[dict],
     real_width: float,
     real_height: float,
-    global_bottom: float
+    global_bottom: float,
 ) -> tuple[float, float, float]:
     """
     Find position for one rectangle.
@@ -280,8 +276,10 @@ def _put_rect(
 
     # Find parent in current line
     for item in line:
-        can_fit_height = item.get('space_left', 0) >= rect['height']
-        can_fit_width = (item['x'] + item['width'] + rect['width'] + PADDING - max_width) <= FLOAT_EPSILON
+        can_fit_height = item.get("space_left", 0) >= rect["height"]
+        can_fit_width = (
+            item["x"] + item["width"] + rect["width"] + PADDING - max_width
+        ) <= FLOAT_EPSILON
 
         if can_fit_height and can_fit_width:
             parent = item
@@ -291,30 +289,30 @@ def _put_rect(
 
     if parent is not None:
         # Place next to parent
-        rect['x'] = parent['x'] + parent['width'] + PADDING
-        rect['y'] = parent['bottom']
-        rect['space_left'] = rect['height']
-        rect['bottom'] = rect['y']
-        parent['space_left'] -= rect['height'] + PADDING
-        parent['bottom'] += rect['height'] + PADDING
+        rect["x"] = parent["x"] + parent["width"] + PADDING
+        rect["y"] = parent["bottom"]
+        rect["space_left"] = rect["height"]
+        rect["bottom"] = rect["y"]
+        parent["space_left"] -= rect["height"] + PADDING
+        parent["bottom"] += rect["height"] + PADDING
     else:
         # Start new row
-        rect['y'] = global_bottom
-        global_bottom += rect['height'] + PADDING
-        rect['x'] = 0
-        rect['bottom'] = rect['y']
-        rect['space_left'] = rect['height']
+        rect["y"] = global_bottom
+        global_bottom += rect["height"] + PADDING
+        rect["x"] = 0
+        rect["bottom"] = rect["y"]
+        rect["space_left"] = rect["height"]
 
     # Update real dimensions
-    if rect['y'] + rect['height'] - real_height > -FLOAT_EPSILON:
-        real_height = rect['y'] + rect['height']
+    if rect["y"] + rect["height"] - real_height > -FLOAT_EPSILON:
+        real_height = rect["y"] + rect["height"]
 
-    if rect['x'] + rect['width'] - real_width > -FLOAT_EPSILON:
-        real_width = rect['x'] + rect['width']
+    if rect["x"] + rect["width"] - real_width > -FLOAT_EPSILON:
+        real_width = rect["x"] + rect["width"]
 
     return real_width, real_height, global_bottom
 
 
 def _get_entire_width(graphs: list[dict[str, Any]]) -> float:
     """Calculate total width if all graphs placed in a line."""
-    return float(sum(g['width'] + PADDING for g in graphs))
+    return float(sum(g["width"] + PADDING for g in graphs))

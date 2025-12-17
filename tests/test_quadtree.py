@@ -413,10 +413,10 @@ class TestBarnesHutWithLayouts:
         import random
 
         from graph_layout import FruchtermanReingoldLayout
+
         random.seed(42)
 
-        nodes = [{"x": random.uniform(0, 500), "y": random.uniform(0, 500)}
-                 for _ in range(30)]
+        nodes = [{"x": random.uniform(0, 500), "y": random.uniform(0, 500)} for _ in range(30)]
         links = [{"source": i, "target": (i + 1) % 30} for i in range(30)]
 
         # Run without Barnes-Hut (use provided positions, no random init)

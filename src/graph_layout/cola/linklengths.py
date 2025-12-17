@@ -11,7 +11,7 @@ import math
 from typing import Callable, Generic, Literal, Optional, TypeVar
 
 T = TypeVar("T")
-Axis = Literal['x', 'y']
+Axis = Literal["x", "y"]
 
 
 class LinkAccessor(Generic[T]):
@@ -89,10 +89,7 @@ def _get_neighbours(links: list[T], la: LinkAccessor[T]) -> dict[int, dict]:
 
 
 def _compute_link_lengths(
-    links: list[T],
-    w: float,
-    f: Callable[[dict, dict], float],
-    la: LinkLengthAccessor[T]
+    links: list[T], w: float, f: Callable[[dict, dict], float], la: LinkLengthAccessor[T]
 ) -> None:
     """
     Compute and set link lengths based on neighbor similarity.
@@ -111,11 +108,7 @@ def _compute_link_lengths(
         la.set_length(l, 1 + w * f(a, b))
 
 
-def symmetric_diff_link_lengths(
-    links: list[T],
-    la: LinkLengthAccessor[T],
-    w: float = 1.0
-) -> None:
+def symmetric_diff_link_lengths(links: list[T], la: LinkLengthAccessor[T], w: float = 1.0) -> None:
     """
     Modify link lengths based on symmetric difference of neighbors.
 
@@ -124,17 +117,14 @@ def symmetric_diff_link_lengths(
         la: Link length accessor
         w: Weight factor
     """
+
     def f(a: dict, b: dict) -> float:
         return math.sqrt(_union_count(a, b) - _intersection_count(a, b))
 
     _compute_link_lengths(links, w, f, la)
 
 
-def jaccard_link_lengths(
-    links: list[T],
-    la: LinkLengthAccessor[T],
-    w: float = 1.0
-) -> None:
+def jaccard_link_lengths(links: list[T], la: LinkLengthAccessor[T], w: float = 1.0) -> None:
     """
     Modify link lengths based on Jaccard similarity of neighbors.
 
@@ -143,6 +133,7 @@ def jaccard_link_lengths(
         la: Link length accessor
         w: Weight factor
     """
+
     def f(a: dict, b: dict) -> float:
         min_size = min(len(a), len(b))
         if min_size < 1.1:
@@ -155,15 +146,8 @@ def jaccard_link_lengths(
 class SeparationConstraint:
     """Separation constraint between two nodes."""
 
-    def __init__(
-        self,
-        axis: Axis,
-        left: int,
-        right: int,
-        gap: float = 0.0,
-        equality: bool = False
-    ):
-        self.type = 'separation'
+    def __init__(self, axis: Axis, left: int, right: int, gap: float = 0.0, equality: bool = False):
+        self.type = "separation"
         self.axis = axis
         self.left = left
         self.right = right
@@ -183,16 +167,13 @@ class AlignmentConstraint:
     """Alignment constraint for multiple nodes."""
 
     def __init__(self, axis: Axis, offsets: list[AlignmentSpecification]):
-        self.type = 'alignment'
+        self.type = "alignment"
         self.axis = axis
         self.offsets = offsets
 
 
 def generate_directed_edge_constraints(
-    n: int,
-    links: list[T],
-    axis: Axis,
-    la: LinkSepAccessor[T]
+    n: int, links: list[T], axis: Axis, la: LinkSepAccessor[T]
 ) -> list[SeparationConstraint]:
     """
     Generate separation constraints for directed edges.
@@ -225,20 +206,15 @@ def generate_directed_edge_constraints(
         v = nodes[vi]
 
         if u != v:
-            constraints.append(SeparationConstraint(
-                axis=axis,
-                left=ui,
-                right=vi,
-                gap=la.get_min_separation(l)
-            ))
+            constraints.append(
+                SeparationConstraint(axis=axis, left=ui, right=vi, gap=la.get_min_separation(l))
+            )
 
     return constraints
 
 
 def strongly_connected_components(
-    num_vertices: int,
-    edges: list[T],
-    la: LinkAccessor[T]
+    num_vertices: int, edges: list[T], la: LinkAccessor[T]
 ) -> list[list[int]]:
     """
     Tarjan's algorithm for finding strongly connected components.
@@ -251,6 +227,7 @@ def strongly_connected_components(
     Returns:
         List of strongly connected components, each a list of node indices
     """
+
     class Node:
         def __init__(self, id: int):
             self.id = id

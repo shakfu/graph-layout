@@ -1,6 +1,5 @@
 """Tests for layout quality metrics."""
 
-
 import pytest
 
 from graph_layout import Link, Node

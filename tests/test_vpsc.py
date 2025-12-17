@@ -12,7 +12,7 @@ from graph_layout.cola.vpsc import (
 
 def round_to(v: float, precision: int = 4) -> float:
     """Round to specified precision."""
-    m = 10 ** precision
+    m = 10**precision
     return round(v * m) / m
 
 
@@ -60,9 +60,7 @@ class TestSolver:
 
     def test_no_splits(self):
         """Test case: no splits required."""
-        variables = [
-            Variable(2), Variable(9), Variable(9), Variable(9), Variable(2)
-        ]
+        variables = [Variable(2), Variable(9), Variable(9), Variable(9), Variable(2)]
         constraints = [
             Constraint(variables[0], variables[4], 3),
             Constraint(variables[0], variables[1], 3),

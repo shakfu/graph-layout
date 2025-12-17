@@ -66,10 +66,7 @@ class TestSymmetricDiffLinkLengths:
     def test_simple_graph(self):
         """Test with simple graph."""
         #  0 -- 1 -- 2
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2)]
 
         la = SimpleLinkLengthAccessor()
         symmetric_diff_link_lengths(links, la)
@@ -94,11 +91,7 @@ class TestJaccardLinkLengths:
 
     def test_simple_graph(self):
         """Test with simple graph."""
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2),
-            SimpleLink(2, 3)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2), SimpleLink(2, 3)]
 
         la = SimpleLinkLengthAccessor()
         jaccard_link_lengths(links, la)
@@ -110,11 +103,7 @@ class TestJaccardLinkLengths:
     def test_triangle_graph(self):
         """Test with triangle graph."""
         # Triangle: all nodes connected
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2),
-            SimpleLink(2, 0)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2), SimpleLink(2, 0)]
 
         la = SimpleLinkLengthAccessor()
         jaccard_link_lengths(links, la, w=1.0)
@@ -128,9 +117,9 @@ class TestSeparationConstraint:
 
     def test_create_constraint(self):
         """Test constraint creation."""
-        c = SeparationConstraint('x', 0, 1, 5.0)
+        c = SeparationConstraint("x", 0, 1, 5.0)
 
-        assert c.axis == 'x'
+        assert c.axis == "x"
         assert c.left == 0
         assert c.right == 1
         assert c.gap == 5.0
@@ -138,7 +127,7 @@ class TestSeparationConstraint:
 
     def test_equality_constraint(self):
         """Test equality constraint."""
-        c = SeparationConstraint('y', 0, 1, 10.0, equality=True)
+        c = SeparationConstraint("y", 0, 1, 10.0, equality=True)
 
         assert c.equality == True
 
@@ -148,16 +137,13 @@ class TestAlignmentConstraint:
 
     def test_create_alignment(self):
         """Test alignment constraint creation."""
-        offsets = [
-            AlignmentSpecification(0, 0.0),
-            AlignmentSpecification(1, 5.0)
-        ]
+        offsets = [AlignmentSpecification(0, 0.0), AlignmentSpecification(1, 5.0)]
 
-        c = AlignmentConstraint('x', offsets)
+        c = AlignmentConstraint("x", offsets)
 
-        assert c.axis == 'x'
+        assert c.axis == "x"
         assert len(c.offsets) == 2
-        assert c.type == 'alignment'
+        assert c.type == "alignment"
 
 
 class TestStronglyConnectedComponents:
@@ -174,10 +160,7 @@ class TestStronglyConnectedComponents:
     def test_linear_graph(self):
         """Test with linear directed graph."""
         # 0 -> 1 -> 2
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2)]
 
         la = SimpleLinkAccessor()
         components = strongly_connected_components(3, links, la)
@@ -188,11 +171,7 @@ class TestStronglyConnectedComponents:
     def test_cycle(self):
         """Test with cycle."""
         # 0 -> 1 -> 2 -> 0 (cycle)
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2),
-            SimpleLink(2, 0)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2), SimpleLink(2, 0)]
 
         la = SimpleLinkAccessor()
         components = strongly_connected_components(3, links, la)
@@ -205,12 +184,7 @@ class TestStronglyConnectedComponents:
         """Test with two separate components."""
         # 0 -> 1 -> 0 (cycle)
         # 2 -> 3 -> 2 (cycle)
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 0),
-            SimpleLink(2, 3),
-            SimpleLink(3, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 0), SimpleLink(2, 3), SimpleLink(3, 2)]
 
         la = SimpleLinkAccessor()
         components = strongly_connected_components(4, links, la)
@@ -229,7 +203,7 @@ class TestStronglyConnectedComponents:
             SimpleLink(0, 1),
             SimpleLink(1, 2),
             SimpleLink(2, 3),
-            SimpleLink(3, 1)  # Back edge creating cycle
+            SimpleLink(3, 1),  # Back edge creating cycle
         ]
 
         la = SimpleLinkAccessor()
@@ -245,29 +219,22 @@ class TestGenerateDirectedEdgeConstraints:
     def test_simple_dag(self):
         """Test with simple DAG."""
         # 0 -> 1 -> 2
-        links = [
-            SimpleLink(0, 1, min_sep=5.0),
-            SimpleLink(1, 2, min_sep=5.0)
-        ]
+        links = [SimpleLink(0, 1, min_sep=5.0), SimpleLink(1, 2, min_sep=5.0)]
 
         la = SimpleLinkSepAccessor()
-        constraints = generate_directed_edge_constraints(3, links, 'x', la)
+        constraints = generate_directed_edge_constraints(3, links, "x", la)
 
         # Should generate constraints for both edges
         assert len(constraints) == 2
-        assert all(c.axis == 'x' for c in constraints)
+        assert all(c.axis == "x" for c in constraints)
 
     def test_with_cycle(self):
         """Test with cycle (SCC)."""
         # 0 -> 1 -> 2 -> 0 (cycle)
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2),
-            SimpleLink(2, 0)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2), SimpleLink(2, 0)]
 
         la = SimpleLinkSepAccessor()
-        constraints = generate_directed_edge_constraints(3, links, 'x', la)
+        constraints = generate_directed_edge_constraints(3, links, "x", la)
 
         # No constraints within SCC
         assert len(constraints) == 0
@@ -280,22 +247,22 @@ class TestGenerateDirectedEdgeConstraints:
             SimpleLink(0, 1, min_sep=5.0),
             SimpleLink(1, 2, min_sep=5.0),
             SimpleLink(2, 1, min_sep=5.0),  # Back edge
-            SimpleLink(2, 3, min_sep=5.0)
+            SimpleLink(2, 3, min_sep=5.0),
         ]
 
         la = SimpleLinkSepAccessor()
-        constraints = generate_directed_edge_constraints(4, links, 'y', la)
+        constraints = generate_directed_edge_constraints(4, links, "y", la)
 
         # Should generate constraints for edges crossing SCC boundaries
         assert len(constraints) > 0
-        assert all(c.axis == 'y' for c in constraints)
+        assert all(c.axis == "y" for c in constraints)
 
     def test_constraint_properties(self):
         """Test that constraints have correct properties."""
         links = [SimpleLink(0, 1, min_sep=10.0)]
 
         la = SimpleLinkSepAccessor()
-        constraints = generate_directed_edge_constraints(2, links, 'x', la)
+        constraints = generate_directed_edge_constraints(2, links, "x", la)
 
         assert len(constraints) == 1
         c = constraints[0]

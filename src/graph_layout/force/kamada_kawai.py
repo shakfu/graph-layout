@@ -177,7 +177,7 @@ class KamadaKawaiLayout(IterativeLayout):
             Distance matrix where dist[i,j] is the shortest path length.
         """
         n = len(self._nodes)
-        dist = np.full((n, n), float('inf'))
+        dist = np.full((n, n), float("inf"))
 
         # Build adjacency list
         adj = self._build_adjacency()
@@ -189,7 +189,7 @@ class KamadaKawaiLayout(IterativeLayout):
             while queue:
                 curr = queue.popleft()
                 for neighbor in adj[curr]:
-                    if dist[start, neighbor] == float('inf'):
+                    if dist[start, neighbor] == float("inf"):
                         dist[start, neighbor] = dist[start, curr] + 1
                         queue.append(neighbor)
 
@@ -206,7 +206,7 @@ class KamadaKawaiLayout(IterativeLayout):
         max_dist: float = 0.0
         for i in range(n):
             for j in range(n):
-                if self._dist_matrix[i, j] != float('inf'):
+                if self._dist_matrix[i, j] != float("inf"):
                     max_dist = max(max_dist, float(self._dist_matrix[i, j]))
 
         # Replace infinity with a large distance
@@ -216,9 +216,7 @@ class KamadaKawaiLayout(IterativeLayout):
             disconn_dist = max(max_dist * 1.5, n) if max_dist > 0 else n
 
         self._dist_matrix = np.where(
-            self._dist_matrix == float('inf'),
-            disconn_dist,
-            self._dist_matrix
+            self._dist_matrix == float("inf"), disconn_dist, self._dist_matrix
         )
 
         # Ideal lengths: l_ij = L * d_ij where L is edge_length
@@ -226,8 +224,8 @@ class KamadaKawaiLayout(IterativeLayout):
 
         # Spring constants: k_ij = K / d_ij^2
         # Using K = 1 for simplicity
-        with np.errstate(divide='ignore', invalid='ignore'):
-            self._k_matrix = 1.0 / (self._dist_matrix ** 2)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            self._k_matrix = 1.0 / (self._dist_matrix**2)
             self._k_matrix[self._dist_matrix == 0] = 0
 
     def _compute_energy_gradient(self, m: int) -> tuple[float, float]:
@@ -354,8 +352,8 @@ class KamadaKawaiLayout(IterativeLayout):
         """
         self._initialize_indices()
 
-        random_init = kwargs.get('random_init', True)
-        center = kwargs.get('center_graph', True)
+        random_init = kwargs.get("random_init", True)
+        center = kwargs.get("center_graph", True)
 
         if random_init:
             self._initialize_positions(random_init=True)
@@ -370,7 +368,7 @@ class KamadaKawaiLayout(IterativeLayout):
         self._alpha = 1.0
 
         # Fire start event
-        self.trigger({'type': EventType.start, 'alpha': self._alpha})
+        self.trigger({"type": EventType.start, "alpha": self._alpha})
 
         # Run layout
         self.kick()
@@ -379,7 +377,7 @@ class KamadaKawaiLayout(IterativeLayout):
             self._center_graph()
 
         # Fire end event
-        self.trigger({'type': EventType.end, 'alpha': 0.0})
+        self.trigger({"type": EventType.end, "alpha": 0.0})
 
         return self
 
@@ -427,11 +425,7 @@ class KamadaKawaiLayout(IterativeLayout):
         self._alpha = max_delta  # Use delta as a measure of "energy"
 
         # Fire tick event
-        self.trigger({
-            'type': EventType.tick,
-            'alpha': self._alpha,
-            'stress': max_delta
-        })
+        self.trigger({"type": EventType.tick, "alpha": self._alpha, "stress": max_delta})
 
         return False
 

@@ -143,7 +143,7 @@ class CircularLayout(StaticLayout):
         if self._sort_by is None:
             return indices
 
-        if self._sort_by == 'degree':
+        if self._sort_by == "degree":
             # Sort by degree (descending)
             degrees = [self._compute_degree(i) for i in range(n)]
             indices.sort(key=lambda i: -degrees[i])

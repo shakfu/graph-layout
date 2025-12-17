@@ -83,7 +83,7 @@ class Rectangle:
     @staticmethod
     def empty() -> Rectangle:
         """Create an empty rectangle."""
-        inf = float('inf')
+        inf = float("inf")
         return Rectangle(inf, -inf, inf, -inf)
 
     def cx(self) -> float:
@@ -136,12 +136,7 @@ class Rectangle:
 
     def union(self, r: Rectangle) -> Rectangle:
         """Get union with another rectangle."""
-        return Rectangle(
-            min(self.x, r.x),
-            max(self.X, r.X),
-            min(self.y, r.y),
-            max(self.Y, r.Y)
-        )
+        return Rectangle(min(self.x, r.x), max(self.X, r.X), min(self.y, r.y), max(self.Y, r.Y))
 
     def line_intersections(self, x1: float, y1: float, x2: float, y2: float) -> list[Point]:
         """
@@ -158,7 +153,7 @@ class Rectangle:
             [self.x, self.y, self.X, self.y],
             [self.X, self.y, self.X, self.Y],
             [self.X, self.Y, self.x, self.Y],
-            [self.x, self.Y, self.x, self.y]
+            [self.x, self.Y, self.x, self.y],
         ]
         intersections = []
         for side in sides:
@@ -186,13 +181,12 @@ class Rectangle:
             Point(self.x, self.y),
             Point(self.X, self.y),
             Point(self.X, self.Y),
-            Point(self.x, self.Y)
+            Point(self.x, self.Y),
         ]
 
     @staticmethod
     def line_intersection(
-        x1: float, y1: float, x2: float, y2: float,
-        x3: float, y3: float, x4: float, y4: float
+        x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, x4: float, y4: float
     ) -> Optional[Point]:
         """
         Find intersection of two line segments.
@@ -234,11 +228,7 @@ class Rectangle:
         return Rectangle(self.x - pad, self.X + pad, self.y - pad, self.Y + pad)
 
 
-def make_edge_between(
-    source: Rectangle,
-    target: Rectangle,
-    ah: float
-) -> dict[str, Point]:
+def make_edge_between(source: Rectangle, target: Rectangle, ah: float) -> dict[str, Point]:
     """
     Create edge between two rectangles.
 
@@ -264,9 +254,9 @@ def make_edge_between(
     al = l - ah
 
     return {
-        'sourceIntersection': si,
-        'targetIntersection': ti,
-        'arrowStart': Point(si.x + al * dx / l, si.y + al * dy / l)
+        "sourceIntersection": si,
+        "targetIntersection": ti,
+        "arrowStart": Point(si.x + al * dx / l, si.y + al * dy / l),
     }
 
 
@@ -336,7 +326,7 @@ class _RectAccessors:
         get_close: Callable[[Rectangle], float],
         get_size: Callable[[Rectangle], float],
         make_rect: Callable[[float, float, float, float], Rectangle],
-        find_neighbours: Callable[[_Node, RBTree[_Node]], None]
+        find_neighbours: Callable[[_Node, RBTree[_Node]], None],
     ):
         self.get_centre = get_centre
         self.get_open = get_open
@@ -348,6 +338,7 @@ class _RectAccessors:
 
 def _find_x_neighbours(v: _Node, scanline: RBTree[_Node]) -> None:
     """Find x-axis neighbors for a node."""
+
     def f(forward: str, reverse: str) -> None:
         it = scanline.find_iter(v)
         while True:
@@ -367,6 +358,7 @@ def _find_x_neighbours(v: _Node, scanline: RBTree[_Node]) -> None:
 
 def _find_y_neighbours(v: _Node, scanline: RBTree[_Node]) -> None:
     """Find y-axis neighbors for a node."""
+
     def f(forward: str, reverse: str) -> None:
         u = getattr(scanline.find_iter(v), forward)()
         if u is not None and u.r.overlap_x(v.r) > 0:
@@ -386,7 +378,7 @@ _x_rect = _RectAccessors(
     make_rect=lambda open, close, center, size: Rectangle(
         center - size / 2, center + size / 2, open, close
     ),
-    find_neighbours=_find_x_neighbours
+    find_neighbours=_find_x_neighbours,
 )
 
 # Y-axis accessors
@@ -398,15 +390,12 @@ _y_rect = _RectAccessors(
     make_rect=lambda open, close, center, size: Rectangle(
         open, close, center - size / 2, center + size / 2
     ),
-    find_neighbours=_find_y_neighbours
+    find_neighbours=_find_y_neighbours,
 )
 
 
 def _generate_constraints(
-    rs: list[Rectangle],
-    vars: list[Variable],
-    rect: _RectAccessors,
-    min_sep: float
+    rs: list[Rectangle], vars: list[Variable], rect: _RectAccessors, min_sep: float
 ) -> list[Constraint]:
     """Generate non-overlap constraints using sweep line algorithm."""
     n = len(rs)
@@ -421,6 +410,7 @@ def _generate_constraints(
         events.append(_Event(False, v, rect.get_close(r)))
 
     from functools import cmp_to_key
+
     events.sort(key=cmp_to_key(_compare_events))
 
     cs: list[Constraint] = []
@@ -520,7 +510,7 @@ class Projection:
         groups: list[ProjectionGroup],
         root_group: Optional[ProjectionGroup] = None,
         constraints: Optional[list[Any]] = None,
-        avoid_overlaps: bool = False
+        avoid_overlaps: bool = False,
     ):
         self.nodes = nodes
         self.groups = groups
@@ -562,10 +552,10 @@ class Projection:
     def _create_separation(self, c: dict) -> Constraint:
         """Create separation constraint."""
         return Constraint(
-            self.nodes[c['left']].variable,
-            self.nodes[c['right']].variable,
-            c['gap'],
-            c.get('equality', False)
+            self.nodes[c["left"]].variable,
+            self.nodes[c["right"]].variable,
+            c["gap"],
+            c.get("equality", False),
         )
 
     def _make_feasible(self, c: dict) -> None:
@@ -573,13 +563,13 @@ class Projection:
         if not self.avoid_overlaps:
             return
 
-        axis = 'x'
-        dim = 'width'
-        if c.get('axis') == 'x':
-            axis = 'y'
-            dim = 'height'
+        axis = "x"
+        dim = "width"
+        if c.get("axis") == "x":
+            axis = "y"
+            dim = "height"
 
-        vs = [self.nodes[o['node']] for o in c['offsets']]
+        vs = [self.nodes[o["node"]] for o in c["offsets"]]
         vs.sort(key=lambda v: getattr(v, axis))
 
         p = None
@@ -592,40 +582,37 @@ class Projection:
 
     def _create_alignment(self, c: dict) -> None:
         """Create alignment constraint."""
-        u = self.nodes[c['offsets'][0]['node']].variable
+        u = self.nodes[c["offsets"][0]["node"]].variable
         self._make_feasible(c)
 
-        cs = self.x_constraints if c['axis'] == 'x' else self.y_constraints
-        for o in c['offsets'][1:]:
-            v = self.nodes[o['node']].variable
-            cs.append(Constraint(u, v, o['offset'], True))
+        cs = self.x_constraints if c["axis"] == "x" else self.y_constraints
+        for o in c["offsets"][1:]:
+            v = self.nodes[o["node"]].variable
+            cs.append(Constraint(u, v, o["offset"], True))
 
     def _create_constraints(self, constraints: list[dict[str, Any]]) -> None:
         """Create constraints from specifications."""
+
         def is_sep(c: dict[str, Any]) -> bool:
-            return 'type' not in c or c['type'] == 'separation'
+            return "type" not in c or c["type"] == "separation"
 
         self.x_constraints = [
-            self._create_separation(c)
-            for c in constraints
-            if c.get('axis') == 'x' and is_sep(c)
+            self._create_separation(c) for c in constraints if c.get("axis") == "x" and is_sep(c)
         ]
 
         self.y_constraints = [
-            self._create_separation(c)
-            for c in constraints
-            if c.get('axis') == 'y' and is_sep(c)
+            self._create_separation(c) for c in constraints if c.get("axis") == "y" and is_sep(c)
         ]
 
         for c in constraints:
-            if c.get('type') == 'alignment':
+            if c.get("type") == "alignment":
                 self._create_alignment(c)
 
     def project_functions(self) -> list[Callable]:
         """Get projection functions for x and y axes."""
         return [
             lambda x0, y0, x: self.x_project(x0, y0, x),
-            lambda x0, y0, y: self.y_project(x0, y0, y)
+            lambda x0, y0, y: self.y_project(x0, y0, y),
         ]
 
     def x_project(self, x0: list[float], y0: list[float], x: list[float]) -> None:

@@ -254,7 +254,7 @@ class RadialTreeLayout(StaticLayout):
             angle_sweep=self._sweep_angle,
             cx=cx,
             cy=cy,
-            visited={root_idx}
+            visited={root_idx},
         )
 
     def _layout_subtree(
@@ -266,7 +266,7 @@ class RadialTreeLayout(StaticLayout):
         angle_sweep: float,
         cx: float,
         cy: float,
-        visited: set[int]
+        visited: set[int],
     ) -> None:
         """Recursively layout a subtree."""
         children = children_map.get(parent, [])
@@ -306,14 +306,7 @@ class RadialTreeLayout(StaticLayout):
 
             # Layout child's subtree
             self._layout_subtree(
-                child,
-                children_map,
-                level + 1,
-                current_angle,
-                child_sweep,
-                cx,
-                cy,
-                visited
+                child, children_map, level + 1, current_angle, child_sweep, cx, cy, visited
             )
 
             current_angle += child_sweep

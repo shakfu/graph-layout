@@ -334,9 +334,7 @@ class ColaLayoutAdapter(IterativeLayout):
         # Get iteration counts
         unconstrained = kwargs.get("unconstrained_iterations", 0)
         user_constraint = kwargs.get("user_constraint_iterations", 0)
-        all_constraints = kwargs.get(
-            "all_constraints_iterations", self._iterations // 3
-        )
+        all_constraints = kwargs.get("all_constraints_iterations", self._iterations // 3)
         grid_snap = kwargs.get("grid_snap_iterations", 0)
         keep_running = kwargs.get("keep_running", True)
         center = kwargs.get("center_graph", True)
@@ -422,9 +420,7 @@ class ColaLayoutAdapter(IterativeLayout):
         self._cola.symmetric_diff_link_lengths(ideal_length, w)
         return self
 
-    def jaccard_link_lengths(
-        self, ideal_length: float, w: float = 1.0
-    ) -> "ColaLayoutAdapter":
+    def jaccard_link_lengths(self, ideal_length: float, w: float = 1.0) -> "ColaLayoutAdapter":
         """
         Compute link lengths using Jaccard coefficient.
 

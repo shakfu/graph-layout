@@ -65,9 +65,9 @@ class TestModule:
 
     def test_predefined_module(self):
         """Test predefined module."""
-        m = Module(0, definition={'color': 'red'})
+        m = Module(0, definition={"color": "red"})
         assert m.is_predefined()
-        assert m.definition['color'] == 'red'
+        assert m.definition["color"] == "red"
 
     def test_is_island(self):
         """Test island detection."""
@@ -224,10 +224,7 @@ class TestConfiguration:
     def test_simple_graph(self):
         """Test simple graph configuration."""
         # 0 -> 1 -> 2
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2)]
 
         la = SimpleLinkAccessor()
         config = Configuration(3, links, la)
@@ -239,10 +236,7 @@ class TestConfiguration:
     def test_merge_modules(self):
         """Test merging two modules."""
         # 0 -> 1, 0 -> 2 (both from 0)
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(0, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(0, 2)]
 
         la = SimpleLinkAccessor()
         config = Configuration(3, links, la)
@@ -260,11 +254,7 @@ class TestConfiguration:
     def test_greedy_merge(self):
         """Test greedy merge algorithm."""
         # Star graph: 0 connects to 1, 2, 3
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(0, 2),
-            SimpleLink(0, 3)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(0, 2), SimpleLink(0, 3)]
 
         la = SimpleLinkAccessor()
         config = Configuration(4, links, la)
@@ -278,10 +268,7 @@ class TestConfiguration:
 
     def test_n_edges(self):
         """Test edge count calculation."""
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(0, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(0, 2)]
 
         la = SimpleLinkAccessor()
         config = Configuration(3, links, la)
@@ -295,10 +282,7 @@ class TestConfiguration:
 
     def test_all_edges(self):
         """Test extracting all edges."""
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2)
-        ]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2)]
 
         la = SimpleLinkAccessor()
         config = Configuration(3, links, la)
@@ -312,96 +296,79 @@ class TestGetGroups:
 
     def test_simple_linear_graph(self):
         """Test with simple linear graph."""
-        nodes = [{'id': i} for i in range(3)]
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2)
-        ]
+        nodes = [{"id": i} for i in range(3)]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2)]
 
         la = SimpleLinkAccessor()
         result = get_groups(nodes, links, la)
 
-        assert 'groups' in result
-        assert 'powerEdges' in result
+        assert "groups" in result
+        assert "powerEdges" in result
 
     def test_star_graph(self):
         """Test with star graph."""
         # Center node 0 connects to 1, 2, 3
-        nodes = [{'id': i} for i in range(4)]
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(0, 2),
-            SimpleLink(0, 3)
-        ]
+        nodes = [{"id": i} for i in range(4)]
+        links = [SimpleLink(0, 1), SimpleLink(0, 2), SimpleLink(0, 3)]
 
         la = SimpleLinkAccessor()
         result = get_groups(nodes, links, la)
 
         # Nodes 1, 2, 3 should be grouped (same incoming edge)
-        groups = result['groups']
+        groups = result["groups"]
         assert len(groups) > 0
 
     def test_disconnected_components(self):
         """Test with disconnected components."""
         # Two separate edges: 0-1 and 2-3
-        nodes = [{'id': i} for i in range(4)]
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(2, 3)
-        ]
+        nodes = [{"id": i} for i in range(4)]
+        links = [SimpleLink(0, 1), SimpleLink(2, 3)]
 
         la = SimpleLinkAccessor()
         result = get_groups(nodes, links, la)
 
         # Each pair should be grouped separately
-        assert 'groups' in result
-        assert 'powerEdges' in result
+        assert "groups" in result
+        assert "powerEdges" in result
 
     def test_typed_edges(self):
         """Test with different edge types."""
-        nodes = [{'id': i} for i in range(3)]
+        nodes = [{"id": i} for i in range(3)]
         links = [
             SimpleLink(0, 1, link_type=0),
-            SimpleLink(0, 2, link_type=1)  # different type
+            SimpleLink(0, 2, link_type=1),  # different type
         ]
 
         la = SimpleLinkAccessor()
         result = get_groups(nodes, links, la)
 
         # Different edge types should prevent merging
-        assert 'groups' in result
-        power_edges = result['powerEdges']
+        assert "groups" in result
+        power_edges = result["powerEdges"]
         assert len(power_edges) > 0
 
     def test_complete_triangle(self):
         """Test with complete triangle graph."""
         # 0-1, 1-2, 2-0
-        nodes = [{'id': i} for i in range(3)]
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(1, 2),
-            SimpleLink(2, 0)
-        ]
+        nodes = [{"id": i} for i in range(3)]
+        links = [SimpleLink(0, 1), SimpleLink(1, 2), SimpleLink(2, 0)]
 
         la = SimpleLinkAccessor()
         result = get_groups(nodes, links, la)
 
         # Complete graph has no useful grouping
-        assert 'groups' in result
-        assert 'powerEdges' in result
+        assert "groups" in result
+        assert "powerEdges" in result
 
     def test_power_edge_retargeting(self):
         """Test that power edges are retargeted to nodes."""
-        nodes = [{'id': i} for i in range(3)]
-        links = [
-            SimpleLink(0, 1),
-            SimpleLink(0, 2)
-        ]
+        nodes = [{"id": i} for i in range(3)]
+        links = [SimpleLink(0, 1), SimpleLink(0, 2)]
 
         la = SimpleLinkAccessor()
         result = get_groups(nodes, links, la)
 
-        power_edges = result['powerEdges']
+        power_edges = result["powerEdges"]
         # Edges should reference actual node objects, not indices
         for edge in power_edges:
             assert isinstance(edge.source, dict) or isinstance(edge.source, int)

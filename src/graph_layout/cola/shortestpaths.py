@@ -16,6 +16,7 @@ from typing import Any, Callable, TypeVar, cast
 
 class PerformanceWarning(UserWarning):
     """Warning about performance-related issues."""
+
     pass
 
 
@@ -28,11 +29,13 @@ _Calculator: Any
 # Try Cython implementation first
 try:
     from .. import _speedups  # type: ignore[attr-defined]
+
     _Calculator = _speedups.Calculator
     _IMPLEMENTATION = "cython"
 except ImportError:
     # Fall back to pure Python
     from ._shortestpaths_py import Calculator as _PyCalculator
+
     _Calculator = _PyCalculator
     _IMPLEMENTATION = "python"
 
@@ -78,6 +81,7 @@ class Calculator:
         # (e.g., path_from_node_to_node_with_prev_cost)
         if _IMPLEMENTATION == "cython":
             from ._shortestpaths_py import Calculator as _PyCalculator
+
             self._py_calc = _PyCalculator(n, edges, get_source_index, get_target_index, get_length)
         else:
             self._py_calc = self._calc
@@ -153,5 +157,5 @@ if _IMPLEMENTATION == "python":
         "For better performance, install from PyPI (pip install graph-layout) "
         "which includes pre-built Cython extensions.",
         PerformanceWarning,
-        stacklevel=2
+        stacklevel=2,
     )

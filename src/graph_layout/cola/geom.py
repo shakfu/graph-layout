@@ -188,8 +188,8 @@ def _tangent_point_poly_c(P: Point, V: Sequence[Point]) -> dict[str, int]:
     V_closed.append(V[0])
 
     return {
-        'rtan': _rtangent_point_poly_c(P, V_closed),
-        'ltan': _ltangent_point_poly_c(P, V_closed)
+        "rtan": _rtangent_point_poly_c(P, V_closed),
+        "ltan": _ltangent_point_poly_c(P, V_closed),
     }
 
 
@@ -307,7 +307,7 @@ def _tangent_poly_poly_c(
     t1: Callable[[Point, list[Point]], int],
     t2: Callable[[Point, list[Point]], int],
     cmp1: Callable[[Point, Point, Point], bool],
-    cmp2: Callable[[Point, Point, Point], bool]
+    cmp2: Callable[[Point, Point, Point], bool],
 ) -> dict[str, int]:
     """
     Get tangent between two convex polygons.
@@ -345,13 +345,13 @@ def _tangent_poly_poly_c(
             ix2 -= 1  # get tangent from V[ix1] to W
             done = False  # not done if had to adjust this
 
-    return {'t1': ix1, 't2': ix2}
+    return {"t1": ix1, "t2": ix2}
 
 
 def lr_tangent_poly_poly_c(V: list[Point], W: list[Point]) -> dict[str, int]:
     """Get LR tangent between two convex polygons."""
     rl = rl_tangent_poly_poly_c(W, V)
-    return {'t1': rl['t2'], 't2': rl['t1']}
+    return {"t1": rl["t2"], "t2": rl["t1"]}
 
 
 def rl_tangent_poly_poly_c(V: list[Point], W: list[Point]) -> dict[str, int]:
@@ -423,11 +423,7 @@ class VisibilityEdge:
 class TangentVisibilityGraph:
     """Tangent visibility graph for polygons."""
 
-    def __init__(
-        self,
-        P: list[list[TVGPoint]],
-        g0: Optional[dict[str, list]] = None
-    ):
+    def __init__(self, P: list[list[TVGPoint]], g0: Optional[dict[str, list]] = None):
         self.P = P
         self.V: list[VisibilityVertex] = []
         self.E: list[VisibilityEdge] = []
@@ -460,15 +456,15 @@ class TangentVisibilityGraph:
                 for j in range(i + 1, n):
                     Pj = P[j]
                     t = tangents(Pi, Pj)
-                    for tangent_type in ['rl', 'lr', 'll', 'rr']:
+                    for tangent_type in ["rl", "lr", "ll", "rr"]:
                         c = getattr(t, tangent_type)
                         if c is not None:
                             source = Pi[c.t1]
                             target = Pj[c.t2]
                             self.add_edge_if_visible(source, target, i, j)
         else:
-            self.V = g0['V'].copy()
-            self.E = g0['E'].copy()
+            self.V = g0["V"].copy()
+            self.E = g0["E"].copy()
 
     def add_edge_if_visible(self, u: TVGPoint, v: TVGPoint, i1: int, i2: int) -> None:
         """Add edge if visible (not intersecting polygons)."""
@@ -485,8 +481,8 @@ class TangentVisibilityGraph:
                 continue
             poly = self.P[i]
             t = _tangent_point_poly_c(p, poly)
-            self.add_edge_if_visible(p, poly[t['ltan']], i1, i)
-            self.add_edge_if_visible(p, poly[t['rtan']], i1, i)
+            self.add_edge_if_visible(p, poly[t["ltan"]], i1, i)
+            self.add_edge_if_visible(p, poly[t["rtan"]], i1, i)
         assert p.vv is not None
         return p.vv
 
@@ -499,8 +495,7 @@ class TangentVisibilityGraph:
 
 
 def _line_intersection(
-    x1: float, y1: float, x2: float, y2: float,
-    x3: float, y3: float, x4: float, y4: float
+    x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, x4: float, y4: float
 ) -> Optional[Point]:
     """
     Calculate intersection point of two line segments.
@@ -527,17 +522,13 @@ def _intersects(l: LineSegment, P: Sequence[Point]) -> list[Point]:
     ints = []
     for i in range(1, len(P)):
         intersection = _line_intersection(
-            l.x1, l.y1, l.x2, l.y2,
-            P[i - 1].x, P[i - 1].y, P[i].x, P[i].y
+            l.x1, l.y1, l.x2, l.y2, P[i - 1].x, P[i - 1].y, P[i].x, P[i].y
         )
         if intersection is not None:
             ints.append(intersection)
     # Check closing edge from last to first vertex
     if len(P) > 0:
-        intersection = _line_intersection(
-            l.x1, l.y1, l.x2, l.y2,
-            P[-1].x, P[-1].y, P[0].x, P[0].y
-        )
+        intersection = _line_intersection(l.x1, l.y1, l.x2, l.y2, P[-1].x, P[-1].y, P[0].x, P[0].y)
         if intersection is not None:
             ints.append(intersection)
     return ints
@@ -574,17 +565,41 @@ def tangents(V: Sequence[Point], W: Sequence[Point]) -> BiTangents:
             w2v1v2 = is_left(w2, v1, v2)
             w2v2v3 = is_left(w2, v2, v3)
 
-            if (v1v2w2 >= 0 and v2w1w2 >= 0 and v2w2w3 < 0 and
-                w1w2v2 >= 0 and w2v1v2 >= 0 and w2v2v3 < 0):
+            if (
+                v1v2w2 >= 0
+                and v2w1w2 >= 0
+                and v2w2w3 < 0
+                and w1w2v2 >= 0
+                and w2v1v2 >= 0
+                and w2v2v3 < 0
+            ):
                 bt.ll = BiTangent(i, j)
-            elif (v1v2w2 <= 0 and v2w1w2 <= 0 and v2w2w3 > 0 and
-                  w1w2v2 <= 0 and w2v1v2 <= 0 and w2v2v3 > 0):
+            elif (
+                v1v2w2 <= 0
+                and v2w1w2 <= 0
+                and v2w2w3 > 0
+                and w1w2v2 <= 0
+                and w2v1v2 <= 0
+                and w2v2v3 > 0
+            ):
                 bt.rr = BiTangent(i, j)
-            elif (v1v2w2 <= 0 and v2w1w2 > 0 and v2w2w3 <= 0 and
-                  w1w2v2 >= 0 and w2v1v2 < 0 and w2v2v3 >= 0):
+            elif (
+                v1v2w2 <= 0
+                and v2w1w2 > 0
+                and v2w2w3 <= 0
+                and w1w2v2 >= 0
+                and w2v1v2 < 0
+                and w2v2v3 >= 0
+            ):
                 bt.rl = BiTangent(i, j)
-            elif (v1v2w2 >= 0 and v2w1w2 < 0 and v2w2w3 >= 0 and
-                  w1w2v2 <= 0 and w2v1v2 > 0 and w2v2v3 <= 0):
+            elif (
+                v1v2w2 >= 0
+                and v2w1w2 < 0
+                and v2w2w3 >= 0
+                and w1w2v2 <= 0
+                and w2v1v2 > 0
+                and w2v2v3 <= 0
+            ):
                 bt.lr = BiTangent(i, j)
 
     return bt

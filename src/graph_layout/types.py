@@ -23,6 +23,7 @@ class EventType(IntEnum):
     - tick: Fired once per iteration (for animation)
     - end: Layout has converged or stopped
     """
+
     start = 0
     tick = 1
     end = 2
@@ -30,6 +31,7 @@ class EventType(IntEnum):
 
 class Event(TypedDict, total=False):
     """Event payload passed to event listeners."""
+
     type: EventType
     alpha: float
     stress: Optional[float]
@@ -53,16 +55,16 @@ class Node:
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize node with optional properties."""
-        self.index: Optional[int] = kwargs.get('index')
-        self.x: float = kwargs.get('x', 0.0)
-        self.y: float = kwargs.get('y', 0.0)
-        self.width: Optional[float] = kwargs.get('width')
-        self.height: Optional[float] = kwargs.get('height')
-        self.fixed: int = kwargs.get('fixed', 0)
+        self.index: Optional[int] = kwargs.get("index")
+        self.x: float = kwargs.get("x", 0.0)
+        self.y: float = kwargs.get("y", 0.0)
+        self.width: Optional[float] = kwargs.get("width")
+        self.height: Optional[float] = kwargs.get("height")
+        self.fixed: int = kwargs.get("fixed", 0)
 
         # Bounds (used by layout algorithms for overlap avoidance)
-        self.bounds: Optional[Any] = kwargs.get('bounds')
-        self.innerBounds: Optional[Any] = kwargs.get('innerBounds')
+        self.bounds: Optional[Any] = kwargs.get("bounds")
+        self.innerBounds: Optional[Any] = kwargs.get("innerBounds")
 
         # Internal: previous position (for drag operations)
         self.px: Optional[float] = None
@@ -97,7 +99,7 @@ class Link:
         target: Union[Node, int],
         length: Optional[float] = None,
         weight: Optional[float] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """
         Initialize link between two nodes.
@@ -130,11 +132,11 @@ class Link:
         if isinstance(self.source, int):
             src: Any = self.source
         else:
-            src = getattr(self.source, 'index', None)
+            src = getattr(self.source, "index", None)
         if isinstance(self.target, int):
             tgt: Any = self.target
         else:
-            tgt = getattr(self.target, 'index', None)
+            tgt = getattr(self.target, "index", None)
         return f"Link({src} -> {tgt})"
 
 
@@ -151,14 +153,14 @@ class Group:
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize group with optional properties."""
-        self.leaves: Optional[list[Union[Node, int]]] = kwargs.get('leaves')
-        self.groups: Optional[list[Union[Group, int]]] = kwargs.get('groups')
-        self.padding: float = kwargs.get('padding', 1.0)
+        self.leaves: Optional[list[Union[Node, int]]] = kwargs.get("leaves")
+        self.groups: Optional[list[Union[Group, int]]] = kwargs.get("groups")
+        self.padding: float = kwargs.get("padding", 1.0)
         self.parent: Optional[Group] = None
         self.index: Optional[int] = None
 
         # Bounds (used by layout algorithms)
-        self.bounds: Optional[Any] = kwargs.get('bounds')
+        self.bounds: Optional[Any] = kwargs.get("bounds")
 
         # Copy any additional custom properties
         for key, value in kwargs.items():
@@ -173,7 +175,7 @@ class Group:
 
 def is_group(obj: Any) -> bool:
     """Check if an object is a Group (has leaves or groups attribute)."""
-    return hasattr(obj, 'leaves') or hasattr(obj, 'groups')
+    return hasattr(obj, "leaves") or hasattr(obj, "groups")
 
 
 # Type aliases for callbacks
@@ -181,8 +183,8 @@ LinkNumericPropertyAccessor = Callable[[Link], float]
 
 
 # Generic type variables for custom node/link types
-NodeT = TypeVar('NodeT', bound=Node)
-LinkT = TypeVar('LinkT', bound=Link)
+NodeT = TypeVar("NodeT", bound=Node)
+LinkT = TypeVar("LinkT", bound=Link)
 
 
 class LinkAccessor(Generic[LinkT]):

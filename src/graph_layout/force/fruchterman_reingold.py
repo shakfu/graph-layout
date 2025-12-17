@@ -31,6 +31,7 @@ from ..types import (
 # Try to import Cython-optimized functions
 try:
     from .. import _speedups  # type: ignore[attr-defined]
+
     _HAS_CYTHON = True
 except ImportError:
     _HAS_CYTHON = False
@@ -251,8 +252,8 @@ class FruchtermanReingoldLayout(IterativeLayout):
         # Initialize parameters
         self._initialize_indices()
 
-        random_init = kwargs.get('random_init', True)
-        center = kwargs.get('center_graph', True)
+        random_init = kwargs.get("random_init", True)
+        center = kwargs.get("center_graph", True)
 
         if random_init:
             self._initialize_positions(random_init=True)
@@ -291,7 +292,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
         self._alpha = 1.0
 
         # Fire start event
-        self.trigger({'type': EventType.start, 'alpha': self._alpha})
+        self.trigger({"type": EventType.start, "alpha": self._alpha})
 
         # Run layout
         self.kick()
@@ -300,7 +301,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
             self._center_graph()
 
         # Fire end event
-        self.trigger({'type': EventType.end, 'alpha': 0.0})
+        self.trigger({"type": EventType.end, "alpha": 0.0})
 
         return self
 
@@ -345,15 +346,17 @@ class FruchtermanReingoldLayout(IterativeLayout):
         if _HAS_CYTHON:
             if self._use_barnes_hut and n > 50:
                 _speedups.compute_repulsive_forces_barnes_hut(
-                    self._pos_x, self._pos_y,
-                    self._disp_x, self._disp_y,
-                    k_sq, n, self._barnes_hut_theta
+                    self._pos_x,
+                    self._pos_y,
+                    self._disp_x,
+                    self._disp_y,
+                    k_sq,
+                    n,
+                    self._barnes_hut_theta,
                 )
             else:
                 _speedups.compute_repulsive_forces(
-                    self._pos_x, self._pos_y,
-                    self._disp_x, self._disp_y,
-                    k_sq, n
+                    self._pos_x, self._pos_y, self._disp_x, self._disp_y, k_sq, n
                 )
         else:
             if self._use_barnes_hut and n > 50:
@@ -364,10 +367,14 @@ class FruchtermanReingoldLayout(IterativeLayout):
         # Calculate attractive forces along edges
         if _HAS_CYTHON and len(self._links) > 0:
             _speedups.compute_attractive_forces(
-                self._pos_x, self._pos_y,
-                self._disp_x, self._disp_y,
-                self._sources, self._targets,
-                k, len(self._links)
+                self._pos_x,
+                self._pos_y,
+                self._disp_x,
+                self._disp_y,
+                self._sources,
+                self._targets,
+                k,
+                len(self._links),
             )
         else:
             for link in self._links:
@@ -405,15 +412,22 @@ class FruchtermanReingoldLayout(IterativeLayout):
         # Apply displacements, limited by temperature
         if _HAS_CYTHON:
             _speedups.apply_displacements(
-                self._pos_x, self._pos_y,
-                self._disp_x, self._disp_y,
-                self._fixed, self._temperature,
-                0.0, 0.0, self._canvas_size[0], self._canvas_size[1], n
+                self._pos_x,
+                self._pos_y,
+                self._disp_x,
+                self._disp_y,
+                self._fixed,
+                self._temperature,
+                0.0,
+                0.0,
+                self._canvas_size[0],
+                self._canvas_size[1],
+                n,
             )
             # Sync positions back to nodes
             for i, node in enumerate(self._nodes):
-                node.x = self._pos_x[i]
-                node.y = self._pos_y[i]
+                node.x = float(self._pos_x[i])
+                node.y = float(self._pos_y[i])
         else:
             for i in range(n):
                 node = self._nodes[i]
@@ -423,8 +437,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
                     continue
 
                 disp_len = math.sqrt(
-                    self._disp_x[i] * self._disp_x[i] +
-                    self._disp_y[i] * self._disp_y[i]
+                    self._disp_x[i] * self._disp_x[i] + self._disp_y[i] * self._disp_y[i]
                 )
 
                 if disp_len > 0:
@@ -443,11 +456,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
         self._alpha = self._temperature / (self._canvas_size[0] / 10)
 
         # Fire tick event
-        self.trigger({
-            'type': EventType.tick,
-            'alpha': self._alpha,
-            'stress': None
-        })
+        self.trigger({"type": EventType.tick, "alpha": self._alpha, "stress": None})
 
         return False
 
@@ -476,11 +485,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
         """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""
         assert self._disp_x is not None and self._disp_y is not None
         # Build quadtree from current node positions
-        tree = QuadTree.from_nodes(
-            self._nodes,
-            padding=10.0,
-            theta=self._barnes_hut_theta
-        )
+        tree = QuadTree.from_nodes(self._nodes, padding=10.0, theta=self._barnes_hut_theta)
 
         # Calculate force on each node using the tree
         for i, node in enumerate(self._nodes):

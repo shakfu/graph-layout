@@ -15,10 +15,7 @@ from .layout import Layout, Node
 
 
 def gridify(
-    pg_layout: dict,
-    nudge_gap: float,
-    margin: float,
-    group_margin: float
+    pg_layout: dict, nudge_gap: float, margin: float, group_margin: float
 ) -> list[list[list[Point]]]:
     """
     Apply grid-based edge routing to a power graph layout.
@@ -32,8 +29,8 @@ def gridify(
     Returns:
         List of routed edge paths
     """
-    cola = pg_layout['cola']
-    power_graph = pg_layout['powerGraph']
+    cola = pg_layout["cola"]
+    power_graph = pg_layout["powerGraph"]
 
     # Run initial layout
     cola.start(0, 0, 0, 10, False)
@@ -46,16 +43,11 @@ def gridify(
         power_graph.powerEdges,
         nudge_gap,
         lambda e: e.source.routerNode.id,
-        lambda e: e.target.routerNode.id
+        lambda e: e.target.routerNode.id,
     )
 
 
-def _route(
-    nodes: list[Node],
-    groups: list[Any],
-    margin: float,
-    group_margin: float
-) -> GridRouter:
+def _route(nodes: list[Node], groups: list[Any], margin: float, group_margin: float) -> GridRouter:
     """
     Create a grid router for the given nodes and groups.
 
@@ -70,27 +62,27 @@ def _route(
     """
     # Create router nodes for each node
     for d in nodes:
-        d.routerNode = type('RouterNode', (), {
-            'name': getattr(d, 'name', None),
-            'bounds': d.bounds.inflate(-margin)
-        })()
+        d.routerNode = type(
+            "RouterNode",
+            (),
+            {"name": getattr(d, "name", None), "bounds": d.bounds.inflate(-margin)},
+        )()
 
     # Create router nodes for each group
     for d in groups:
         children = []
 
         # Add group children indices
-        if hasattr(d, 'groups') and d.groups:
+        if hasattr(d, "groups") and d.groups:
             children.extend([len(nodes) + g.id for g in d.groups])
 
         # Add leaf children indices
-        if hasattr(d, 'leaves') and d.leaves:
+        if hasattr(d, "leaves") and d.leaves:
             children.extend([leaf.index for leaf in d.leaves])
 
-        d.routerNode = type('RouterNode', (), {
-            'bounds': d.bounds.inflate(-group_margin),
-            'children': children
-        })()
+        d.routerNode = type(
+            "RouterNode", (), {"bounds": d.bounds.inflate(-group_margin), "children": children}
+        )()
 
     # Combine nodes and groups
     grid_router_nodes = []
@@ -101,22 +93,16 @@ def _route(
     # Create accessor for router nodes
     class RouterNodeAccessor:
         def get_children(self, v: Any) -> list[int]:
-            return getattr(v, 'children', [])
+            return getattr(v, "children", [])
 
         def get_bounds(self, v: Any):
             return v.bounds
 
-    return GridRouter(
-        grid_router_nodes,
-        RouterNodeAccessor(),
-        margin - group_margin
-    )
+    return GridRouter(grid_router_nodes, RouterNodeAccessor(), margin - group_margin)
 
 
 def power_graph_grid_layout(
-    graph: dict[str, Any],
-    size: list[float],
-    grouppadding: float
+    graph: dict[str, Any], size: list[float], grouppadding: float
 ) -> dict[str, Any]:
     """
     Create a power graph layout with grid-based edge routing.
@@ -130,7 +116,7 @@ def power_graph_grid_layout(
         Dict with 'cola' (Layout) and 'powerGraph' keys
     """
     # Initialize node indices
-    for i, v in enumerate(graph['nodes']):
+    for i, v in enumerate(graph["nodes"]):
         v.index = i
 
     # Compute power graph
@@ -142,16 +128,14 @@ def power_graph_grid_layout(
         for v in power_graph.groups:
             v.padding = grouppadding
 
-    Layout() \
-        .avoid_overlaps(False) \
-        .nodes(graph['nodes']) \
-        .links(graph['links']) \
-        .power_graph_groups(power_graph_callback)
+    Layout().avoid_overlaps(False).nodes(graph["nodes"]).links(graph["links"]).power_graph_groups(
+        power_graph_callback
+    )
 
     # Construct flat graph with dummy nodes for groups
-    n = len(graph['nodes'])
+    n = len(graph["nodes"])
     edges = []
-    vs = graph['nodes'][:]
+    vs = graph["nodes"][:]
 
     # Set indices
     for i, v in enumerate(vs):
@@ -164,44 +148,37 @@ def power_graph_grid_layout(
         vs.append(g)
 
         # Add edges from group to leaves
-        if hasattr(g, 'leaves') and g.leaves:
+        if hasattr(g, "leaves") and g.leaves:
             for v in g.leaves:
-                edges.append({'source': source_ind, 'target': v.index})
+                edges.append({"source": source_ind, "target": v.index})
 
         # Add edges from group to subgroups
-        if hasattr(g, 'groups') and g.groups:
+        if hasattr(g, "groups") and g.groups:
             for gg in g.groups:
-                edges.append({'source': source_ind, 'target': gg.id + n})
+                edges.append({"source": source_ind, "target": gg.id + n})
 
     # Add power edges
     for e in power_graph.powerEdges:
-        edges.append({'source': e.source.index, 'target': e.target.index})
+        edges.append({"source": e.source.index, "target": e.target.index})
 
     # Layout flat graph with dummy nodes
-    Layout() \
-        .size(size) \
-        .nodes(vs) \
-        .links(edges) \
-        .avoid_overlaps(False) \
-        .link_distance(30) \
-        .symmetric_diff_link_lengths(5) \
-        .convergence_threshold(1e-4) \
-        .start(100, 0, 0, 0, False)
+    Layout().size(size).nodes(vs).links(edges).avoid_overlaps(False).link_distance(
+        30
+    ).symmetric_diff_link_lengths(5).convergence_threshold(1e-4).start(100, 0, 0, 0, False)
 
     # Final layout with group constraints
-    cola = Layout() \
-        .convergence_threshold(1e-3) \
-        .size(size) \
-        .avoid_overlaps(True) \
-        .nodes(graph['nodes']) \
-        .links(graph['links']) \
-        .group_compactness(1e-4) \
-        .link_distance(30) \
-        .symmetric_diff_link_lengths(5) \
-        .power_graph_groups(power_graph_callback) \
+    cola = (
+        Layout()
+        .convergence_threshold(1e-3)
+        .size(size)
+        .avoid_overlaps(True)
+        .nodes(graph["nodes"])
+        .links(graph["links"])
+        .group_compactness(1e-4)
+        .link_distance(30)
+        .symmetric_diff_link_lengths(5)
+        .power_graph_groups(power_graph_callback)
         .start(50, 0, 100, 0, False)
+    )
 
-    return {
-        'cola': cola,
-        'powerGraph': power_graph
-    }
+    return {"cola": cola, "powerGraph": power_graph}

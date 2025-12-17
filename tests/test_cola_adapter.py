@@ -170,6 +170,7 @@ class TestColaAdapterSpecificFeatures:
 
     def test_link_distance_function(self):
         """Test link_distance property with function."""
+
         def distance_fn(link):
             return 50
 

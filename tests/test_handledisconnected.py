@@ -33,7 +33,7 @@ class TestSeparateGraphs:
         graphs = separate_graphs(nodes, links)
 
         assert len(graphs) == 1
-        assert len(graphs[0]['array']) == 1
+        assert len(graphs[0]["array"]) == 1
 
     def test_two_connected_nodes(self):
         """Test with two connected nodes."""
@@ -43,20 +43,20 @@ class TestSeparateGraphs:
         graphs = separate_graphs(nodes, links)
 
         assert len(graphs) == 1
-        assert len(graphs[0]['array']) == 2
+        assert len(graphs[0]["array"]) == 2
 
     def test_two_disconnected_components(self):
         """Test with two separate components."""
         nodes = [SimpleNode(i) for i in range(4)]
         links = [
             SimpleLink(nodes[0], nodes[1]),  # Component 1
-            SimpleLink(nodes[2], nodes[3])   # Component 2
+            SimpleLink(nodes[2], nodes[3]),  # Component 2
         ]
 
         graphs = separate_graphs(nodes, links)
 
         assert len(graphs) == 2
-        assert all(len(g['array']) == 2 for g in graphs)
+        assert all(len(g["array"]) == 2 for g in graphs)
 
     def test_linear_graph(self):
         """Test with linear connected graph."""
@@ -65,13 +65,13 @@ class TestSeparateGraphs:
             SimpleLink(nodes[0], nodes[1]),
             SimpleLink(nodes[1], nodes[2]),
             SimpleLink(nodes[2], nodes[3]),
-            SimpleLink(nodes[3], nodes[4])
+            SimpleLink(nodes[3], nodes[4]),
         ]
 
         graphs = separate_graphs(nodes, links)
 
         assert len(graphs) == 1
-        assert len(graphs[0]['array']) == 5
+        assert len(graphs[0]["array"]) == 5
 
     def test_cycle(self):
         """Test with cyclic graph."""
@@ -79,13 +79,13 @@ class TestSeparateGraphs:
         links = [
             SimpleLink(nodes[0], nodes[1]),
             SimpleLink(nodes[1], nodes[2]),
-            SimpleLink(nodes[2], nodes[0])
+            SimpleLink(nodes[2], nodes[0]),
         ]
 
         graphs = separate_graphs(nodes, links)
 
         assert len(graphs) == 1
-        assert len(graphs[0]['array']) == 3
+        assert len(graphs[0]["array"]) == 3
 
     def test_complex_disconnected(self):
         """Test with complex disconnected graph."""
@@ -104,7 +104,7 @@ class TestSeparateGraphs:
         graphs = separate_graphs(nodes, links)
 
         assert len(graphs) == 3
-        component_sizes = sorted([len(g['array']) for g in graphs])
+        component_sizes = sorted([len(g["array"]) for g in graphs])
         assert component_sizes == [1, 3, 3]
 
 
@@ -123,13 +123,13 @@ class TestApplyPacking:
         node.width = 20
         node.height = 20
 
-        graphs = [{'array': [node]}]
+        graphs = [{"array": [node]}]
         apply_packing(graphs, 200, 200, node_size=20)
 
         # Graph should have dimensions
-        assert 'width' in graphs[0]
-        assert 'height' in graphs[0]
-        assert graphs[0]['width'] > 0
+        assert "width" in graphs[0]
+        assert "height" in graphs[0]
+        assert graphs[0]["width"] > 0
 
     def test_multiple_components(self):
         """Test packing multiple components."""
@@ -139,16 +139,16 @@ class TestApplyPacking:
             node = SimpleNode(i, x=0, y=0)
             node.width = 30
             node.height = 20
-            graphs.append({'array': [node]})
+            graphs.append({"array": [node]})
 
         apply_packing(graphs, 300, 300, node_size=25)
 
         # All graphs should have dimensions
         for g in graphs:
-            assert 'width' in g
-            assert 'height' in g
-            assert 'x' in g
-            assert 'y' in g
+            assert "width" in g
+            assert "height" in g
+            assert "x" in g
+            assert "y" in g
 
     def test_packing_positions_nodes(self):
         """Test that packing actually positions nodes."""
@@ -158,19 +158,19 @@ class TestApplyPacking:
             node = SimpleNode(i, x=0, y=0)
             node.width = 40
             node.height = 40
-            graphs.append({'array': [node]})
+            graphs.append({"array": [node]})
 
-        initial_positions = [(g['array'][0].x, g['array'][0].y) for g in graphs]
+        initial_positions = [(g["array"][0].x, g["array"][0].y) for g in graphs]
 
         apply_packing(graphs, 400, 400, node_size=40)
 
-        final_positions = [(g['array'][0].x, g['array'][0].y) for g in graphs]
+        final_positions = [(g["array"][0].x, g["array"][0].y) for g in graphs]
 
         # At least some positions should change (due to centering)
         # This might not always be true if already centered, so we just check structure
         for g in graphs:
-            assert hasattr(g['array'][0], 'x')
-            assert hasattr(g['array'][0], 'y')
+            assert hasattr(g["array"][0], "x")
+            assert hasattr(g["array"][0], "y")
 
     def test_packing_with_custom_ratio(self):
         """Test packing with custom aspect ratio."""
@@ -180,7 +180,7 @@ class TestApplyPacking:
             node = SimpleNode(i, x=0, y=0)
             node.width = 25
             node.height = 25
-            graphs.append({'array': [node]})
+            graphs.append({"array": [node]})
 
         apply_packing(graphs, 500, 300, node_size=25, desired_ratio=2.0)
 
@@ -193,13 +193,13 @@ class TestApplyPacking:
         node.width = 30
         node.height = 30
 
-        graphs = [{'array': [node]}]
+        graphs = [{"array": [node]}]
 
         apply_packing(graphs, 200, 200, node_size=30, center_graph=False)
 
         # Should still calculate dimensions
-        assert 'width' in graphs[0]
-        assert 'height' in graphs[0]
+        assert "width" in graphs[0]
+        assert "height" in graphs[0]
 
     def test_packing_preserves_node_count(self):
         """Test that packing doesn't lose nodes."""
@@ -207,15 +207,15 @@ class TestApplyPacking:
         total_nodes = 0
 
         for i in range(3):
-            nodes = [SimpleNode(j + total_nodes, x=j*10, y=0) for j in range(2)]
+            nodes = [SimpleNode(j + total_nodes, x=j * 10, y=0) for j in range(2)]
             total_nodes += len(nodes)
             for node in nodes:
                 node.width = 20
                 node.height = 20
-            graphs.append({'array': nodes})
+            graphs.append({"array": nodes})
 
         apply_packing(graphs, 400, 400, node_size=20)
 
         # Check all nodes still present
-        packed_node_count = sum(len(g['array']) for g in graphs)
+        packed_node_count = sum(len(g["array"]) for g in graphs)
         assert packed_node_count == total_nodes

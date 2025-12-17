@@ -91,17 +91,15 @@ class TestDescent:
     def test_create_descent(self):
         """Test descent creation."""
         # Simple 2D case with 3 nodes
-        x = np.array([
-            [0.0, 1.0, 0.5],  # x coordinates
-            [0.0, 0.0, 1.0]   # y coordinates
-        ])
+        x = np.array(
+            [
+                [0.0, 1.0, 0.5],  # x coordinates
+                [0.0, 0.0, 1.0],  # y coordinates
+            ]
+        )
 
         # Distance matrix
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
 
@@ -135,17 +133,15 @@ class TestDescent:
     def test_compute_stress_ideal_positions(self):
         """Test stress computation with nodes at ideal positions."""
         # Triangle with side length 1
-        x = np.array([
-            [0.0, 1.0, 0.5],
-            [0.0, 0.0, 0.866]  # approx sqrt(3)/2
-        ])
+        x = np.array(
+            [
+                [0.0, 1.0, 0.5],
+                [0.0, 0.0, 0.866],  # approx sqrt(3)/2
+            ]
+        )
 
         # Ideal distances (equilateral triangle)
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         stress = descent.compute_stress()
@@ -156,16 +152,9 @@ class TestDescent:
     def test_compute_stress_non_ideal(self):
         """Test stress with non-ideal positions."""
         # All nodes at same position (worst case)
-        x = np.array([
-            [0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0]
-        ])
+        x = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         stress = descent.compute_stress()
@@ -175,16 +164,9 @@ class TestDescent:
 
     def test_compute_derivatives(self):
         """Test derivative computation."""
-        x = np.array([
-            [0.0, 2.0, 1.0],
-            [0.0, 0.0, 1.0]
-        ])
+        x = np.array([[0.0, 2.0, 1.0], [0.0, 0.0, 1.0]])
 
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         descent.compute_derivatives(x)
@@ -197,16 +179,9 @@ class TestDescent:
     def test_reduce_stress(self):
         """Test that reduce_stress actually reduces stress."""
         # Start with poor configuration
-        x = np.array([
-            [0.0, 2.0, 4.0],
-            [0.0, 0.0, 0.0]
-        ])
+        x = np.array([[0.0, 2.0, 4.0], [0.0, 0.0, 0.0]])
 
-        D = np.array([
-            [0.0, 1.0, 2.0],
-            [1.0, 0.0, 1.0],
-            [2.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 2.0], [1.0, 0.0, 1.0], [2.0, 1.0, 0.0]])
 
         descent = Descent(x.copy(), D)
         initial_stress = descent.compute_stress()
@@ -219,16 +194,9 @@ class TestDescent:
 
     def test_runge_kutta_step(self):
         """Test Runge-Kutta integration step."""
-        x = np.array([
-            [0.0, 2.0, 1.0],
-            [0.0, 0.0, 1.0]
-        ])
+        x = np.array([[0.0, 2.0, 1.0], [0.0, 0.0, 1.0]])
 
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         initial_x = descent.x.copy()
@@ -242,16 +210,9 @@ class TestDescent:
 
     def test_run_iterations(self):
         """Test running descent for multiple iterations."""
-        x = np.array([
-            [0.0, 3.0, 1.5],
-            [0.0, 0.0, 2.0]
-        ])
+        x = np.array([[0.0, 3.0, 1.5], [0.0, 0.0, 2.0]])
 
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         initial_stress = descent.compute_stress()
@@ -263,16 +224,9 @@ class TestDescent:
 
     def test_locks_prevent_movement(self):
         """Test that locked nodes don't move much."""
-        x = np.array([
-            [0.0, 3.0, 1.5],
-            [0.0, 0.0, 2.0]
-        ])
+        x = np.array([[0.0, 3.0, 1.5], [0.0, 0.0, 2.0]])
 
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x.copy(), D)
 
@@ -288,23 +242,18 @@ class TestDescent:
 
     def test_with_weight_matrix(self):
         """Test descent with weight matrix G."""
-        x = np.array([
-            [0.0, 2.0, 1.0],
-            [0.0, 0.0, 1.0]
-        ])
+        x = np.array([[0.0, 2.0, 1.0], [0.0, 0.0, 1.0]])
 
-        D = np.array([
-            [0.0, 1.0, 2.0],
-            [1.0, 0.0, 1.0],
-            [2.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 2.0], [1.0, 0.0, 1.0], [2.0, 1.0, 0.0]])
 
         # Weight matrix - higher weights for some pairs
-        G = np.array([
-            [1.0, 1.0, 2.0],  # Long-range connection
-            [1.0, 1.0, 1.0],
-            [2.0, 1.0, 1.0]
-        ])
+        G = np.array(
+            [
+                [1.0, 1.0, 2.0],  # Long-range connection
+                [1.0, 1.0, 1.0],
+                [2.0, 1.0, 1.0],
+            ]
+        )
 
         descent = Descent(x, D, G)
         descent.run(5)
@@ -317,11 +266,7 @@ class TestDescent:
         # 3 nodes in 1D
         x = np.array([[0.0, 3.0, 6.0]])
 
-        D = np.array([
-            [0.0, 1.0, 2.0],
-            [1.0, 0.0, 1.0],
-            [2.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 2.0], [1.0, 0.0, 1.0], [2.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         descent.run(10)
@@ -332,11 +277,7 @@ class TestDescent:
     def test_3d_descent(self):
         """Test 3D descent."""
         # 4 nodes in 3D (tetrahedron)
-        x = np.array([
-            [0.0, 1.0, 0.5, 0.5],
-            [0.0, 0.0, 0.866, 0.289],
-            [0.0, 0.0, 0.0, 0.816]
-        ])
+        x = np.array([[0.0, 1.0, 0.5, 0.5], [0.0, 0.0, 0.866, 0.289], [0.0, 0.0, 0.0, 0.816]])
 
         D = np.ones((4, 4))  # All distances = 1
         np.fill_diagonal(D, 0)
@@ -350,16 +291,9 @@ class TestDescent:
 
     def test_convergence_threshold(self):
         """Test that descent respects convergence threshold."""
-        x = np.array([
-            [0.0, 1.0, 0.5],
-            [0.0, 0.0, 0.866]
-        ])
+        x = np.array([[0.0, 1.0, 0.5], [0.0, 0.0, 0.866]])
 
-        D = np.array([
-            [0.0, 1.0, 1.0],
-            [1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0]
-        ])
+        D = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])
 
         descent = Descent(x, D)
         descent.threshold = 0.001
@@ -373,16 +307,9 @@ class TestDescent:
 
     def test_grid_snap_nodes(self):
         """Test grid snapping functionality."""
-        x = np.array([
-            [0.0, 50.5, 99.5],
-            [0.0, 49.5, 101.0]
-        ])
+        x = np.array([[0.0, 50.5, 99.5], [0.0, 49.5, 101.0]])
 
-        D = np.array([
-            [0.0, 50.0, 100.0],
-            [50.0, 0.0, 50.0],
-            [100.0, 50.0, 0.0]
-        ])
+        D = np.array([[0.0, 50.0, 100.0], [50.0, 0.0, 50.0], [100.0, 50.0, 0.0]])
 
         descent = Descent(x, D)
         descent.num_grid_snap_nodes = 3

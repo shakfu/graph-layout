@@ -131,12 +131,12 @@ class BaseLayout(ABC):
             else:
                 # Generic object - copy attributes
                 node = Node()
-                for attr in ['index', 'x', 'y', 'width', 'height', 'fixed']:
+                for attr in ["index", "x", "y", "width", "height", "fixed"]:
                     if hasattr(node_data, attr):
                         setattr(node, attr, getattr(node_data, attr))
                 # Copy any additional attributes
                 for attr in dir(node_data):
-                    if not attr.startswith('_') and not hasattr(node, attr):
+                    if not attr.startswith("_") and not hasattr(node, attr):
                         setattr(node, attr, getattr(node_data, attr))
                 self._nodes.append(node)
 
@@ -156,10 +156,10 @@ class BaseLayout(ABC):
                 self._links.append(Link(**link_data))
             else:
                 # Generic object - extract source/target
-                source = getattr(link_data, 'source', 0)
-                target = getattr(link_data, 'target', 0)
-                length = getattr(link_data, 'length', None)
-                weight = getattr(link_data, 'weight', None)
+                source = getattr(link_data, "source", 0)
+                target = getattr(link_data, "target", 0)
+                length = getattr(link_data, "length", None)
+                weight = getattr(link_data, "weight", None)
                 self._links.append(Link(source, target, length, weight))
 
     @property
@@ -178,7 +178,7 @@ class BaseLayout(ABC):
                 self._groups.append(Group(**group_data))
             else:
                 group = Group()
-                for attr in ['leaves', 'groups', 'padding']:
+                for attr in ["leaves", "groups", "padding"]:
                     if hasattr(group_data, attr):
                         setattr(group, attr, getattr(group_data, attr))
                 self._groups.append(group)
@@ -216,11 +216,7 @@ class BaseLayout(ABC):
     # Event System
     # -------------------------------------------------------------------------
 
-    def on(
-        self,
-        event: EventType | str,
-        callback: Callable[[Optional[Event]], None]
-    ) -> Self:
+    def on(self, event: EventType | str, callback: Callable[[Optional[Event]], None]) -> Self:
         """
         Subscribe to a layout event.
 
@@ -243,7 +239,7 @@ class BaseLayout(ABC):
         Args:
             event: Event payload with type and optional data
         """
-        event_type = event.get('type')
+        event_type = event.get("type")
         if event_type is not None and event_type in self._events:
             self._events[event_type](event)
 
@@ -311,9 +307,7 @@ class BaseLayout(ABC):
                 node.index = i
 
     def _initialize_positions(
-        self,
-        random_init: bool = True,
-        center: Optional[tuple[float, float]] = None
+        self, random_init: bool = True, center: Optional[tuple[float, float]] = None
     ) -> None:
         """
         Initialize node positions.
@@ -534,7 +528,7 @@ class IterativeLayout(BaseLayout):
         """Resume layout with alpha reset to 0.1."""
         self._alpha = 0.1
         self._running = True
-        self.trigger({'type': EventType.start, 'alpha': self._alpha})
+        self.trigger({"type": EventType.start, "alpha": self._alpha})
         self.kick()
         return self
 
@@ -575,15 +569,15 @@ class StaticLayout(BaseLayout):
             self (for chaining)
         """
         self._initialize_indices()
-        self.trigger({'type': EventType.start, 'alpha': 1.0})
+        self.trigger({"type": EventType.start, "alpha": 1.0})
 
         # Subclasses implement _compute()
         self._compute(**kwargs)
 
-        if kwargs.get('center_graph', True):
+        if kwargs.get("center_graph", True):
             self._center_graph()
 
-        self.trigger({'type': EventType.end, 'alpha': 0.0})
+        self.trigger({"type": EventType.end, "alpha": 0.0})
         return self
 
     @abstractmethod

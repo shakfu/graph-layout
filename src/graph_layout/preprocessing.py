@@ -16,9 +16,19 @@ from __future__ import annotations
 from collections import deque
 from typing import Any, Callable, Optional, Sequence, TypeVar
 
-from .types import LinkLike, NodeLike
+from .types import LinkLike
 
 T = TypeVar("T")
+
+
+def _default_get_source(link: Any) -> int:
+    """Default function to extract source index from a link."""
+    return link["source"] if isinstance(link, dict) else link.source
+
+
+def _default_get_target(link: Any) -> int:
+    """Default function to extract target index from a link."""
+    return link["target"] if isinstance(link, dict) else link.target
 
 
 # =============================================================================
@@ -49,15 +59,16 @@ def detect_cycle(
 
     Example:
         >>> nodes = [{} for _ in range(3)]
-        >>> links = [{'source': 0, 'target': 1}, {'source': 1, 'target': 2}, {'source': 2, 'target': 0}]
+        >>> links = [{'source': 0, 'target': 1}, {'source': 1, 'target': 2},
+        ...          {'source': 2, 'target': 0}]
         >>> cycle = detect_cycle(3, links)
         >>> cycle is not None
         True
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     # Build adjacency list
     adj: list[list[int]] = [[] for _ in range(n)]
@@ -69,7 +80,6 @@ def detect_cycle(
 
     # DFS states: 0=unvisited, 1=visiting, 2=visited
     state = [0] * n
-    parent = [-1] * n
 
     def dfs(node: int, path: list[int]) -> Optional[list[int]]:
         state[node] = 1
@@ -149,9 +159,9 @@ def remove_cycles(
         False
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     # Build edge list with indices
     edges: list[tuple[int, int, int]] = []  # (src, tgt, original_index)
@@ -192,9 +202,9 @@ def remove_cycles(
         src = get_source(link)
         tgt = get_target(link)
         if i in reversed_indices:
-            new_links.append({'source': tgt, 'target': src})
+            new_links.append({"source": tgt, "target": src})
         else:
-            new_links.append({'source': src, 'target': tgt})
+            new_links.append({"source": src, "target": tgt})
 
     return new_links, reversed_indices
 
@@ -230,9 +240,9 @@ def topological_sort(
         [0, 1, 2]
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     # Build adjacency list and compute in-degrees
     adj: list[list[int]] = [[] for _ in range(n)]
@@ -302,9 +312,9 @@ def connected_components(
         2
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     # Build undirected adjacency list
     adj: list[list[int]] = [[] for _ in range(n)]
@@ -393,15 +403,16 @@ def assign_layers_longest_path(
         Layer 0 contains source nodes (no incoming edges).
 
     Example:
-        >>> links = [{'source': 0, 'target': 1}, {'source': 0, 'target': 2}, {'source': 1, 'target': 3}]
+        >>> links = [{'source': 0, 'target': 1}, {'source': 0, 'target': 2},
+        ...          {'source': 1, 'target': 3}]
         >>> layers = assign_layers_longest_path(4, links)
         >>> layers[0]  # Source node
         [0]
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     if n == 0:
         return []
@@ -486,9 +497,9 @@ def minimize_crossings_barycenter(
         >>> new_layers = minimize_crossings_barycenter(layers, links)
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     if len(layers) < 2:
         return [list(layer) for layer in layers]
@@ -500,7 +511,6 @@ def minimize_crossings_barycenter(
             node_layer[node] = layer_idx
 
     # Build adjacency lists
-    n = sum(len(layer) for layer in layers)
     max_node = max(max(layer) for layer in layers if layer) + 1
     outgoing: list[list[int]] = [[] for _ in range(max_node)]
     incoming: list[list[int]] = [[] for _ in range(max_node)]
@@ -579,9 +589,9 @@ def count_crossings(
         Number of edge crossings.
     """
     if get_source is None:
-        get_source = lambda link: link['source'] if isinstance(link, dict) else link.source
+        get_source = _default_get_source
     if get_target is None:
-        get_target = lambda link: link['target'] if isinstance(link, dict) else link.target
+        get_target = _default_get_target
 
     # Build node position map
     node_layer: dict[int, int] = {}
@@ -610,7 +620,7 @@ def count_crossings(
     total = 0
     for edges in layer_edges.values():
         for i, (s1, t1) in enumerate(edges):
-            for s2, t2 in edges[i + 1:]:
+            for s2, t2 in edges[i + 1 :]:
                 # Two edges cross if one is "above" on left and "below" on right
                 if (s1 < s2 and t1 > t2) or (s1 > s2 and t1 < t2):
                     total += 1

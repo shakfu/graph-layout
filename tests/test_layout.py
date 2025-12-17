@@ -16,15 +16,15 @@ class TestEventType:
 
     def test_event_names(self):
         """Test event type names."""
-        assert EventType.start.name == 'start'
-        assert EventType.tick.name == 'tick'
-        assert EventType.end.name == 'end'
+        assert EventType.start.name == "start"
+        assert EventType.tick.name == "tick"
+        assert EventType.end.name == "end"
 
     def test_string_access(self):
         """Test accessing by string name."""
-        assert EventType['start'] == EventType.start
-        assert EventType['tick'] == EventType.tick
-        assert EventType['end'] == EventType.end
+        assert EventType["start"] == EventType.start
+        assert EventType["tick"] == EventType.tick
+        assert EventType["end"] == EventType.end
 
 
 class TestNode:
@@ -59,9 +59,9 @@ class TestNode:
 
     def test_node_custom_properties(self):
         """Test adding custom properties to node."""
-        node = Node(id='node1', color='red', weight=2.5)
-        assert node.id == 'node1'
-        assert node.color == 'red'
+        node = Node(id="node1", color="red", weight=2.5)
+        assert node.id == "node1"
+        assert node.color == "red"
         assert node.weight == 2.5
 
     def test_node_index_property(self):
@@ -101,9 +101,9 @@ class TestLink:
 
     def test_link_custom_properties(self):
         """Test adding custom properties to link."""
-        link = Link(0, 1, id='edge1', label='connects')
-        assert link.id == 'edge1'
-        assert link.label == 'connects'
+        link = Link(0, 1, id="edge1", label="connects")
+        assert link.id == "edge1"
+        assert link.label == "connects"
 
 
 class TestGroup:
@@ -193,7 +193,7 @@ class TestLayout:
     def test_set_nodes_as_dicts(self):
         """Test setting nodes as dicts."""
         layout = Layout()
-        nodes = [{'x': 0, 'y': 0}, {'x': 10, 'y': 10}]
+        nodes = [{"x": 0, "y": 0}, {"x": 10, "y": 10}]
         layout.nodes(nodes)
 
         assert len(layout.nodes()) == 2
@@ -211,7 +211,7 @@ class TestLayout:
     def test_set_links_as_dicts(self):
         """Test setting links as dicts."""
         layout = Layout()
-        links = [{'source': 0, 'target': 1}, {'source': 1, 'target': 2}]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
         layout.links(links)
 
         assert len(layout.links()) == 2
@@ -276,7 +276,7 @@ class TestLayoutEventSystem:
         called = []
 
         def on_start(e):
-            called.append('start')
+            called.append("start")
 
         layout.on(EventType.start, on_start)
 
@@ -289,9 +289,9 @@ class TestLayoutEventSystem:
         called = []
 
         def on_tick(e):
-            called.append('tick')
+            called.append("tick")
 
-        layout.on('tick', on_tick)
+        layout.on("tick", on_tick)
 
         assert EventType.tick in layout.event
 
@@ -304,11 +304,11 @@ class TestLayoutEventSystem:
             events.append(e)
 
         layout.on(EventType.start, on_start)
-        layout.trigger({'type': EventType.start, 'alpha': 1.0})
+        layout.trigger({"type": EventType.start, "alpha": 1.0})
 
         assert len(events) == 1
-        assert events[0]['type'] == EventType.start
-        assert events[0]['alpha'] == 1.0
+        assert events[0]["type"] == EventType.start
+        assert events[0]["alpha"] == 1.0
 
     def test_multiple_event_types(self):
         """Test registering multiple event types."""
@@ -319,11 +319,11 @@ class TestLayoutEventSystem:
         layout.on(EventType.start, lambda e: start_called.append(e))
         layout.on(EventType.end, lambda e: end_called.append(e))
 
-        layout.trigger({'type': EventType.start, 'alpha': 1.0})
+        layout.trigger({"type": EventType.start, "alpha": 1.0})
         assert len(start_called) == 1
         assert len(end_called) == 0
 
-        layout.trigger({'type': EventType.end, 'alpha': 0.0})
+        layout.trigger({"type": EventType.end, "alpha": 0.0})
         assert len(start_called) == 1
         assert len(end_called) == 1
 
@@ -334,10 +334,7 @@ class TestLayoutSimpleGraph:
     def test_two_nodes_connected(self):
         """Test layout with two connected nodes."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=100, y=0, width=10, height=10)
-        ])
+        layout.nodes([Node(x=0, y=0, width=10, height=10), Node(x=100, y=0, width=10, height=10)])
         layout.links([Link(0, 1)])
         layout.size([200, 200])
         layout.link_distance(50)
@@ -354,11 +351,13 @@ class TestLayoutSimpleGraph:
     def test_three_nodes_linear(self):
         """Test layout with three nodes in line."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=50, y=0, width=10, height=10),
-            Node(x=100, y=0, width=10, height=10)
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=10, height=10),
+                Node(x=50, y=0, width=10, height=10),
+                Node(x=100, y=0, width=10, height=10),
+            ]
+        )
         layout.links([Link(0, 1), Link(1, 2)])
         layout.size([200, 200])
 
@@ -368,22 +367,20 @@ class TestLayoutSimpleGraph:
         assert len(nodes) == 3
         # All nodes should have positions
         for node in nodes:
-            assert hasattr(node, 'x')
-            assert hasattr(node, 'y')
+            assert hasattr(node, "x")
+            assert hasattr(node, "y")
 
     def test_triangle_graph(self):
         """Test layout with triangle graph."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=100, y=0, width=10, height=10),
-            Node(x=50, y=87, width=10, height=10)
-        ])
-        layout.links([
-            Link(0, 1),
-            Link(1, 2),
-            Link(2, 0)
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=10, height=10),
+                Node(x=100, y=0, width=10, height=10),
+                Node(x=50, y=87, width=10, height=10),
+            ]
+        )
+        layout.links([Link(0, 1), Link(1, 2), Link(2, 0)])
 
         layout.start(10, 0, 0, 0, False)
 
@@ -397,10 +394,7 @@ class TestLayoutWithSizes:
     def test_nodes_with_width_height(self):
         """Test layout with nodes having width and height."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=20, height=20),
-            Node(x=50, y=0, width=30, height=30)
-        ])
+        layout.nodes([Node(x=0, y=0, width=20, height=20), Node(x=50, y=0, width=30, height=30)])
         layout.links([Link(0, 1)])
 
         layout.start(5, 0, 0, 0, False)
@@ -412,10 +406,12 @@ class TestLayoutWithSizes:
     def test_overlap_avoidance(self):
         """Test overlap avoidance."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=20, height=20),
-            Node(x=5, y=5, width=20, height=20)  # Overlapping
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=20, height=20),
+                Node(x=5, y=5, width=20, height=20),  # Overlapping
+            ]
+        )
         layout.links([Link(0, 1)])
         layout.avoid_overlaps(True)
 
@@ -435,14 +431,8 @@ class TestLayoutWithGroups:
     def test_simple_group(self):
         """Test layout with a simple group."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0),
-            Node(x=10, y=10),
-            Node(x=100, y=100)
-        ])
-        layout.groups([
-            Group(leaves=[0, 1], padding=5)
-        ])
+        layout.nodes([Node(x=0, y=0), Node(x=10, y=10), Node(x=100, y=100)])
+        layout.groups([Group(leaves=[0, 1], padding=5)])
 
         groups = layout.groups()
         assert len(groups) == 1
@@ -452,12 +442,14 @@ class TestLayoutWithGroups:
     def test_nested_groups(self):
         """Test layout with nested groups."""
         layout = Layout()
-        layout.nodes([Node(x=i*10, y=i*10) for i in range(4)])
-        layout.groups([
-            Group(leaves=[0, 1]),
-            Group(leaves=[2, 3]),
-            Group(groups=[0, 1])  # Parent group
-        ])
+        layout.nodes([Node(x=i * 10, y=i * 10) for i in range(4)])
+        layout.groups(
+            [
+                Group(leaves=[0, 1]),
+                Group(leaves=[2, 3]),
+                Group(groups=[0, 1]),  # Parent group
+            ]
+        )
 
         groups = layout.groups()
         assert len(groups) == 3
@@ -465,11 +457,13 @@ class TestLayoutWithGroups:
     def test_layout_with_groups_start(self):
         """Test running layout with groups."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=10, y=0, width=10, height=10),
-            Node(x=100, y=100, width=10, height=10)
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=10, height=10),
+                Node(x=10, y=0, width=10, height=10),
+                Node(x=100, y=100, width=10, height=10),
+            ]
+        )
         layout.links([Link(0, 1)])
         layout.groups([Group(leaves=[0, 1])])
 
@@ -486,7 +480,7 @@ class TestLayoutConstraints:
     def test_set_constraints(self):
         """Test setting constraints."""
         layout = Layout()
-        constraint = {'axis': 'x', 'left': 0, 'right': 1, 'gap': 50}
+        constraint = {"axis": "x", "left": 0, "right": 1, "gap": 50}
         layout.constraints([constraint])
 
         constraints = layout.constraints()
@@ -496,14 +490,11 @@ class TestLayoutConstraints:
     def test_layout_with_separation_constraint(self):
         """Test layout with separation constraint."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=10, y=0, width=10, height=10)
-        ])
+        layout.nodes([Node(x=0, y=0, width=10, height=10), Node(x=10, y=0, width=10, height=10)])
         layout.links([Link(0, 1)])
 
         # Add a constraint (dict format expected by Projection)
-        constraint = {'axis': 'x', 'left': 0, 'right': 1, 'gap': 100}
+        constraint = {"axis": "x", "left": 0, "right": 1, "gap": 100}
         layout.constraints([constraint])
 
         layout.start(0, 10, 0, 0, False)
@@ -526,7 +517,7 @@ class TestLayoutFlowLayout:
         layout.nodes([Node() for _ in range(3)])
         layout.links([Link(0, 1), Link(1, 2)])
 
-        result = layout.flow_layout('y', 50)
+        result = layout.flow_layout("y", 50)
         assert result is layout  # Method chaining
 
     def test_flow_layout_x_axis(self):
@@ -535,7 +526,7 @@ class TestLayoutFlowLayout:
         layout.nodes([Node() for _ in range(3)])
         layout.links([Link(0, 1), Link(1, 2)])
 
-        result = layout.flow_layout('x', 50)
+        result = layout.flow_layout("x", 50)
         assert result is layout
 
     def test_flow_layout_with_function(self):
@@ -544,7 +535,7 @@ class TestLayoutFlowLayout:
         layout.nodes([Node() for _ in range(3)])
         layout.links([Link(0, 1), Link(1, 2)])
 
-        result = layout.flow_layout('y', lambda: 30)
+        result = layout.flow_layout("y", lambda: 30)
         assert result is layout
 
 
@@ -554,16 +545,20 @@ class TestLayoutDisconnectedGraphs:
     def test_disconnected_components(self):
         """Test layout with disconnected components."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=10, y=0, width=10, height=10),
-            Node(x=100, y=100, width=10, height=10),
-            Node(x=110, y=100, width=10, height=10)
-        ])
-        layout.links([
-            Link(0, 1),  # Component 1
-            Link(2, 3)   # Component 2
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=10, height=10),
+                Node(x=10, y=0, width=10, height=10),
+                Node(x=100, y=100, width=10, height=10),
+                Node(x=110, y=100, width=10, height=10),
+            ]
+        )
+        layout.links(
+            [
+                Link(0, 1),  # Component 1
+                Link(2, 3),  # Component 2
+            ]
+        )
         layout.handle_disconnected(True)
 
         layout.start(10, 0, 0, 0, False)
@@ -601,10 +596,7 @@ class TestLayoutAlphaAndConvergence:
     def test_stop_layout(self):
         """Test stopping layout with keep_running=True."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=10, y=0, width=10, height=10)
-        ])
+        layout.nodes([Node(x=0, y=0, width=10, height=10), Node(x=10, y=0, width=10, height=10)])
         layout.links([Link(0, 1)])
 
         # Start with keep_running=True so alpha gets set
@@ -618,10 +610,7 @@ class TestLayoutAlphaAndConvergence:
     def test_resume_layout(self):
         """Test resuming layout."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10),
-            Node(x=10, y=0, width=10, height=10)
-        ])
+        layout.nodes([Node(x=0, y=0, width=10, height=10), Node(x=10, y=0, width=10, height=10)])
         layout.links([Link(0, 1)])
 
         layout.start(0, 0, 0, 0, False)
@@ -690,7 +679,7 @@ class TestLayoutDragOperations:
         """Test dragging a node."""
         node = Node(x=10, y=20)
         Layout.drag_start(node)
-        Layout.drag(node, {'x': 30, 'y': 40})
+        Layout.drag(node, {"x": 30, "y": 40})
 
         assert node.px == 30
         assert node.py == 40
@@ -729,8 +718,8 @@ class TestLayoutDragOperations:
         node = Node(x=15, y=25)
         origin = Layout.drag_origin(node)
 
-        assert origin['x'] == 15
-        assert origin['y'] == 25
+        assert origin["x"] == 15
+        assert origin["y"] == 25
 
 
 class TestLayoutLinkLengthCalculators:
@@ -740,11 +729,7 @@ class TestLayoutLinkLengthCalculators:
         """Test symmetric diff link length calculator."""
         layout = Layout()
         layout.nodes([Node() for _ in range(4)])
-        layout.links([
-            Link(0, 1),
-            Link(0, 2),
-            Link(0, 3)
-        ])
+        layout.links([Link(0, 1), Link(0, 2), Link(0, 3)])
 
         result = layout.symmetric_diff_link_lengths(50.0, 1.0)
         assert result is layout
@@ -753,11 +738,7 @@ class TestLayoutLinkLengthCalculators:
         """Test Jaccard link length calculator."""
         layout = Layout()
         layout.nodes([Node() for _ in range(4)])
-        layout.links([
-            Link(0, 1),
-            Link(0, 2),
-            Link(0, 3)
-        ])
+        layout.links([Link(0, 1), Link(0, 2), Link(0, 3)])
 
         result = layout.jaccard_link_lengths(50.0, 1.0)
         assert result is layout
@@ -772,11 +753,7 @@ class TestLayoutDistanceMatrix:
         layout.nodes([Node() for _ in range(3)])
 
         # Custom distance matrix
-        D = np.array([
-            [0, 1, 2],
-            [1, 0, 1],
-            [2, 1, 0]
-        ], dtype=float)
+        D = np.array([[0, 1, 2], [1, 0, 1], [2, 1, 0]], dtype=float)
 
         result = layout.distance_matrix(D)
         assert result is layout
@@ -790,11 +767,7 @@ class TestLayoutDistanceMatrix:
         layout.nodes([Node(x=0, y=0) for _ in range(3)])
         layout.links([Link(0, 1), Link(1, 2)])
 
-        D = np.array([
-            [0, 1, 2],
-            [1, 0, 1],
-            [2, 1, 0]
-        ], dtype=float)
+        D = np.array([[0, 1, 2], [1, 0, 1], [2, 1, 0]], dtype=float)
 
         layout.distance_matrix(D)
         layout.start(5, 0, 0, 0, False)
@@ -809,10 +782,12 @@ class TestLayoutFixedNodes:
     def test_fixed_node_stays_in_place(self):
         """Test that fixed nodes don't move much during layout."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10, fixed=1),  # Fixed
-            Node(x=100, y=0, width=10, height=10)
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=10, height=10, fixed=1),  # Fixed
+                Node(x=100, y=0, width=10, height=10),
+            ]
+        )
         layout.links([Link(0, 1)])
         # Disable disconnected component handling which can move fixed nodes
         layout.handle_disconnected(False)
@@ -828,15 +803,14 @@ class TestLayoutFixedNodes:
     def test_partially_fixed_network(self):
         """Test layout with some fixed and some free nodes."""
         layout = Layout()
-        layout.nodes([
-            Node(x=0, y=0, width=10, height=10, fixed=1),
-            Node(x=100, y=100, width=10, height=10, fixed=1),
-            Node(x=50, y=50, width=10, height=10)  # Free to move
-        ])
-        layout.links([
-            Link(0, 2),
-            Link(1, 2)
-        ])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=10, height=10, fixed=1),
+                Node(x=100, y=100, width=10, height=10, fixed=1),
+                Node(x=50, y=50, width=10, height=10),  # Free to move
+            ]
+        )
+        layout.links([Link(0, 2), Link(1, 2)])
         # Disable disconnected component handling
         layout.handle_disconnected(False)
 

@@ -17,47 +17,48 @@ from graph_layout.force import (
 # Test Fixtures
 # =============================================================================
 
+
 def create_simple_graph():
     """Create a simple graph with 3 nodes in a triangle."""
     nodes = [
-        {'x': 0, 'y': 0},
-        {'x': 100, 'y': 0},
-        {'x': 50, 'y': 100},
+        {"x": 0, "y": 0},
+        {"x": 100, "y": 0},
+        {"x": 50, "y": 100},
     ]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 1, 'target': 2},
-        {'source': 2, 'target': 0},
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 0},
     ]
     return nodes, links
 
 
 def create_linear_graph(n=5):
     """Create a linear chain of n nodes."""
-    nodes = [{'x': i * 10, 'y': 0} for i in range(n)]
-    links = [{'source': i, 'target': i + 1} for i in range(n - 1)]
+    nodes = [{"x": i * 10, "y": 0} for i in range(n)]
+    links = [{"source": i, "target": i + 1} for i in range(n - 1)]
     return nodes, links
 
 
 def create_star_graph(n=6):
     """Create a star graph with center node 0 and n-1 peripheral nodes."""
-    nodes = [{'x': 0, 'y': 0}]  # Center
-    nodes.extend([{'x': i * 10, 'y': i * 10} for i in range(1, n)])
-    links = [{'source': 0, 'target': i} for i in range(1, n)]
+    nodes = [{"x": 0, "y": 0}]  # Center
+    nodes.extend([{"x": i * 10, "y": i * 10} for i in range(1, n)])
+    links = [{"source": 0, "target": i} for i in range(1, n)]
     return nodes, links
 
 
 def create_disconnected_graph():
     """Create two disconnected components."""
     nodes = [
-        {'x': 0, 'y': 0},
-        {'x': 10, 'y': 0},
-        {'x': 100, 'y': 100},
-        {'x': 110, 'y': 100},
+        {"x": 0, "y": 0},
+        {"x": 10, "y": 0},
+        {"x": 100, "y": 100},
+        {"x": 110, "y": 100},
     ]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 2, 'target': 3},
+        {"source": 0, "target": 1},
+        {"source": 2, "target": 3},
     ]
     return nodes, links
 
@@ -65,6 +66,7 @@ def create_disconnected_graph():
 # =============================================================================
 # Fruchterman-Reingold Tests
 # =============================================================================
+
 
 class TestFruchtermanReingoldLayout:
     """Tests for Fruchterman-Reingold algorithm."""
@@ -82,13 +84,13 @@ class TestFruchtermanReingoldLayout:
 
         assert len(layout.nodes) == 3
         for node in layout.nodes:
-            assert hasattr(node, 'x')
-            assert hasattr(node, 'y')
+            assert hasattr(node, "x")
+            assert hasattr(node, "y")
 
     def test_nodes_move(self):
         """Test that nodes actually move during layout."""
         nodes, links = create_simple_graph()
-        initial_positions = [(n['x'], n['y']) for n in nodes]
+        initial_positions = [(n["x"], n["y"]) for n in nodes]
 
         layout = FruchtermanReingoldLayout(
             nodes=nodes,
@@ -100,8 +102,10 @@ class TestFruchtermanReingoldLayout:
 
         moved = False
         for i, node in enumerate(layout.nodes):
-            if abs(node.x - initial_positions[i][0]) > 1 or \
-               abs(node.y - initial_positions[i][1]) > 1:
+            if (
+                abs(node.x - initial_positions[i][0]) > 1
+                or abs(node.y - initial_positions[i][1]) > 1
+            ):
                 moved = True
                 break
         assert moved, "Nodes should move during layout"
@@ -144,13 +148,13 @@ class TestFruchtermanReingoldLayout:
     def test_fixed_nodes(self):
         """Test that fixed nodes don't move during layout."""
         nodes = [
-            {'x': 100, 'y': 100, 'fixed': 1},
-            {'x': 200, 'y': 100},
-            {'x': 150, 'y': 200},
+            {"x": 100, "y": 100, "fixed": 1},
+            {"x": 200, "y": 100},
+            {"x": 150, "y": 200},
         ]
         links = [
-            {'source': 0, 'target': 1},
-            {'source': 1, 'target': 2},
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
         ]
 
         layout = FruchtermanReingoldLayout(
@@ -172,13 +176,13 @@ class TestFruchtermanReingoldLayout:
         events = []
 
         def on_start(e):
-            events.append(('start', e))
+            events.append(("start", e))
 
         def on_tick(e):
-            events.append(('tick', e))
+            events.append(("tick", e))
 
         def on_end(e):
-            events.append(('end', e))
+            events.append(("end", e))
 
         layout = FruchtermanReingoldLayout(
             nodes=nodes,
@@ -191,9 +195,9 @@ class TestFruchtermanReingoldLayout:
         )
         layout.run()
 
-        start_events = [e for e in events if e[0] == 'start']
-        tick_events = [e for e in events if e[0] == 'tick']
-        end_events = [e for e in events if e[0] == 'end']
+        start_events = [e for e in events if e[0] == "start"]
+        tick_events = [e for e in events if e[0] == "tick"]
+        end_events = [e for e in events if e[0] == "end"]
 
         assert len(start_events) == 1
         assert len(tick_events) > 0
@@ -211,15 +215,15 @@ class TestFruchtermanReingoldLayout:
             iterations=10,
         )
 
-        layout.on('start', lambda e: events.append(('start', e)))
-        layout.on('tick', lambda e: events.append(('tick', e)))
-        layout.on('end', lambda e: events.append(('end', e)))
+        layout.on("start", lambda e: events.append(("start", e)))
+        layout.on("tick", lambda e: events.append(("tick", e)))
+        layout.on("end", lambda e: events.append(("end", e)))
 
         layout.run()
 
-        start_events = [e for e in events if e[0] == 'start']
-        tick_events = [e for e in events if e[0] == 'tick']
-        end_events = [e for e in events if e[0] == 'end']
+        start_events = [e for e in events if e[0] == "start"]
+        tick_events = [e for e in events if e[0] == "tick"]
+        end_events = [e for e in events if e[0] == "end"]
 
         assert len(start_events) == 1
         assert len(tick_events) > 0
@@ -240,11 +244,11 @@ class TestFruchtermanReingoldLayout:
         pos1 = [(n.x, n.y) for n in layout1.nodes]
 
         # Create new graph with same seed
-        nodes2 = [{'x': 0, 'y': 0}, {'x': 100, 'y': 0}, {'x': 50, 'y': 100}]
+        nodes2 = [{"x": 0, "y": 0}, {"x": 100, "y": 0}, {"x": 50, "y": 100}]
         links2 = [
-            {'source': 0, 'target': 1},
-            {'source': 1, 'target': 2},
-            {'source': 2, 'target': 0}
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 0},
         ]
 
         layout2 = FruchtermanReingoldLayout(
@@ -275,7 +279,7 @@ class TestFruchtermanReingoldLayout:
     def test_single_node(self):
         """Test layout with single node."""
         layout = FruchtermanReingoldLayout(
-            nodes=[{'x': 100, 'y': 100}],
+            nodes=[{"x": 100, "y": 100}],
             links=[],
             size=(500, 500),
             iterations=10,
@@ -287,6 +291,7 @@ class TestFruchtermanReingoldLayout:
 # =============================================================================
 # Spring Layout Tests
 # =============================================================================
+
 
 class TestSpringLayout:
     """Tests for Spring layout algorithm."""
@@ -322,8 +327,8 @@ class TestSpringLayout:
 
     def test_spring_length_respected(self):
         """Test that connected nodes tend toward spring length."""
-        nodes = [{'x': 0, 'y': 0}, {'x': 10, 'y': 0}]
-        links = [{'source': 0, 'target': 1}]
+        nodes = [{"x": 0, "y": 0}, {"x": 10, "y": 0}]
+        links = [{"source": 0, "target": 1}]
 
         layout = SpringLayout(
             nodes=nodes,
@@ -372,6 +377,7 @@ class TestSpringLayout:
 # Kamada-Kawai Tests
 # =============================================================================
 
+
 class TestKamadaKawaiLayout:
     """Tests for Kamada-Kawai algorithm."""
 
@@ -403,8 +409,8 @@ class TestKamadaKawaiLayout:
     def test_graph_theoretic_distance(self):
         """Test that layout respects graph-theoretic distances."""
         # Create a path graph: 0 -- 1 -- 2
-        nodes = [{'x': 0, 'y': 0}, {'x': 50, 'y': 0}, {'x': 100, 'y': 0}]
-        links = [{'source': 0, 'target': 1}, {'source': 1, 'target': 2}]
+        nodes = [{"x": 0, "y": 0}, {"x": 50, "y": 0}, {"x": 100, "y": 0}]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
 
         layout = KamadaKawaiLayout(
             nodes=nodes,
@@ -445,11 +451,11 @@ class TestKamadaKawaiLayout:
         # Components should be separated
         comp1_center = (
             (layout.nodes[0].x + layout.nodes[1].x) / 2,
-            (layout.nodes[0].y + layout.nodes[1].y) / 2
+            (layout.nodes[0].y + layout.nodes[1].y) / 2,
         )
         comp2_center = (
             (layout.nodes[2].x + layout.nodes[3].x) / 2,
-            (layout.nodes[2].y + layout.nodes[3].y) / 2
+            (layout.nodes[2].y + layout.nodes[3].y) / 2,
         )
 
         dx = comp2_center[0] - comp1_center[0]
@@ -461,7 +467,7 @@ class TestKamadaKawaiLayout:
     def test_single_node(self):
         """Test layout with single node."""
         layout = KamadaKawaiLayout(
-            nodes=[{'x': 100, 'y': 100}],
+            nodes=[{"x": 100, "y": 100}],
             links=[],
             size=(500, 500),
             iterations=10,
@@ -471,8 +477,8 @@ class TestKamadaKawaiLayout:
 
     def test_two_connected_nodes(self):
         """Test layout with two connected nodes."""
-        nodes = [{'x': 0, 'y': 0}, {'x': 10, 'y': 0}]
-        links = [{'source': 0, 'target': 1}]
+        nodes = [{"x": 0, "y": 0}, {"x": 10, "y": 0}]
+        links = [{"source": 0, "target": 1}]
 
         layout = KamadaKawaiLayout(
             nodes=nodes,
@@ -494,40 +500,50 @@ class TestKamadaKawaiLayout:
 # Cross-Algorithm Tests
 # =============================================================================
 
+
 class TestAllForceLayouts:
     """Tests that apply to all force-directed algorithms."""
 
-    @pytest.mark.parametrize("LayoutClass", [
-        FruchtermanReingoldLayout,
-        SpringLayout,
-        KamadaKawaiLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            FruchtermanReingoldLayout,
+            SpringLayout,
+            KamadaKawaiLayout,
+        ],
+    )
     def test_empty_graph(self, LayoutClass):
         """All algorithms should handle empty graphs."""
         layout = LayoutClass(nodes=[], links=[], size=(500, 500))
         layout.run()
         assert len(layout.nodes) == 0
 
-    @pytest.mark.parametrize("LayoutClass", [
-        FruchtermanReingoldLayout,
-        SpringLayout,
-        KamadaKawaiLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            FruchtermanReingoldLayout,
+            SpringLayout,
+            KamadaKawaiLayout,
+        ],
+    )
     def test_single_node(self, LayoutClass):
         """All algorithms should handle single node."""
         layout = LayoutClass(
-            nodes=[{'x': 100, 'y': 100}],
+            nodes=[{"x": 100, "y": 100}],
             links=[],
             size=(500, 500),
         )
         layout.run()
         assert len(layout.nodes) == 1
 
-    @pytest.mark.parametrize("LayoutClass", [
-        FruchtermanReingoldLayout,
-        SpringLayout,
-        KamadaKawaiLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            FruchtermanReingoldLayout,
+            SpringLayout,
+            KamadaKawaiLayout,
+        ],
+    )
     def test_pythonic_api(self, LayoutClass):
         """All algorithms support Pythonic API."""
         nodes, links = create_simple_graph()
@@ -542,11 +558,14 @@ class TestAllForceLayouts:
         assert len(layout.links) == 3
         assert layout.size == (500, 500)
 
-    @pytest.mark.parametrize("LayoutClass", [
-        FruchtermanReingoldLayout,
-        SpringLayout,
-        KamadaKawaiLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            FruchtermanReingoldLayout,
+            SpringLayout,
+            KamadaKawaiLayout,
+        ],
+    )
     def test_node_objects_supported(self, LayoutClass):
         """All algorithms support Node objects directly."""
         nodes = [Node(x=0, y=0), Node(x=100, y=0), Node(x=50, y=100)]

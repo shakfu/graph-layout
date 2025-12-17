@@ -11,7 +11,7 @@ from typing import Any, Callable, Generic, Optional, TypeVar
 
 from .linklengths import LinkAccessor
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class LinkTypeAccessor(LinkAccessor[T]):
@@ -66,7 +66,7 @@ class ModuleSet:
         if m.id in self.table:
             del self.table[m.id]
 
-    def for_all(self, func: Callable[['Module'], None]) -> None:
+    def for_all(self, func: Callable[["Module"], None]) -> None:
         """Apply function to all modules."""
         for module in self.table.values():
             func(module)
@@ -119,10 +119,12 @@ class LinkSets:
         for linktype, module_set in self.sets.items():
             func(module_set, linktype)
 
-    def for_all_modules(self, func: Callable[['Module'], None]) -> None:
+    def for_all_modules(self, func: Callable[["Module"], None]) -> None:
         """Apply function to all modules across all link types."""
+
         def wrapper(ms: ModuleSet, lt: int) -> None:
             ms.for_all(func)
+
         self.for_all(wrapper)
 
     def intersection(self, other: LinkSets) -> LinkSets:
@@ -147,7 +149,7 @@ class Module:
         outgoing: Optional[LinkSets] = None,
         incoming: Optional[LinkSets] = None,
         children: Optional[ModuleSet] = None,
-        definition: Optional[dict] = None
+        definition: Optional[dict] = None,
     ):
         self.id = module_id
         self.outgoing = outgoing if outgoing is not None else LinkSets()
@@ -158,9 +160,11 @@ class Module:
 
     def get_edges(self, es: list[PowerEdge]) -> None:
         """Add this module's edges to list."""
+
         def add_edges(ms: ModuleSet, edgetype: int) -> None:
             def add_edge(target: Module) -> None:
                 es.append(PowerEdge(self.id, target.id, edgetype))
+
             ms.for_all(add_edge)
 
         self.outgoing.for_all(add_edges)
@@ -186,7 +190,7 @@ class Configuration(Generic[T]):
         n: int,
         edges: list[T],
         link_accessor: LinkTypeAccessor[T],
-        root_group: Optional[dict[str, Any]] = None
+        root_group: Optional[dict[str, Any]] = None,
     ):
         """
         Initialize configuration.
@@ -224,17 +228,17 @@ class Configuration(Generic[T]):
         module_set = ModuleSet()
         self.roots.append(module_set)
 
-        for node in group.get('leaves', []):
-            node_id = node.get('id', node) if isinstance(node, dict) else node
+        for node in group.get("leaves", []):
+            node_id = node.get("id", node) if isinstance(node, dict) else node
             module = Module(node_id)
             self.modules[node_id] = module
             module_set.add(module)
 
-        for j, child in enumerate(group.get('groups', [])):
+        for j, child in enumerate(group.get("groups", [])):
             # Propagate group properties
             definition = {}
             for prop, value in child.items():
-                if prop not in ['leaves', 'groups']:
+                if prop not in ["leaves", "groups"]:
                     definition[prop] = value
 
             # Use negative module id to avoid clashes
@@ -302,12 +306,7 @@ class Configuration(Generic[T]):
             for j in range(i + 1, n):
                 a = rs[i]
                 b = rs[j]
-                merges.append({
-                    'id': ctr,
-                    'nEdges': self._n_edges(a, b),
-                    'a': a,
-                    'b': b
-                })
+                merges.append({"id": ctr, "nEdges": self._n_edges(a, b), "a": a, "b": b})
                 ctr += 1
 
         return merges
@@ -325,16 +324,13 @@ class Configuration(Generic[T]):
                 continue
 
             # Find merge that removes most edges
-            ms = sorted(
-                self._root_merges(i),
-                key=lambda x: (x['nEdges'], x['id'])
-            )
+            ms = sorted(self._root_merges(i), key=lambda x: (x["nEdges"], x["id"]))
 
             m = ms[0]
-            if m['nEdges'] >= self.R:
+            if m["nEdges"] >= self.R:
                 continue
 
-            self.merge(m['a'], m['b'], i)
+            self.merge(m["a"], m["b"], i)
             return True
 
         return False
@@ -380,6 +376,7 @@ class Configuration(Generic[T]):
     @staticmethod
     def _get_edges(modules: ModuleSet, es: list[PowerEdge]) -> None:
         """Recursively collect edges from modules."""
+
         def process_module(m: Module) -> None:
             m.get_edges(es)
             Configuration._get_edges(m.children, es)
@@ -389,25 +386,26 @@ class Configuration(Generic[T]):
 
 def _to_groups(modules: ModuleSet, group: dict[str, Any], groups: list[dict[str, Any]]) -> None:
     """Convert module hierarchy to group structure."""
+
     def process_module(m: Module) -> None:
         if m.is_leaf():
-            if 'leaves' not in group:
-                group['leaves'] = []
-            group['leaves'].append(m.id)
+            if "leaves" not in group:
+                group["leaves"] = []
+            group["leaves"].append(m.id)
         else:
             g: dict[str, Any] = group
             m.gid = len(groups)
 
             if not m.is_island() or m.is_predefined():
-                g = {'id': m.gid}
+                g = {"id": m.gid}
                 if m.is_predefined() and m.definition is not None:
                     # Apply original group properties
                     for prop, value in m.definition.items():
                         g[prop] = value
 
-                if 'groups' not in group:
-                    group['groups'] = []
-                group['groups'].append(m.gid)
+                if "groups" not in group:
+                    group["groups"] = []
+                group["groups"].append(m.gid)
                 groups.append(g)
 
             _to_groups(m.children, g, groups)
@@ -419,7 +417,7 @@ def get_groups(
     nodes: list[Any],
     links: list[T],
     link_accessor: LinkTypeAccessor[T],
-    root_group: Optional[dict[str, Any]] = None
+    root_group: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """
     Generate power graph groups from node and link structure.
@@ -449,4 +447,4 @@ def get_groups(
         if isinstance(e.target, int):
             e.target = nodes[e.target]
 
-    return {'groups': groups, 'powerEdges': power_edges}
+    return {"groups": groups, "powerEdges": power_edges}

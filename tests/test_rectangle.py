@@ -30,8 +30,8 @@ class TestRectangle:
     def test_empty_rectangle(self):
         """Test empty rectangle creation."""
         r = Rectangle.empty()
-        assert r.x == float('inf')
-        assert r.X == -float('inf')
+        assert r.x == float("inf")
+        assert r.X == -float("inf")
 
     def test_center(self):
         """Test center calculation."""
@@ -152,9 +152,9 @@ class TestMakeEdge:
 
         edge = make_edge_between(r1, r2, 2)
 
-        assert 'sourceIntersection' in edge
-        assert 'targetIntersection' in edge
-        assert 'arrowStart' in edge
+        assert "sourceIntersection" in edge
+        assert "targetIntersection" in edge
+        assert "arrowStart" in edge
 
     def test_make_edge_to(self):
         """Test creating edge to rectangle."""
@@ -271,14 +271,7 @@ class TestProjection:
         nodes[0].x = 0
         nodes[1].x = 10
 
-        constraints = [
-            {
-                'axis': 'x',
-                'left': 0,
-                'right': 1,
-                'gap': 5.0
-            }
-        ]
+        constraints = [{"axis": "x", "left": 0, "right": 1, "gap": 5.0}]
 
         proj = Projection(nodes, [], constraints=constraints)
 

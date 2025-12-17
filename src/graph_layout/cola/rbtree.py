@@ -17,7 +17,7 @@ T = TypeVar("T")
 class RBTreeIterator(Generic[T]):
     """Iterator for traversing sorted elements."""
 
-    def __init__(self, tree: 'RBTree[T]', index: int):
+    def __init__(self, tree: "RBTree[T]", index: int):
         self.tree = tree
         self.index = index
 
@@ -53,6 +53,7 @@ class RBTree(Generic[T]):
         if compare is not None:
             # SortedList expects a key function, so we wrap the comparator
             from functools import cmp_to_key
+
             # Wrap float comparator to return int for cmp_to_key
             def int_compare(a: T, b: T) -> int:
                 result = compare(a, b)
@@ -61,6 +62,7 @@ class RBTree(Generic[T]):
                 elif result > 0:
                     return 1
                 return 0
+
             self._data: SortedList[T] = SortedList(key=cmp_to_key(int_compare))
         else:
             self._data = SortedList()

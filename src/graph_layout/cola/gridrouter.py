@@ -15,7 +15,7 @@ from .rectangle import Rectangle
 from .shortestpaths import Calculator
 from .vpsc import Constraint, Solver, Variable
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class NodeAccessor(Generic[T], Protocol):
@@ -46,12 +46,7 @@ class Vert:
     """Vertex in the routing graph."""
 
     def __init__(
-        self,
-        vert_id: int,
-        x: float,
-        y: float,
-        node: Optional[NodeWrapper] = None,
-        line=None
+        self, vert_id: int, x: float, y: float, node: Optional[NodeWrapper] = None, line=None
     ):
         self.id = vert_id
         self.x = x
@@ -71,15 +66,15 @@ class LongestCommonSubsequence(Generic[T]):
         tr = t[::-1]
         mr = self._find_match(s, tr)
 
-        if mf['length'] >= mr['length']:
-            self.length = mf['length']
-            self.si = mf['si']
-            self.ti = mf['ti']
+        if mf["length"] >= mr["length"]:
+            self.length = mf["length"]
+            self.si = mf["si"]
+            self.ti = mf["ti"]
             self.reversed = False
         else:
-            self.length = mr['length']
-            self.si = mr['si']
-            self.ti = len(t) - mr['ti'] - mr['length']
+            self.length = mr["length"]
+            self.si = mr["si"]
+            self.ti = len(t) - mr["ti"] - mr["length"]
             self.reversed = True
 
     @staticmethod
@@ -87,7 +82,7 @@ class LongestCommonSubsequence(Generic[T]):
         """Find longest common substring."""
         m = len(s)
         n = len(t)
-        match = {'length': 0, 'si': -1, 'ti': -1}
+        match = {"length": 0, "si": -1, "ti": -1}
         l = [[0] * n for _ in range(m)]
 
         for i in range(m):
@@ -95,10 +90,10 @@ class LongestCommonSubsequence(Generic[T]):
                 if s[i] == t[j]:
                     v = 1 if (i == 0 or j == 0) else l[i - 1][j - 1] + 1
                     l[i][j] = v
-                    if v > match['length']:
-                        match['length'] = v
-                        match['si'] = i - v + 1
-                        match['ti'] = j - v + 1
+                    if v > match["length"]:
+                        match["length"] = v
+                        match["si"] = i - v + 1
+                        match["ti"] = j - v + 1
                 else:
                     l[i][j] = 0
 
@@ -107,7 +102,7 @@ class LongestCommonSubsequence(Generic[T]):
     def get_sequence(self) -> list[T]:
         """Get the common subsequence."""
         if self.length >= 0:
-            return self.s[self.si:self.si + self.length]
+            return self.s[self.si : self.si + self.length]
         return []
 
 
@@ -123,10 +118,7 @@ class GridRouter(Generic[T]):
     """Grid-based orthogonal edge router."""
 
     def __init__(
-        self,
-        originalnodes: list[T],
-        accessor: NodeAccessor[T],
-        group_padding: float = 12
+        self, originalnodes: list[T], accessor: NodeAccessor[T], group_padding: float = 12
     ):
         self.originalnodes = originalnodes
         self.group_padding = group_padding
@@ -140,8 +132,8 @@ class GridRouter(Generic[T]):
         self.leaves = [v for v in self.nodes if v.leaf]
         self.groups = [g for g in self.nodes if not g.leaf]
 
-        self.cols = self._get_grid_lines('x')
-        self.rows = self._get_grid_lines('y')
+        self.cols = self._get_grid_lines("x")
+        self.rows = self._get_grid_lines("y")
 
         # Create parent relationships
         for v in self.groups:
@@ -149,7 +141,7 @@ class GridRouter(Generic[T]):
                 self.nodes[c].parent = v
 
         # Root claims orphans
-        self.root = type('Root', (), {'children': []})()
+        self.root = type("Root", (), {"children": []})()
         for v in self.nodes:
             if v.parent is None:
                 v.parent = self.root
@@ -177,21 +169,13 @@ class GridRouter(Generic[T]):
 
         # Horizontal lines
         hlines = [
-            {'x1': rowx, 'x2': rowX, 'y1': r.pos, 'y2': r.pos, 'verts': []}
-            for r in self.rows
-        ] + [
-            {'x1': rowx, 'x2': rowX, 'y1': m, 'y2': m, 'verts': []}
-            for m in row_mids
-        ]
+            {"x1": rowx, "x2": rowX, "y1": r.pos, "y2": r.pos, "verts": []} for r in self.rows
+        ] + [{"x1": rowx, "x2": rowX, "y1": m, "y2": m, "verts": []} for m in row_mids]
 
         # Vertical lines
         vlines = [
-            {'x1': c.pos, 'x2': c.pos, 'y1': coly, 'y2': colY, 'verts': []}
-            for c in self.cols
-        ] + [
-            {'x1': m, 'x2': m, 'y1': coly, 'y2': colY, 'verts': []}
-            for m in col_mids
-        ]
+            {"x1": c.pos, "x2": c.pos, "y1": coly, "y2": colY, "verts": []} for c in self.cols
+        ] + [{"x1": m, "x2": m, "y1": coly, "y2": colY, "verts": []} for m in col_mids]
 
         lines = hlines + vlines
 
@@ -202,9 +186,9 @@ class GridRouter(Generic[T]):
         # Create vertices at line intersections
         for h in hlines:
             for v in vlines:
-                p = Vert(len(self.verts), v['x1'], h['y1'])
-                h['verts'].append(p)
-                v['verts'].append(p)
+                p = Vert(len(self.verts), v["x1"], h["y1"])
+                h["verts"].append(p)
+                v["verts"].append(p)
                 self.verts.append(p)
 
                 # Assign to nodes
@@ -219,44 +203,35 @@ class GridRouter(Generic[T]):
         # Create vertices at node-line intersections
         for li, l in enumerate(lines):
             for v in self.nodes:
-                intersections = v.rect.line_intersections(
-                    l['x1'], l['y1'], l['x2'], l['y2']
-                )
+                intersections = v.rect.line_intersections(l["x1"], l["y1"], l["x2"], l["y2"])
                 for intersect in intersections:
                     p = Vert(len(self.verts), intersect.x, intersect.y, v, l)
                     self.verts.append(p)
-                    l['verts'].append(p)
+                    l["verts"].append(p)
                     v.ports.append(p)
 
             # Create edges along lines
-            is_horiz = abs(l['y1'] - l['y2']) < 0.1
+            is_horiz = abs(l["y1"] - l["y2"]) < 0.1
 
             def delta(a, b):
                 return b.x - a.x if is_horiz else b.y - a.y
 
-            l['verts'].sort(key=lambda a: (a.x if is_horiz else a.y))
+            l["verts"].sort(key=lambda a: (a.x if is_horiz else a.y))
 
-            for i in range(1, len(l['verts'])):
-                u = l['verts'][i - 1]
-                v_vert = l['verts'][i]
+            for i in range(1, len(l["verts"])):
+                u = l["verts"][i - 1]
+                v_vert = l["verts"][i]
                 # Skip edges within same leaf node
                 if u.node and u.node == v_vert.node and u.node.leaf:
                     continue
-                self.edges.append({
-                    'source': u.id,
-                    'target': v_vert.id,
-                    'length': abs(delta(u, v_vert))
-                })
+                self.edges.append(
+                    {"source": u.id, "target": v_vert.id, "length": abs(delta(u, v_vert))}
+                )
 
         # Ensure all nodes have at least one port (center point)
         for v in self.nodes:
             if not v.ports:
-                center_port = Vert(
-                    len(self.verts),
-                    v.rect.cx(),
-                    v.rect.cy(),
-                    v
-                )
+                center_port = Vert(len(self.verts), v.rect.cx(), v.rect.cy(), v)
                 self.verts.append(center_port)
                 v.ports.append(center_port)
 
@@ -275,16 +250,13 @@ class GridRouter(Generic[T]):
         while ls:
             # Find overlapping nodes
             first = ls[0]
-            overlapping = [
-                v for v in ls
-                if getattr(v.rect, f'overlap_{axis}')(first.rect)
-            ]
+            overlapping = [v for v in ls if getattr(v.rect, f"overlap_{axis}")(first.rect)]
 
             # Safeguard: if nothing overlaps, at least take the first node
             if not overlapping:
                 overlapping = [first]
 
-            pos = self._avg([getattr(v.rect, f'c{axis}')() for v in overlapping])
+            pos = self._avg([getattr(v.rect, f"c{axis}")() for v in overlapping])
             col = GridLine(overlapping, pos)
             columns.append(col)
 
@@ -330,27 +302,18 @@ class GridRouter(Generic[T]):
         i = 0
         while i < len(aa) and i < len(ba) and aa[i] == ba[i]:
             i += 1
-        return {
-            'commonAncestor': aa[i - 1],
-            'lineages': aa[i:] + ba[i:]
-        }
+        return {"commonAncestor": aa[i - 1], "lineages": aa[i:] + ba[i:]}
 
     def sibling_obstacles(self, a: NodeWrapper, b: NodeWrapper) -> list[NodeWrapper]:
         """Find sibling obstacles between two nodes."""
         path = self._find_ancestor_path_between(a, b)
-        lineage_lookup = {v.id: True for v in path['lineages']}
+        lineage_lookup = {v.id: True for v in path["lineages"]}
 
-        obstacles = [
-            v for v in path['commonAncestor'].children
-            if v not in lineage_lookup
-        ]
+        obstacles = [v for v in path["commonAncestor"].children if v not in lineage_lookup]
 
-        for v in path['lineages']:
-            if v.parent != path['commonAncestor']:
-                obstacles.extend([
-                    c for c in v.parent.children
-                    if c != v.id
-                ])
+        for v in path["lineages"]:
+            if v.parent != path["commonAncestor"]:
+                obstacles.extend([c for c in v.parent.children if c != v.id])
 
         return [self.nodes[v] for v in obstacles]
 
@@ -363,38 +326,38 @@ class GridRouter(Generic[T]):
         obstacle_lookup = {o.id: o for o in self.obstacles}
 
         self.passable_edges = [
-            e for e in self.edges
+            e
+            for e in self.edges
             if not (
-                (self.verts[e['source']].node and
-                 self.verts[e['source']].node.id in obstacle_lookup)
-                or
-                (self.verts[e['target']].node and
-                 self.verts[e['target']].node.id in obstacle_lookup)
+                (
+                    self.verts[e["source"]].node
+                    and self.verts[e["source"]].node.id in obstacle_lookup
+                )
+                or (
+                    self.verts[e["target"]].node
+                    and self.verts[e["target"]].node.id in obstacle_lookup
+                )
             )
         ]
 
         # Add dummy edges within source
         for i in range(1, len(source.ports)):
-            self.passable_edges.append({
-                'source': source.ports[0].id,
-                'target': source.ports[i].id,
-                'length': 0
-            })
+            self.passable_edges.append(
+                {"source": source.ports[0].id, "target": source.ports[i].id, "length": 0}
+            )
 
         # Add dummy edges within target
         for i in range(1, len(target.ports)):
-            self.passable_edges.append({
-                'source': target.ports[0].id,
-                'target': target.ports[i].id,
-                'length': 0
-            })
+            self.passable_edges.append(
+                {"source": target.ports[0].id, "target": target.ports[i].id, "length": 0}
+            )
 
         calc = Calculator(
             len(self.verts),
             self.passable_edges,
-            lambda e: e['source'],
-            lambda e: e['target'],
-            lambda e: e['length']
+            lambda e: e["source"],
+            lambda e: e["target"],
+            lambda e: e["length"],
         )
 
         def bend_penalty(u: int, v: int, w: int) -> float:
@@ -405,16 +368,13 @@ class GridRouter(Generic[T]):
             dy = abs(c.y - a.y)
 
             # Don't count bends from internal edges
-            if (a.node == source and a.node == b.node) or \
-               (b.node == target and b.node == c.node):
+            if (a.node == source and a.node == b.node) or (b.node == target and b.node == c.node):
                 return 0
 
             return 1000 if dx > 1 and dy > 1 else 0
 
         shortest_path = calc.path_from_node_to_node_with_prev_cost(
-            source.ports[0].id,
-            target.ports[0].id,
-            bend_penalty
+            source.ports[0].id, target.ports[0].id, bend_penalty
         )
 
         # Reverse and add target port
@@ -423,19 +383,22 @@ class GridRouter(Generic[T]):
 
         # Filter internal points
         return [
-            v for i, v in enumerate(path_points)
+            v
+            for i, v in enumerate(path_points)
             if not (
-                (i < len(path_points) - 1 and
-                 path_points[i + 1].node == source and v.node == source)
-                or
-                (i > 0 and v.node == target and
-                 path_points[i - 1].node == target)
+                (
+                    i < len(path_points) - 1
+                    and path_points[i + 1].node == source
+                    and v.node == source
+                )
+                or (i > 0 and v.node == target and path_points[i - 1].node == target)
             )
         ]
 
     @staticmethod
     def make_segments(path: list[Point]) -> list[list[Point]]:
         """Create segments from path, merging straight sections."""
+
         def copy_point(p: Point) -> Point:
             return Point(p.x, p.y)
 
@@ -464,11 +427,11 @@ class GridRouter(Generic[T]):
             for si, s in enumerate(route):
                 # Wrap segment with metadata
                 seg_with_meta = {
-                    'segment': s,
-                    'edgeid': ei,
-                    'i': si,
+                    "segment": s,
+                    "edgeid": ei,
+                    "i": si,
                     0: s[0],  # for compatibility
-                    1: s[1]
+                    1: s[1],
                 }
                 sdx = s[1][x] - s[0][x]
                 if abs(sdx) < 0.1:
@@ -481,22 +444,15 @@ class GridRouter(Generic[T]):
         segmentset = None
 
         for s in vsegments:
-            if not segmentset or abs(s[0][x] - segmentset['pos']) > 0.1:
-                segmentset = {'pos': s[0][x], 'segments': []}
+            if not segmentset or abs(s[0][x] - segmentset["pos"]) > 0.1:
+                segmentset = {"pos": s[0][x], "segments": []}
                 vsegmentsets.append(segmentset)
-            segmentset['segments'].append(s)
+            segmentset["segments"].append(s)
 
         return vsegmentsets
 
     @staticmethod
-    def nudge_segs(
-        x: str,
-        y: str,
-        routes: list,
-        segments: list,
-        left_of: Callable,
-        gap: float
-    ):
+    def nudge_segs(x: str, y: str, routes: list, segments: list, left_of: Callable, gap: float):
         """Nudge segments apart using VPSC."""
         n = len(segments)
         if n <= 1:
@@ -512,12 +468,12 @@ class GridRouter(Generic[T]):
 
                 s1 = segments[i]
                 s2 = segments[j]
-                e1 = s1['edgeid']
-                e2 = s2['edgeid']
+                e1 = s1["edgeid"]
+                e2 = s2["edgeid"]
                 lind = -1
                 rind = -1
 
-                if x == 'x':
+                if x == "x":
                     if left_of(e1, e2):
                         if s1[0][y] < s1[1][y]:
                             lind, rind = j, i
@@ -540,50 +496,36 @@ class GridRouter(Generic[T]):
             s = segments[i]
             pos = v.position()
             # Update the wrapped segment
-            seg = s['segment'] if 'segment' in s else s
+            seg = s["segment"] if "segment" in s else s
             seg[0][x] = seg[1][x] = pos
             # Also update the references in s
             s[0][x] = s[1][x] = pos
 
-            route = routes[s['edgeid']]
-            if s['i'] > 0:
-                route[s['i'] - 1][1][x] = pos
-            if s['i'] < len(route) - 1:
-                route[s['i'] + 1][0][x] = pos
+            route = routes[s["edgeid"]]
+            if s["i"] > 0:
+                route[s["i"] - 1][1][x] = pos
+            if s["i"] < len(route) - 1:
+                route[s["i"] + 1][0][x] = pos
 
     @staticmethod
-    def nudge_segments(
-        routes: list,
-        x: str,
-        y: str,
-        left_of: Callable,
-        gap: float
-    ):
+    def nudge_segments(routes: list, x: str, y: str, left_of: Callable, gap: float):
         """Nudge all overlapping segment bundles."""
         vsegmentsets = GridRouter.get_segment_sets(routes, x, y)
 
         for ss in vsegmentsets:
             events = []
-            for s in ss['segments']:
-                events.append({
-                    'type': 0,
-                    's': s,
-                    'pos': min(s[0][y], s[1][y])
-                })
-                events.append({
-                    'type': 1,
-                    's': s,
-                    'pos': max(s[0][y], s[1][y])
-                })
+            for s in ss["segments"]:
+                events.append({"type": 0, "s": s, "pos": min(s[0][y], s[1][y])})
+                events.append({"type": 1, "s": s, "pos": max(s[0][y], s[1][y])})
 
-            events.sort(key=lambda a: (a['pos'], a['type']))
+            events.sort(key=lambda a: (a["pos"], a["type"]))
 
             open_segs = []
             open_count = 0
 
             for e in events:
-                if e['type'] == 0:
-                    open_segs.append(e['s'])
+                if e["type"] == 0:
+                    open_segs.append(e["s"])
                     open_count += 1
                 else:
                     open_count -= 1
@@ -602,9 +544,9 @@ class GridRouter(Generic[T]):
         """Create lookup function for edge ordering."""
         outgoing = {}
         for p in pairs:
-            if p['l'] not in outgoing:
-                outgoing[p['l']] = {}
-            outgoing[p['l']][p['r']] = True
+            if p["l"] not in outgoing:
+                outgoing[p["l"]] = {}
+            outgoing[p["l"]][p["r"]] = True
 
         return lambda l, r: l in outgoing and r in outgoing[l]
 
@@ -627,14 +569,13 @@ class GridRouter(Generic[T]):
                     f.reversed = True
                     lcs = LongestCommonSubsequence(e, f)
 
-                if ((lcs.si <= 0 or lcs.ti <= 0) and
-                    (lcs.si + lcs.length >= len(e) or
-                     lcs.ti + lcs.length >= len(f))):
-                    edge_order.append({'l': i, 'r': j})
+                if (lcs.si <= 0 or lcs.ti <= 0) and (
+                    lcs.si + lcs.length >= len(e) or lcs.ti + lcs.length >= len(f)
+                ):
+                    edge_order.append({"l": i, "r": j})
                     continue
 
-                if (lcs.si + lcs.length >= len(e) or
-                    lcs.ti + lcs.length >= len(f)):
+                if lcs.si + lcs.length >= len(e) or lcs.ti + lcs.length >= len(f):
                     u = e[lcs.si + 1]
                     vj = e[lcs.si - 1]
                     vi = f[lcs.ti - 1]
@@ -644,9 +585,9 @@ class GridRouter(Generic[T]):
                     vj = f[lcs.ti + lcs.length]
 
                 if GridRouter.is_left(u, vi, vj):
-                    edge_order.append({'l': j, 'r': i})
+                    edge_order.append({"l": j, "r": i})
                 else:
-                    edge_order.append({'l': i, 'r': j})
+                    edge_order.append({"l": i, "r": j})
 
         return GridRouter.get_order(edge_order)
 
@@ -655,7 +596,7 @@ class GridRouter(Generic[T]):
         """Restore original edge direction."""
         for i, segments in enumerate(routes):
             path = route_paths[i]
-            if hasattr(path, 'reversed') and path.reversed:
+            if hasattr(path, "reversed") and path.reversed:
                 segments.reverse()
                 for segment in segments:
                     segment.reverse()
@@ -665,7 +606,7 @@ class GridRouter(Generic[T]):
         edges: list[T],
         nudge_gap: float,
         source: Callable[[T], int],
-        target: Callable[[T], int]
+        target: Callable[[T], int],
     ) -> list[list[list[Point]]]:
         """Route edges with nudging to minimize crossings."""
         route_paths = [self.route(source(e), target(e)) for e in edges]
@@ -677,24 +618,23 @@ class GridRouter(Generic[T]):
         for route in routes:
             route_dict = []
             for seg in route:
-                route_dict.append([
-                    {'x': seg[0].x, 'y': seg[0].y},
-                    {'x': seg[1].x, 'y': seg[1].y}
-                ])
+                route_dict.append([{"x": seg[0].x, "y": seg[0].y}, {"x": seg[1].x, "y": seg[1].y}])
             routes_dicts.append(route_dict)
 
-        GridRouter.nudge_segments(routes_dicts, 'x', 'y', order, nudge_gap)
-        GridRouter.nudge_segments(routes_dicts, 'y', 'x', order, nudge_gap)
+        GridRouter.nudge_segments(routes_dicts, "x", "y", order, nudge_gap)
+        GridRouter.nudge_segments(routes_dicts, "y", "x", order, nudge_gap)
 
         # Convert back to Points
         routes_points = []
         for route_dict in routes_dicts:
             route_points = []
             for seg_dict in route_dict:
-                route_points.append([
-                    Point(seg_dict[0]['x'], seg_dict[0]['y']),
-                    Point(seg_dict[1]['x'], seg_dict[1]['y'])
-                ])
+                route_points.append(
+                    [
+                        Point(seg_dict[0]["x"], seg_dict[0]["y"]),
+                        Point(seg_dict[1]["x"], seg_dict[1]["y"]),
+                    ]
+                )
             routes_points.append(route_points)
 
         GridRouter.unreverse_edges(routes_points, route_paths)
@@ -712,16 +652,10 @@ class GridRouter(Generic[T]):
 
     @staticmethod
     def get_route_path(
-        route: list[list[Point]],
-        cornerradius: float,
-        arrowwidth: float,
-        arrowheight: float
+        route: list[list[Point]], cornerradius: float, arrowwidth: float, arrowheight: float
     ) -> dict:
         """Generate SVG path with rounded corners and arrow."""
-        result = {
-            'routepath': f'M {route[0][0].x} {route[0][0].y} ',
-            'arrowpath': ''
-        }
+        result = {"routepath": f"M {route[0][0].x} {route[0][0].y} ", "arrowpath": ""}
 
         if len(route) > 1:
             for i, li in enumerate(route):
@@ -735,7 +669,7 @@ class GridRouter(Generic[T]):
                     else:
                         y -= dy / abs(dy) * cornerradius
 
-                    result['routepath'] += f'L {x} {y} '
+                    result["routepath"] += f"L {x} {y} "
 
                     l = route[i + 1]
                     x0, y0 = l[0].x, l[0].y
@@ -754,7 +688,7 @@ class GridRouter(Generic[T]):
 
                     cx = abs(x2 - x)
                     cy = abs(y2 - y)
-                    result['routepath'] += f'A {cx} {cy} 0 0 {angle} {x2} {y2} '
+                    result["routepath"] += f"A {cx} {cy} 0 0 {angle} {x2} {y2} "
                 else:
                     arrowtip = [x, y]
                     if abs(dx) > 0:
@@ -766,12 +700,12 @@ class GridRouter(Generic[T]):
                         arrowcorner1 = [x + arrowwidth, y]
                         arrowcorner2 = [x - arrowwidth, y]
 
-                    result['routepath'] += f'L {x} {y} '
+                    result["routepath"] += f"L {x} {y} "
                     if arrowheight > 0:
-                        result['arrowpath'] = (
-                            f'M {arrowtip[0]} {arrowtip[1]} '
-                            f'L {arrowcorner1[0]} {arrowcorner1[1]} '
-                            f'L {arrowcorner2[0]} {arrowcorner2[1]}'
+                        result["arrowpath"] = (
+                            f"M {arrowtip[0]} {arrowtip[1]} "
+                            f"L {arrowcorner1[0]} {arrowcorner1[1]} "
+                            f"L {arrowcorner2[0]} {arrowcorner2[1]}"
                         )
         else:
             li = route[0]
@@ -789,12 +723,12 @@ class GridRouter(Generic[T]):
                 arrowcorner1 = [x + arrowwidth, y]
                 arrowcorner2 = [x - arrowwidth, y]
 
-            result['routepath'] += f'L {x} {y} '
+            result["routepath"] += f"L {x} {y} "
             if arrowheight > 0:
-                result['arrowpath'] = (
-                    f'M {arrowtip[0]} {arrowtip[1]} '
-                    f'L {arrowcorner1[0]} {arrowcorner1[1]} '
-                    f'L {arrowcorner2[0]} {arrowcorner2[1]}'
+                result["arrowpath"] = (
+                    f"M {arrowtip[0]} {arrowtip[1]} "
+                    f"L {arrowcorner1[0]} {arrowcorner1[1]} "
+                    f"L {arrowcorner2[0]} {arrowcorner2[1]}"
                 )
 
         return result

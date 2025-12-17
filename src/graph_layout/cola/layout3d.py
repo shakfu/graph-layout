@@ -74,15 +74,10 @@ class Layout3D:
     Uses gradient descent to minimize stress in 3D space.
     """
 
-    DIMS = ['x', 'y', 'z']
+    DIMS = ["x", "y", "z"]
     K = len(DIMS)
 
-    def __init__(
-        self,
-        nodes: list[Node3D],
-        links: list[Link3D],
-        ideal_link_length: float = 1.0
-    ):
+    def __init__(self, nodes: list[Node3D], links: list[Link3D], ideal_link_length: float = 1.0):
         """
         Initialize 3D layout.
 
@@ -115,7 +110,7 @@ class Layout3D:
         """Get actual length of a link in current layout."""
         return l.actual_length(self.result)
 
-    def start(self, iterations: int = 100) -> 'Layout3D':
+    def start(self, iterations: int = 100) -> "Layout3D":
         """
         Run layout algorithm.
 
@@ -138,13 +133,7 @@ class Layout3D:
             e.length *= self.ideal_link_length
 
         # Create distance matrix using shortest paths
-        calc = Calculator(
-            n,
-            self.links,
-            lambda e: e.source,
-            lambda e: e.target,
-            lambda e: e.length
-        )
+        calc = Calculator(n, self.links, lambda e: e.source, lambda e: e.target, lambda e: e.length)
         distance_matrix = calc.distance_matrix()
 
         # Convert to NumPy array
@@ -163,10 +152,9 @@ class Layout3D:
         # Add constraints if specified
         if self.constraints:
             from typing import cast
+
             self.descent.project = Projection(
-                cast(list[GraphNode], self.nodes),
-                [],
-                constraints=self.constraints
+                cast(list[GraphNode], self.nodes), [], constraints=self.constraints
             ).project_functions()
 
         # Lock fixed nodes

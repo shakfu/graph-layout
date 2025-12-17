@@ -215,8 +215,8 @@ class SpringLayout(IterativeLayout):
         """
         self._initialize_indices()
 
-        random_init = kwargs.get('random_init', True)
-        center = kwargs.get('center_graph', True)
+        random_init = kwargs.get("random_init", True)
+        center = kwargs.get("center_graph", True)
 
         if random_init:
             self._initialize_positions(random_init=True)
@@ -229,7 +229,7 @@ class SpringLayout(IterativeLayout):
         self._alpha = 1.0
 
         # Fire start event
-        self.trigger({'type': EventType.start, 'alpha': self._alpha})
+        self.trigger({"type": EventType.start, "alpha": self._alpha})
 
         # Run layout
         self.kick()
@@ -238,7 +238,7 @@ class SpringLayout(IterativeLayout):
             self._center_graph()
 
         # Fire end event
-        self.trigger({'type': EventType.end, 'alpha': 0.0})
+        self.trigger({"type": EventType.end, "alpha": 0.0})
 
         return self
 
@@ -330,17 +330,11 @@ class SpringLayout(IterativeLayout):
         converged = total_movement < 0.01 * n
 
         # Fire tick event
-        self.trigger({
-            'type': EventType.tick,
-            'alpha': self._alpha,
-            'stress': total_movement
-        })
+        self.trigger({"type": EventType.tick, "alpha": self._alpha, "stress": total_movement})
 
         return converged
 
-    def _compute_repulsive_naive(
-        self, n: int, force_x: np.ndarray, force_y: np.ndarray
-    ) -> None:
+    def _compute_repulsive_naive(self, n: int, force_x: np.ndarray, force_y: np.ndarray) -> None:
         """Compute repulsive forces using O(n^2) pairwise calculation."""
         for i in range(n):
             for j in range(i + 1, n):
@@ -360,16 +354,10 @@ class SpringLayout(IterativeLayout):
                     force_x[j] -= fx
                     force_y[j] -= fy
 
-    def _compute_repulsive_barnes_hut(
-        self, force_x: np.ndarray, force_y: np.ndarray
-    ) -> None:
+    def _compute_repulsive_barnes_hut(self, force_x: np.ndarray, force_y: np.ndarray) -> None:
         """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""
         # Build quadtree from current node positions
-        tree = QuadTree.from_nodes(
-            self._nodes,
-            padding=10.0,
-            theta=self._barnes_hut_theta
-        )
+        tree = QuadTree.from_nodes(self._nodes, padding=10.0, theta=self._barnes_hut_theta)
 
         # Calculate force on each node using the tree
         # We use the tree's structure but compute Coulomb forces (k/d^2)
@@ -379,9 +367,7 @@ class SpringLayout(IterativeLayout):
             force_x[i] += fx
             force_y[i] += fy
 
-    def _calculate_coulomb_force(
-        self, node: Any, body: Body
-    ) -> tuple[float, float]:
+    def _calculate_coulomb_force(self, node: Any, body: Body) -> tuple[float, float]:
         """Calculate Coulomb force on body from quadtree node."""
         if node is None or node.is_empty():
             return 0.0, 0.0

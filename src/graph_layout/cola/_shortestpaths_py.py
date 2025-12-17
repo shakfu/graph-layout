@@ -192,7 +192,7 @@ class Calculator(Generic[T]):
 
         # Initialize all nodes
         for i, node in enumerate(self.neighbours):
-            node.d = 0.0 if i == start else float('inf')
+            node.d = 0.0 if i == start else float("inf")
             node.q = q.push(node)
 
         while not q.empty():
@@ -214,10 +214,10 @@ class Calculator(Generic[T]):
                 v = self.neighbours[neighbour.id]
                 t = u.d + neighbour.distance
 
-                if u.d != float('inf') and v.d > t:
+                if u.d != float("inf") and v.d > t:
                     v.d = t
                     v.prev = u
                     assert v.q is not None  # Node was added to queue
-                    q.reduce_key(v.q, v, lambda e, heap_q: setattr(e, 'q', heap_q))
+                    q.reduce_key(v.q, v, lambda e, heap_q: setattr(e, "q", heap_q))
 
         return d

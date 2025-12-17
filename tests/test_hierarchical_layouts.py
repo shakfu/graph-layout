@@ -16,6 +16,7 @@ from graph_layout.hierarchical import (
 # Test Fixtures
 # =============================================================================
 
+
 def create_binary_tree():
     """Create a binary tree with 7 nodes."""
     #        0
@@ -25,12 +26,12 @@ def create_binary_tree():
     #    3  4 5  6
     nodes = [{} for _ in range(7)]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 0, 'target': 2},
-        {'source': 1, 'target': 3},
-        {'source': 1, 'target': 4},
-        {'source': 2, 'target': 5},
-        {'source': 2, 'target': 6},
+        {"source": 0, "target": 1},
+        {"source": 0, "target": 2},
+        {"source": 1, "target": 3},
+        {"source": 1, "target": 4},
+        {"source": 2, "target": 5},
+        {"source": 2, "target": 6},
     ]
     return nodes, links
 
@@ -39,9 +40,9 @@ def create_linear_tree():
     """Create a linear tree (linked list)."""
     nodes = [{} for _ in range(4)]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 1, 'target': 2},
-        {'source': 2, 'target': 3},
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 3},
     ]
     return nodes, links
 
@@ -50,11 +51,11 @@ def create_wide_tree():
     """Create a wide tree with one parent and many children."""
     nodes = [{} for _ in range(6)]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 0, 'target': 2},
-        {'source': 0, 'target': 3},
-        {'source': 0, 'target': 4},
-        {'source': 0, 'target': 5},
+        {"source": 0, "target": 1},
+        {"source": 0, "target": 2},
+        {"source": 0, "target": 3},
+        {"source": 0, "target": 4},
+        {"source": 0, "target": 5},
     ]
     return nodes, links
 
@@ -70,11 +71,11 @@ def create_dag():
     #     4
     nodes = [{} for _ in range(5)]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 0, 'target': 2},
-        {'source': 1, 'target': 3},
-        {'source': 2, 'target': 3},
-        {'source': 3, 'target': 4},
+        {"source": 0, "target": 1},
+        {"source": 0, "target": 2},
+        {"source": 1, "target": 3},
+        {"source": 2, "target": 3},
+        {"source": 3, "target": 4},
     ]
     return nodes, links
 
@@ -82,6 +83,7 @@ def create_dag():
 # =============================================================================
 # Reingold-Tilford Tests
 # =============================================================================
+
 
 class TestReingoldTilfordLayout:
     """Tests for Reingold-Tilford tree layout."""
@@ -98,8 +100,8 @@ class TestReingoldTilfordLayout:
 
         assert len(layout.nodes) == 7
         for node in layout.nodes:
-            assert hasattr(node, 'x')
-            assert hasattr(node, 'y')
+            assert hasattr(node, "x")
+            assert hasattr(node, "y")
 
     def test_root_at_top(self):
         """Test that root is at top in top-to-bottom orientation."""
@@ -108,7 +110,7 @@ class TestReingoldTilfordLayout:
             nodes=nodes,
             links=links,
             size=(800, 600),
-            orientation='top-to-bottom',
+            orientation="top-to-bottom",
         )
         layout.run()
 
@@ -125,7 +127,7 @@ class TestReingoldTilfordLayout:
             nodes=nodes,
             links=links,
             size=(800, 600),
-            orientation='top-to-bottom',
+            orientation="top-to-bottom",
         )
         layout.run()
 
@@ -143,13 +145,13 @@ class TestReingoldTilfordLayout:
             root=0,
             node_separation=2.0,
             level_separation=1.5,
-            orientation='left-to-right',
+            orientation="left-to-right",
         )
 
         assert layout.root == 0
         assert layout.node_separation == 2.0
         assert layout.level_separation == 1.5
-        assert layout.orientation == 'left-to-right'
+        assert layout.orientation == "left-to-right"
 
     def test_linear_tree(self):
         """Test layout of linear tree."""
@@ -158,7 +160,7 @@ class TestReingoldTilfordLayout:
             nodes=nodes,
             links=links,
             size=(800, 600),
-            orientation='top-to-bottom',
+            orientation="top-to-bottom",
         )
         layout.run()
 
@@ -189,7 +191,7 @@ class TestReingoldTilfordLayout:
         """Test all orientation options."""
         nodes, links = create_binary_tree()
 
-        for orient in ['top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left']:
+        for orient in ["top-to-bottom", "bottom-to-top", "left-to-right", "right-to-left"]:
             layout = ReingoldTilfordLayout(
                 nodes=nodes,
                 links=links,
@@ -224,6 +226,7 @@ class TestReingoldTilfordLayout:
 # =============================================================================
 # Radial Tree Tests
 # =============================================================================
+
 
 class TestRadialTreeLayout:
     """Tests for Radial tree layout."""
@@ -269,17 +272,11 @@ class TestRadialTreeLayout:
         cx, cy = 400, 300
 
         # Root distance
-        root_dist = math.sqrt(
-            (layout.nodes[0].x - cx) ** 2 +
-            (layout.nodes[0].y - cy) ** 2
-        )
+        root_dist = math.sqrt((layout.nodes[0].x - cx) ** 2 + (layout.nodes[0].y - cy) ** 2)
 
         # Children should be further from center
         for i in [1, 2]:
-            child_dist = math.sqrt(
-                (layout.nodes[i].x - cx) ** 2 +
-                (layout.nodes[i].y - cy) ** 2
-            )
+            child_dist = math.sqrt((layout.nodes[i].x - cx) ** 2 + (layout.nodes[i].y - cy) ** 2)
             assert child_dist > root_dist
 
     def test_configuration_properties(self):
@@ -337,6 +334,7 @@ class TestRadialTreeLayout:
 # Sugiyama Tests
 # =============================================================================
 
+
 class TestSugiyamaLayout:
     """Tests for Sugiyama DAG layout."""
 
@@ -359,7 +357,7 @@ class TestSugiyamaLayout:
             nodes=nodes,
             links=links,
             size=(800, 600),
-            orientation='top-to-bottom',
+            orientation="top-to-bottom",
         )
         layout.run()
 
@@ -383,13 +381,13 @@ class TestSugiyamaLayout:
         layout = SugiyamaLayout(
             layer_separation=120,
             node_separation=60,
-            orientation='left-to-right',
+            orientation="left-to-right",
             crossing_iterations=30,
         )
 
         assert layout.layer_separation == 120
         assert layout.node_separation == 60
-        assert layout.orientation == 'left-to-right'
+        assert layout.orientation == "left-to-right"
         assert layout.crossing_iterations == 30
 
     def test_tree_as_dag(self):
@@ -408,7 +406,7 @@ class TestSugiyamaLayout:
         """Test all orientation options."""
         nodes, links = create_dag()
 
-        for orient in ['top-to-bottom', 'bottom-to-top', 'left-to-right', 'right-to-left']:
+        for orient in ["top-to-bottom", "bottom-to-top", "left-to-right", "right-to-left"]:
             layout = SugiyamaLayout(
                 nodes=nodes,
                 links=links,
@@ -443,16 +441,16 @@ class TestSugiyamaLayout:
         """Test linear DAG layout."""
         nodes = [{} for _ in range(4)]
         links = [
-            {'source': 0, 'target': 1},
-            {'source': 1, 'target': 2},
-            {'source': 2, 'target': 3},
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
         ]
 
         layout = SugiyamaLayout(
             nodes=nodes,
             links=links,
             size=(800, 600),
-            orientation='top-to-bottom',
+            orientation="top-to-bottom",
         )
         layout.run()
 
@@ -465,36 +463,46 @@ class TestSugiyamaLayout:
 # Cross-Algorithm Tests
 # =============================================================================
 
+
 class TestAllHierarchicalLayouts:
     """Tests that apply to all hierarchical algorithms."""
 
-    @pytest.mark.parametrize("LayoutClass", [
-        ReingoldTilfordLayout,
-        RadialTreeLayout,
-        SugiyamaLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            ReingoldTilfordLayout,
+            RadialTreeLayout,
+            SugiyamaLayout,
+        ],
+    )
     def test_empty_graph(self, LayoutClass):
         """All algorithms should handle empty graphs."""
         layout = LayoutClass(nodes=[], links=[], size=(800, 600))
         layout.run()
         assert len(layout.nodes) == 0
 
-    @pytest.mark.parametrize("LayoutClass", [
-        ReingoldTilfordLayout,
-        RadialTreeLayout,
-        SugiyamaLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            ReingoldTilfordLayout,
+            RadialTreeLayout,
+            SugiyamaLayout,
+        ],
+    )
     def test_single_node(self, LayoutClass):
         """All algorithms should handle single node."""
         layout = LayoutClass(nodes=[{}], links=[], size=(800, 600))
         layout.run()
         assert len(layout.nodes) == 1
 
-    @pytest.mark.parametrize("LayoutClass", [
-        ReingoldTilfordLayout,
-        RadialTreeLayout,
-        SugiyamaLayout,
-    ])
+    @pytest.mark.parametrize(
+        "LayoutClass",
+        [
+            ReingoldTilfordLayout,
+            RadialTreeLayout,
+            SugiyamaLayout,
+        ],
+    )
     def test_pythonic_api(self, LayoutClass):
         """All algorithms support Pythonic API."""
         nodes, links = create_binary_tree()

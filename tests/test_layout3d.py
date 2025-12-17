@@ -49,16 +49,8 @@ class TestLayout3D:
 
     def test_simple_layout(self):
         """Test running simple layout."""
-        nodes = [
-            Node3D(0, 0, 0),
-            Node3D(1, 0, 0),
-            Node3D(0, 1, 0)
-        ]
-        links = [
-            Link3D(0, 1),
-            Link3D(1, 2),
-            Link3D(2, 0)
-        ]
+        nodes = [Node3D(0, 0, 0), Node3D(1, 0, 0), Node3D(0, 1, 0)]
+        links = [Link3D(0, 1), Link3D(1, 2), Link3D(2, 0)]
 
         layout = Layout3D(nodes, links, ideal_link_length=1.0)
         layout.start(iterations=10)
@@ -68,10 +60,7 @@ class TestLayout3D:
 
     def test_fixed_nodes(self):
         """Test layout with fixed nodes."""
-        nodes = [
-            Node3D(0, 0, 0),
-            Node3D(2, 0, 0)
-        ]
+        nodes = [Node3D(0, 0, 0), Node3D(2, 0, 0)]
         nodes[0].fixed = True  # Fix first node
 
         links = [Link3D(0, 1)]
@@ -126,7 +115,7 @@ class TestLayout3D:
         """Test with larger graph."""
         # Create a simple chain
         nodes = [Node3D(i, 0, 0) for i in range(5)]
-        links = [Link3D(i, i+1) for i in range(4)]
+        links = [Link3D(i, i + 1) for i in range(4)]
 
         layout = Layout3D(nodes, links, ideal_link_length=2.0)
         layout.start(iterations=20)

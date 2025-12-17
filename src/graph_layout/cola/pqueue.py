@@ -121,9 +121,7 @@ class PairingHeap(Generic[T]):
         """
         return self.merge(PairingHeap(obj), less_than)
 
-    def merge(
-        self, heap2: "PairingHeap[T]", less_than: Callable[[T, T], bool]
-    ) -> "PairingHeap[T]":
+    def merge(self, heap2: "PairingHeap[T]", less_than: Callable[[T, T], bool]) -> "PairingHeap[T]":
         """
         Merge two heaps.
 

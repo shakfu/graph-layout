@@ -55,6 +55,19 @@ from .metrics import (
     stress,
 )
 
+# Preprocessing utilities
+from .preprocessing import (
+    assign_layers_longest_path,
+    connected_components,
+    count_crossings,
+    detect_cycle,
+    has_cycle,
+    is_connected,
+    minimize_crossings_barycenter,
+    remove_cycles,
+    topological_sort,
+)
+
 # Spatial data structures
 from .spatial import Body, QuadTree, QuadTreeNode
 
@@ -72,19 +85,6 @@ from .types import (
     NodeLike,
     SizeType,
     is_group,
-)
-
-# Preprocessing utilities
-from .preprocessing import (
-    assign_layers_longest_path,
-    connected_components,
-    count_crossings,
-    detect_cycle,
-    has_cycle,
-    is_connected,
-    minimize_crossings_barycenter,
-    remove_cycles,
-    topological_sort,
 )
 
 # Validation utilities

@@ -12,15 +12,16 @@ from graph_layout.circular import CircularLayout, ShellLayout
 # Test Fixtures
 # =============================================================================
 
+
 def create_simple_graph():
     """Create a simple graph with 5 nodes."""
     nodes = [{} for _ in range(5)]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 1, 'target': 2},
-        {'source': 2, 'target': 3},
-        {'source': 3, 'target': 4},
-        {'source': 4, 'target': 0},
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 3},
+        {"source": 3, "target": 4},
+        {"source": 4, "target": 0},
     ]
     return nodes, links
 
@@ -29,11 +30,11 @@ def create_star_graph():
     """Create a star graph with center at 0."""
     nodes = [{} for _ in range(6)]
     links = [
-        {'source': 0, 'target': 1},
-        {'source': 0, 'target': 2},
-        {'source': 0, 'target': 3},
-        {'source': 0, 'target': 4},
-        {'source': 0, 'target': 5},
+        {"source": 0, "target": 1},
+        {"source": 0, "target": 2},
+        {"source": 0, "target": 3},
+        {"source": 0, "target": 4},
+        {"source": 0, "target": 5},
     ]
     return nodes, links
 
@@ -41,6 +42,7 @@ def create_star_graph():
 # =============================================================================
 # Circular Layout Tests
 # =============================================================================
+
 
 class TestCircularLayout:
     """Tests for Circular layout."""
@@ -115,12 +117,12 @@ class TestCircularLayout:
         layout = CircularLayout(
             radius=200,
             start_angle=math.pi / 4,
-            sort_by='degree',
+            sort_by="degree",
         )
 
         assert layout.radius == 200
         assert layout.start_angle == math.pi / 4
-        assert layout.sort_by == 'degree'
+        assert layout.sort_by == "degree"
 
     def test_sort_by_degree(self):
         """Test sorting by degree."""
@@ -129,7 +131,7 @@ class TestCircularLayout:
             nodes=nodes,
             links=links,
             size=(800, 600),
-            sort_by='degree',
+            sort_by="degree",
         )
         layout.run()
 
@@ -138,12 +140,12 @@ class TestCircularLayout:
 
     def test_custom_sort_function(self):
         """Test custom sort function."""
-        nodes = [{'priority': i} for i in range(5)]
+        nodes = [{"priority": i} for i in range(5)]
         layout = CircularLayout(
             nodes=nodes,
             links=[],
             size=(800, 600),
-            sort_by=lambda n: -getattr(n, 'priority', 0),
+            sort_by=lambda n: -getattr(n, "priority", 0),
         )
         layout.run()
 
@@ -173,6 +175,7 @@ class TestCircularLayout:
 # =============================================================================
 # Shell Layout Tests
 # =============================================================================
+
 
 class TestShellLayout:
     """Tests for Shell layout."""
@@ -291,6 +294,7 @@ class TestShellLayout:
 # =============================================================================
 # Cross-Algorithm Tests
 # =============================================================================
+
 
 class TestAllCircularLayouts:
     """Tests that apply to all circular algorithms."""

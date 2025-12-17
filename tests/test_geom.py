@@ -101,23 +101,14 @@ class TestConvexHull:
 
     def test_simple_triangle(self):
         """Test convex hull of triangle."""
-        points = [
-            Point(0, 0),
-            Point(1, 0),
-            Point(0.5, 1)
-        ]
+        points = [Point(0, 0), Point(1, 0), Point(0.5, 1)]
 
         hull = convex_hull(points)
         assert len(hull) == 3
 
     def test_square(self):
         """Test convex hull of square."""
-        points = [
-            Point(0, 0),
-            Point(1, 0),
-            Point(1, 1),
-            Point(0, 1)
-        ]
+        points = [Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)]
 
         hull = convex_hull(points)
         assert len(hull) == 4
@@ -129,7 +120,7 @@ class TestConvexHull:
             Point(2, 0),
             Point(2, 2),
             Point(0, 2),
-            Point(1, 1)  # Inside point
+            Point(1, 1),  # Inside point
         ]
 
         hull = convex_hull(points)
@@ -138,11 +129,7 @@ class TestConvexHull:
 
     def test_collinear_points(self):
         """Test convex hull with collinear points."""
-        points = [
-            Point(0, 0),
-            Point(1, 0),
-            Point(2, 0)
-        ]
+        points = [Point(0, 0), Point(1, 0), Point(2, 0)]
 
         hull = convex_hull(points)
         # Should return endpoints
@@ -168,10 +155,10 @@ class TestClockwiseRadialSweep:
         """Test basic radial sweep."""
         center = Point(0, 0)
         points = [
-            Point(1, 0),   # 0 degrees
-            Point(0, 1),   # 90 degrees
+            Point(1, 0),  # 0 degrees
+            Point(0, 1),  # 90 degrees
             Point(-1, 0),  # 180 degrees
-            Point(0, -1)   # 270 degrees
+            Point(0, -1),  # 270 degrees
         ]
 
         visited = []
@@ -184,7 +171,7 @@ class TestClockwiseRadialSweep:
         """Test radial sweep ordering."""
         center = Point(0, 0)
         points = [
-            Point(1, 1),   # 45 degrees
+            Point(1, 1),  # 45 degrees
             Point(-1, 1),  # 135 degrees
         ]
 
@@ -227,22 +214,17 @@ class TestTangents:
     def test_tangent_point_to_square(self):
         """Test finding tangent from point to square polygon."""
         # Square centered at origin
-        square = [
-            Point(-1, -1),
-            Point(1, -1),
-            Point(1, 1),
-            Point(-1, 1)
-        ]
+        square = [Point(-1, -1), Point(1, -1), Point(1, 1), Point(-1, 1)]
 
         # Point to the right of square
         p = Point(3, 0)
 
         result = _tangent_point_poly_c(p, square)
 
-        assert 'rtan' in result
-        assert 'ltan' in result
-        assert isinstance(result['rtan'], int)
-        assert isinstance(result['ltan'], int)
+        assert "rtan" in result
+        assert "ltan" in result
+        assert isinstance(result["rtan"], int)
+        assert isinstance(result["ltan"], int)
 
 
 class TestBiTangent:
@@ -273,19 +255,9 @@ class TestTangentsBetweenPolygons:
     def test_tangents_between_squares(self):
         """Test finding tangents between two squares."""
         # Two non-overlapping squares
-        square1 = [
-            Point(0, 0),
-            Point(1, 0),
-            Point(1, 1),
-            Point(0, 1)
-        ]
+        square1 = [Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)]
 
-        square2 = [
-            Point(2, 0),
-            Point(3, 0),
-            Point(3, 1),
-            Point(2, 1)
-        ]
+        square2 = [Point(2, 0), Point(3, 0), Point(3, 1), Point(2, 1)]
 
         bt = tangents(square1, square2)
 
@@ -342,17 +314,9 @@ class TestTangentVisibilityGraph:
     def test_create_simple_graph(self):
         """Test creating visibility graph for simple polygons."""
         # Two triangles
-        poly1 = [
-            TVGPoint(0, 0),
-            TVGPoint(1, 0),
-            TVGPoint(0.5, 1)
-        ]
+        poly1 = [TVGPoint(0, 0), TVGPoint(1, 0), TVGPoint(0.5, 1)]
 
-        poly2 = [
-            TVGPoint(2, 0),
-            TVGPoint(3, 0),
-            TVGPoint(2.5, 1)
-        ]
+        poly2 = [TVGPoint(2, 0), TVGPoint(3, 0), TVGPoint(2.5, 1)]
 
         graph = TangentVisibilityGraph([poly1, poly2])
 
@@ -364,12 +328,7 @@ class TestTangentVisibilityGraph:
 
     def test_single_polygon(self):
         """Test visibility graph with single polygon."""
-        poly = [
-            TVGPoint(0, 0),
-            TVGPoint(1, 0),
-            TVGPoint(1, 1),
-            TVGPoint(0, 1)
-        ]
+        poly = [TVGPoint(0, 0), TVGPoint(1, 0), TVGPoint(1, 1), TVGPoint(0, 1)]
 
         graph = TangentVisibilityGraph([poly])
 
@@ -381,12 +340,7 @@ class TestTangentVisibilityGraph:
 
     def test_add_point(self):
         """Test adding point to visibility graph."""
-        poly = [
-            TVGPoint(0, 0),
-            TVGPoint(1, 0),
-            TVGPoint(1, 1),
-            TVGPoint(0, 1)
-        ]
+        poly = [TVGPoint(0, 0), TVGPoint(1, 0), TVGPoint(1, 1), TVGPoint(0, 1)]
 
         graph = TangentVisibilityGraph([poly])
         initial_vertex_count = len(graph.V)
@@ -403,73 +357,33 @@ class TestPolysOverlap:
 
     def test_non_overlapping_squares(self):
         """Test non-overlapping squares."""
-        square1 = [
-            Point(0, 0),
-            Point(1, 0),
-            Point(1, 1),
-            Point(0, 1)
-        ]
+        square1 = [Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)]
 
-        square2 = [
-            Point(2, 0),
-            Point(3, 0),
-            Point(3, 1),
-            Point(2, 1)
-        ]
+        square2 = [Point(2, 0), Point(3, 0), Point(3, 1), Point(2, 1)]
 
         assert not polys_overlap(square1, square2)
 
     def test_overlapping_squares(self):
         """Test overlapping squares."""
-        square1 = [
-            Point(0, 0),
-            Point(2, 0),
-            Point(2, 2),
-            Point(0, 2)
-        ]
+        square1 = [Point(0, 0), Point(2, 0), Point(2, 2), Point(0, 2)]
 
-        square2 = [
-            Point(1, 1),
-            Point(3, 1),
-            Point(3, 3),
-            Point(1, 3)
-        ]
+        square2 = [Point(1, 1), Point(3, 1), Point(3, 3), Point(1, 3)]
 
         assert polys_overlap(square1, square2)
 
     def test_one_inside_other(self):
         """Test one polygon inside another."""
-        outer = [
-            Point(0, 0),
-            Point(4, 0),
-            Point(4, 4),
-            Point(0, 4)
-        ]
+        outer = [Point(0, 0), Point(4, 0), Point(4, 4), Point(0, 4)]
 
-        inner = [
-            Point(1, 1),
-            Point(2, 1),
-            Point(2, 2),
-            Point(1, 2)
-        ]
+        inner = [Point(1, 1), Point(2, 1), Point(2, 2), Point(1, 2)]
 
         assert polys_overlap(outer, inner)
 
     def test_edge_touching(self):
         """Test polygons touching at edge."""
-        square1 = [
-            Point(0, 0),
-            Point(1, 0),
-            Point(1, 1),
-            Point(0, 1)
-        ]
+        square1 = [Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)]
 
-        square2 = [
-            Point(1, 0),
-            Point(2, 0),
-            Point(2, 1),
-            Point(1, 1)
-        ]
+        square2 = [Point(1, 0), Point(2, 0), Point(2, 1), Point(1, 1)]
 
         # Touching at edge - this may or may not be considered overlap
         # depending on implementation details

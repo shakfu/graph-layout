@@ -96,16 +96,12 @@ def validate_link_indices(
         if src is None:
             issues.append((i, f"Link {i}: source is None"))
         elif src < 0 or src >= node_count:
-            issues.append(
-                (i, f"Link {i}: source index {src} out of bounds [0, {node_count})")
-            )
+            issues.append((i, f"Link {i}: source index {src} out of bounds [0, {node_count})"))
 
         if tgt is None:
             issues.append((i, f"Link {i}: target is None"))
         elif tgt < 0 or tgt >= node_count:
-            issues.append(
-                (i, f"Link {i}: target index {tgt} out of bounds [0, {node_count})")
-            )
+            issues.append((i, f"Link {i}: target index {tgt} out of bounds [0, {node_count})"))
 
     if strict and issues:
         msg = "Invalid link indices:\n" + "\n".join(issue[1] for issue in issues)

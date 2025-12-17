@@ -54,6 +54,7 @@ class InputNode(TypedDict, total=False):
         height: Height of the node's bounding box (for overlap avoidance)
         fixed: Selective bit mask. !=0 means layout will not move
     """
+
     index: int
     x: float
     y: float
@@ -130,8 +131,8 @@ class Layout:
         Args:
             e: Event to trigger
         """
-        if self.event and e['type'] in self.event:
-            self.event[e['type']](e)
+        if self.event and e["type"] in self.event:
+            self.event[e["type"]](e)
 
     def kick(self) -> None:
         """
@@ -152,11 +153,7 @@ class Layout:
         """
         if self._alpha < self._threshold:
             self._running = False
-            self.trigger({
-                'type': EventType.end,
-                'alpha': 0.0,
-                'stress': self._lastStress
-            })
+            self.trigger({"type": EventType.end, "alpha": 0.0, "stress": self._lastStress})
             self._alpha = 0.0
             return True
 
@@ -186,11 +183,7 @@ class Layout:
 
         self._update_node_positions()
 
-        self.trigger({
-            'type': EventType.tick,
-            'alpha': self._alpha,
-            'stress': self._lastStress
-        })
+        self.trigger({"type": EventType.tick, "alpha": self._alpha, "stress": self._lastStress})
 
         return False
 
@@ -243,7 +236,7 @@ class Layout:
                 # Treat as an object with attributes
                 node = Node()
                 for attr in dir(node_data):
-                    if not attr.startswith('_'):
+                    if not attr.startswith("_"):
                         setattr(node, attr, getattr(node_data, attr))
                 self._nodes.append(node)
 
@@ -272,7 +265,7 @@ class Layout:
             else:
                 group = Group()
                 for attr in dir(group_data):
-                    if not attr.startswith('_'):
+                    if not attr.startswith("_"):
                         setattr(group, attr, getattr(group_data, attr))
                 self._groups.append(group)
 
@@ -308,8 +301,12 @@ class Layout:
                 g.groups = new_groups
 
         # Set root group
-        self._rootGroup.leaves = [v for v in self._nodes if not hasattr(v, 'parent') or v.parent is None]
-        self._rootGroup.groups = [g for g in self._groups if not hasattr(g, 'parent') or g.parent is None]
+        self._rootGroup.leaves = [
+            v for v in self._nodes if not hasattr(v, "parent") or v.parent is None
+        ]
+        self._rootGroup.groups = [
+            g for g in self._groups if not hasattr(g, "parent") or g.parent is None
+        ]
 
         return self
 
@@ -326,10 +323,9 @@ class Layout:
         g = get_groups(self._nodes, self._links, self.link_accessor, self._rootGroup)
 
         # Convert dict result to object-like structure for compatibility
-        power_graph = type('PowerGraph', (), {
-            'groups': g['groups'],
-            'powerEdges': g['powerEdges']
-        })()
+        power_graph = type(
+            "PowerGraph", (), {"groups": g["groups"], "powerEdges": g["powerEdges"]}
+        )()
 
         self.groups(power_graph.groups)
         f(power_graph)
@@ -374,11 +370,7 @@ class Layout:
         self._handleDisconnected = v
         return self
 
-    def flow_layout(
-        self,
-        axis: str = 'y',
-        min_separation: Union[float, Callable] = None
-    ) -> Layout:
+    def flow_layout(self, axis: str = "y", min_separation: Union[float, Callable] = None) -> Layout:
         """
         Generate constraints for directed flow layout.
 
@@ -399,10 +391,7 @@ class Layout:
         else:
             get_min_sep = min_separation if min_separation else lambda: 0
 
-        self._directedLinkConstraints = {
-            'axis': axis,
-            'getMinSeparation': get_min_sep
-        }
+        self._directedLinkConstraints = {"axis": axis, "getMinSeparation": get_min_sep}
         return self
 
     def links(self, x: Optional[list] = None) -> Union[list[Link], Layout]:
@@ -427,19 +416,17 @@ class Layout:
                 self._links.append(Link(**link_data))
             else:
                 link = Link(
-                    source=getattr(link_data, 'source', 0),
-                    target=getattr(link_data, 'target', 0)
+                    source=getattr(link_data, "source", 0), target=getattr(link_data, "target", 0)
                 )
                 for attr in dir(link_data):
-                    if not attr.startswith('_') and attr not in ('source', 'target'):
+                    if not attr.startswith("_") and attr not in ("source", "target"):
                         setattr(link, attr, getattr(link_data, attr))
                 self._links.append(link)
 
         return self
 
     def constraints(
-        self,
-        c: Optional[list[Union[SeparationConstraint, AlignmentConstraint]]] = None
+        self, c: Optional[list[Union[SeparationConstraint, AlignmentConstraint]]] = None
     ) -> Union[list[Union[SeparationConstraint, AlignmentConstraint]], Layout]:
         """
         Get or set list of constraints.
@@ -457,8 +444,7 @@ class Layout:
         return self
 
     def distance_matrix(
-        self,
-        d: Optional[np.ndarray] = None
+        self, d: Optional[np.ndarray] = None
     ) -> Union[Optional[np.ndarray], Layout]:
         """
         Get or set matrix of ideal distances between all pairs of nodes.
@@ -533,8 +519,7 @@ class Layout:
         return self
 
     def link_distance(
-        self,
-        x: Optional[Union[float, LinkNumericPropertyAccessor]] = None
+        self, x: Optional[Union[float, LinkNumericPropertyAccessor]] = None
     ) -> Union[Union[float, LinkNumericPropertyAccessor], Layout]:
         """
         Get or set link distance.
@@ -615,10 +600,7 @@ class Layout:
             if not self._running:
                 self._running = True
                 self._alpha = x
-                self.trigger({
-                    'type': EventType.start,
-                    'alpha': self._alpha
-                })
+                self.trigger({"type": EventType.start, "alpha": self._alpha})
                 self.kick()
 
         return self
@@ -737,7 +719,7 @@ class Layout:
         initial_all_constraints_iterations: int = 0,
         grid_snap_iterations: int = 0,
         keep_running: bool = True,
-        center_graph: bool = True
+        center_graph: bool = True,
     ) -> Layout:
         """
         Start the layout process.
@@ -770,7 +752,7 @@ class Layout:
         # Initialize node positions and indices
         for i, v in enumerate(self._nodes):
             v.index = i
-            if not hasattr(v, 'x') or v.x is None:
+            if not hasattr(v, "x") or v.x is None:
                 v.x = w / 2.0
                 v.y = h / 2.0
             x[i] = v.x
@@ -790,7 +772,7 @@ class Layout:
                 self._links,
                 Layout.get_source_index,
                 Layout.get_target_index,
-                self.get_link_length
+                self.get_link_length,
             )
             distances = calc.distance_matrix()
 
@@ -851,13 +833,10 @@ class Layout:
         if self._directedLinkConstraints:
             # Add get_min_separation to link accessor
             link_acc = self.link_accessor
-            link_acc.get_min_separation = self._directedLinkConstraints['getMinSeparation']
+            link_acc.get_min_separation = self._directedLinkConstraints["getMinSeparation"]
 
             cur_constraints = cur_constraints + generate_directed_edge_constraints(
-                n,
-                self._links,
-                self._directedLinkConstraints['axis'],
-                link_acc
+                n, self._links, self._directedLinkConstraints["axis"], link_acc
             )
 
         # Initialize descent
@@ -882,10 +861,7 @@ class Layout:
         # Apply user constraints
         if len(cur_constraints) > 0:
             self._descent.project = Projection(
-                self._nodes,
-                self._groups,
-                self._rootGroup,
-                cur_constraints
+                self._nodes, self._groups, self._rootGroup, cur_constraints
             ).project_functions()
 
         self._descent.run(initial_user_constraint_iterations)
@@ -899,11 +875,7 @@ class Layout:
                 v.y = y[i]
 
             self._descent.project = Projection(
-                self._nodes,
-                self._groups,
-                self._rootGroup,
-                cur_constraints,
-                True
+                self._nodes, self._groups, self._rootGroup, cur_constraints, True
             ).project_functions()
 
             for i, v in enumerate(self._nodes):
@@ -919,7 +891,7 @@ class Layout:
             self._descent.snap_strength = 1000.0
             self._descent.snap_grid_size = self._nodes[0].width
             self._descent.num_grid_snap_nodes = n
-            self._descent.scale_snap_by_max_h = (n != N)
+            self._descent.scale_snap_by_max_h = n != N
 
             G0 = Descent.create_square_matrix(N, lambda i, j: G[i][j] if i >= n or j >= n else 0.0)
             self._descent.G = G0
@@ -943,26 +915,23 @@ class Layout:
             # Construct flat graph with dummy nodes for groups
             n = len(self._nodes)
 
-            edges = [
-                {'source': e.source.index, 'target': e.target.index}
-                for e in self._links
-            ]
+            edges = [{"source": e.source.index, "target": e.target.index} for e in self._links]
 
-            vs = [{'index': v.index} for v in self._nodes]
+            vs = [{"index": v.index} for v in self._nodes]
 
             for i, g in enumerate(self._groups):
                 g.index = n + i
-                vs.append({'index': g.index})
+                vs.append({"index": g.index})
 
             # Add edges from groups to their children
             for g in self._groups:
                 if g.leaves is not None:
                     for v in g.leaves:
-                        edges.append({'source': g.index, 'target': v.index})
+                        edges.append({"source": g.index, "target": v.index})
 
                 if g.groups is not None:
                     for gg in g.groups:
-                        edges.append({'source': g.index, 'target': gg.index})
+                        edges.append({"source": g.index, "target": gg.index})
 
             # Layout flat graph
             flat_layout = Layout()
@@ -977,16 +946,13 @@ class Layout:
 
             # Copy positions back
             for v in self._nodes:
-                x[v.index] = vs[v.index]['x']
-                y[v.index] = vs[v.index]['y']
+                x[v.index] = vs[v.index]["x"]
+                y[v.index] = vs[v.index]["y"]
         else:
             self._descent.run(iterations)
 
     def _separate_overlapping_components(
-        self,
-        width: float,
-        height: float,
-        center_graph: bool = True
+        self, width: float, height: float, center_graph: bool = True
     ) -> None:
         """
         Recalculate node positions for disconnected graphs.
@@ -1066,9 +1032,7 @@ class Layout:
 
         # Create a copy of visibility graph
         vg2 = TangentVisibilityGraph(
-            self._visibilityGraph.P,
-            V=self._visibilityGraph.V,
-            E=self._visibilityGraph.E
+            self._visibilityGraph.P, V=self._visibilityGraph.V, E=self._visibilityGraph.E
         )
 
         port1 = Point(edge.source.x, edge.source.y)
@@ -1084,18 +1048,14 @@ class Layout:
 
         # Find shortest path
         sp_calc = Calculator(
-            len(vg2.V),
-            vg2.E,
-            lambda e: e.source.id,
-            lambda e: e.target.id,
-            lambda e: e.length()
+            len(vg2.V), vg2.E, lambda e: e.source.id, lambda e: e.target.id, lambda e: e.length()
         )
 
         shortest_path = sp_calc.path_from_node_to_node(start.id, end.id)
 
         if len(shortest_path) == 1 or len(shortest_path) == len(vg2.V):
             route = make_edge_between(edge.source.innerBounds, edge.target.innerBounds, ah)
-            line_data = [route['sourceIntersection'], route['arrowStart']]
+            line_data = [route["sourceIntersection"], route["arrowStart"]]
         else:
             n = len(shortest_path) - 2
             p = vg2.V[shortest_path[n]].p
@@ -1202,8 +1162,8 @@ class Layout:
             for v in d.leaves:
                 v.fixed |= 2
                 Layout._stop_node(v)
-                v._dragGroupOffsetX = v.x - origin['x']
-                v._dragGroupOffsetY = v.y - origin['y']
+                v._dragGroupOffsetX = v.x - origin["x"]
+                v._dragGroupOffsetY = v.y - origin["y"]
 
         if d.groups is not None:
             for g in d.groups:
@@ -1223,12 +1183,9 @@ class Layout:
             Dict with 'x' and 'y' keys
         """
         if is_group(d):
-            return {
-                'x': d.bounds.cx(),
-                'y': d.bounds.cy()
-            }
+            return {"x": d.bounds.cx(), "y": d.bounds.cy()}
         else:
-            return {'x': d.x, 'y': d.y}
+            return {"x": d.x, "y": d.y}
 
     @staticmethod
     def drag(d: Union[Node, Group], position: dict) -> None:
@@ -1244,17 +1201,17 @@ class Layout:
         if is_group(d):
             if d.leaves is not None:
                 for v in d.leaves:
-                    d.bounds.set_x_centre(position['x'])
-                    d.bounds.set_y_centre(position['y'])
-                    v.px = v._dragGroupOffsetX + position['x']
-                    v.py = v._dragGroupOffsetY + position['y']
+                    d.bounds.set_x_centre(position["x"])
+                    d.bounds.set_y_centre(position["y"])
+                    v.px = v._dragGroupOffsetX + position["x"]
+                    v.py = v._dragGroupOffsetY + position["y"]
 
             if d.groups is not None:
                 for g in d.groups:
                     Layout.drag(g, position)
         else:
-            d.px = position['x']
-            d.py = position['y']
+            d.px = position["x"]
+            d.py = position["y"]
 
     @staticmethod
     def drag_end(d: Union[Node, Group]) -> None:
@@ -1270,10 +1227,10 @@ class Layout:
             if d.leaves is not None:
                 for v in d.leaves:
                     Layout.drag_end(v)
-                    if hasattr(v, '_dragGroupOffsetX'):
-                        delattr(v, '_dragGroupOffsetX')
-                    if hasattr(v, '_dragGroupOffsetY'):
-                        delattr(v, '_dragGroupOffsetY')
+                    if hasattr(v, "_dragGroupOffsetX"):
+                        delattr(v, "_dragGroupOffsetX")
+                    if hasattr(v, "_dragGroupOffsetY"):
+                        delattr(v, "_dragGroupOffsetY")
 
             if d.groups is not None:
                 for g in d.groups:

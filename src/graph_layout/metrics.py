@@ -86,9 +86,7 @@ def _segments_intersect(
 ) -> bool:
     """Check if line segments (p1,p2) and (p3,p4) intersect."""
 
-    def ccw(
-        a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]
-    ) -> bool:
+    def ccw(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]) -> bool:
         return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
 
     return ccw(p1, p3, p4) != ccw(p2, p3, p4) and ccw(p1, p2, p3) != ccw(p1, p2, p4)

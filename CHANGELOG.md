@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Changed
+
+- **CI wheel build time reduced from 2h 50m to 16m** by replacing QEMU emulation with native GitHub ARM runners (`ubuntu-24.04-arm`) for Linux aarch64 builds
+
 ## [0.1.6] - Unified Cython Speedups and PyPI Publishing
 
 ### Added

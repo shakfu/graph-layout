@@ -147,9 +147,9 @@ build: clean
 	@uv run twine check dist/*.whl
 
 # Upload to TestPyPI
-publish-test: build
+publish-test:
 	@uv run twine upload --repository testpypi dist/*
 
 # Upload to PyPI
-publish: build
+publish:
 	@uv run twine upload dist/*

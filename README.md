@@ -326,7 +326,7 @@ make verify        # Run all checks
 
 ## Credits
 
-- **Cola**: Port of [WebCola](https://github.com/tgdwyer/WebCola) by Tim Dwyer
+- **Cola**: Port of [WebCola](https://github.com/tgdwyer/WebCola) by Tim Dwyer (see also [libcola-releated papers](https://www.adaptagrams.org/documentation/libcola.html) in the [adaptagrams project](https://www.adaptagrams.org).
 - **Fruchterman-Reingold**: Based on "Graph Drawing by Force-directed Placement" (1991)
 - **Kamada-Kawai**: Based on "An Algorithm for Drawing General Undirected Graphs" (1989)
 - **Sugiyama**: Based on "Methods for Visual Understanding of Hierarchical System Structures" (1981)

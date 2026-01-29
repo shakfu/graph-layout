@@ -2,9 +2,7 @@
 Tests for RandomLayout.
 """
 
-import pytest
-
-from graph_layout import RandomLayout, EventType
+from graph_layout import EventType, RandomLayout
 
 
 class TestRandomLayoutBasic:
@@ -140,8 +138,7 @@ class TestRandomLayoutReproducibility:
 
         # Positions should differ for at least one node
         different = any(
-            n1.x != n2.x or n1.y != n2.y
-            for n1, n2 in zip(layout1.nodes, layout2.nodes)
+            n1.x != n2.x or n1.y != n2.y for n1, n2 in zip(layout1.nodes, layout2.nodes)
         )
         assert different
 
@@ -259,12 +256,12 @@ class TestRandomLayoutImport:
 
     def test_import_from_package(self):
         """RandomLayout should be importable from package root."""
-        from graph_layout import RandomLayout as RL
+        from graph_layout import RandomLayout as RandomLayoutPkg
 
-        assert RL is RandomLayout
+        assert RandomLayoutPkg is RandomLayout
 
     def test_import_from_basic_module(self):
         """RandomLayout should be importable from basic module."""
-        from graph_layout.basic import RandomLayout as RL
+        from graph_layout.basic import RandomLayout as RandomLayoutMod
 
-        assert RL is RandomLayout
+        assert RandomLayoutMod is RandomLayout

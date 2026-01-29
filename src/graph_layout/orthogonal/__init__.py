@@ -15,6 +15,14 @@ Available algorithms:
 - KandinskyLayout: Supports arbitrary node degree, good for general use
 """
 
+from .compaction import (
+    CompactionConstraint,
+    CompactionResult,
+    CompactionSolver,
+    compact_horizontal,
+    compact_layout,
+    compact_vertical,
+)
 from .kandinsky import KandinskyLayout
 from .orthogonalization import (
     AngleType,
@@ -26,14 +34,6 @@ from .orthogonalization import (
     compute_orthogonal_representation,
     flow_to_orthogonal_rep,
     solve_min_cost_flow_simple,
-)
-from .compaction import (
-    CompactionConstraint,
-    CompactionResult,
-    CompactionSolver,
-    compact_horizontal,
-    compact_layout,
-    compact_vertical,
 )
 from .planarization import (
     CrossingVertex,

@@ -16,15 +16,15 @@ Each pass uses a constraint system to maintain:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
-from .types import NodeBox, OrthogonalEdge, Side
+from .types import NodeBox, OrthogonalEdge
 
 
 @dataclass
 class CompactionConstraint:
     """A constraint for the compaction solver."""
+
     # left + gap <= right (for horizontal) or top + gap <= bottom (for vertical)
     left: int  # Index of left/top element
     right: int  # Index of right/bottom element
@@ -35,6 +35,7 @@ class CompactionConstraint:
 @dataclass
 class CompactionResult:
     """Result of compaction."""
+
     node_positions: list[tuple[float, float]]  # New (x, y) positions for nodes
     width: float  # Total width of compacted layout
     height: float  # Total height of compacted layout
@@ -145,15 +146,18 @@ def compact_horizontal(
 
         # Check if they overlap vertically (need horizontal separation)
         # Using cached bounds instead of property access
-        if not (box_bottom[left_idx] < box_top[right_idx] or
-                box_bottom[right_idx] < box_top[left_idx]):
+        if not (
+            box_bottom[left_idx] < box_top[right_idx] or box_bottom[right_idx] < box_top[left_idx]
+        ):
             # Gap = half of left width + separation + half of right width
             gap = box_width[left_idx] / 2 + node_separation + box_width[right_idx] / 2
-            constraints.append(CompactionConstraint(
-                left=left_idx,
-                right=right_idx,
-                gap=gap,
-            ))
+            constraints.append(
+                CompactionConstraint(
+                    left=left_idx,
+                    right=right_idx,
+                    gap=gap,
+                )
+            )
 
     # Initial positions
     initial_x = box_x[:]
@@ -215,15 +219,18 @@ def compact_vertical(
 
         # Check if they overlap horizontally (need vertical separation)
         # Using cached bounds instead of property access
-        if not (box_right[top_idx] < box_left[bottom_idx] or
-                box_right[bottom_idx] < box_left[top_idx]):
+        if not (
+            box_right[top_idx] < box_left[bottom_idx] or box_right[bottom_idx] < box_left[top_idx]
+        ):
             # Gap = half of top height + separation + half of bottom height
             gap = box_height[top_idx] / 2 + layer_separation + box_height[bottom_idx] / 2
-            constraints.append(CompactionConstraint(
-                left=top_idx,
-                right=bottom_idx,
-                gap=gap,
-            ))
+            constraints.append(
+                CompactionConstraint(
+                    left=top_idx,
+                    right=bottom_idx,
+                    gap=gap,
+                )
+            )
 
     # Initial positions
     initial_y = box_y[:]
@@ -301,8 +308,7 @@ def compact_layout(
 
     # Combine results
     positions = [
-        (new_x[i] if i < len(new_x) else boxes[i].x,
-         new_y[i] if i < len(new_y) else boxes[i].y)
+        (new_x[i] if i < len(new_x) else boxes[i].x, new_y[i] if i < len(new_y) else boxes[i].y)
         for i in range(n)
     ]
 

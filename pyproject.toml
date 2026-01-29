@@ -1,6 +1,6 @@
 [project]
 name = "graph-layout"
-version = "0.1.6"
+version = "0.1.7"
 description = "A collection of graph layout algorithms in Python"
 readme = "README.md"
 requires-python = ">=3.9"

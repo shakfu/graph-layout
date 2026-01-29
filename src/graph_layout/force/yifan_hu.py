@@ -32,7 +32,7 @@ from ..types import (
 
 # Try to import Cython-optimized functions, fallback to pure Python if unavailable
 try:
-    from .. import _speedups  # type: ignore[attr-defined]
+    from .. import _speedups
 
     # Yifan Hu uses FR-compatible force formulas, check for those functions
     _HAS_CYTHON = hasattr(_speedups, "_compute_repulsive_forces")

@@ -7,12 +7,13 @@ handling non-planar graphs in orthogonal layouts.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 # Try to import Cython-optimized functions
 try:
-    from .._speedups import _segments_intersect, _find_edge_crossings
+    from .._speedups import _find_edge_crossings, _segments_intersect
+
     _USE_CYTHON = True
 except ImportError:
     _USE_CYTHON = False
@@ -26,6 +27,7 @@ class CrossingVertex:
     When two edges cross in a non-planar graph, we insert a dummy
     vertex at the crossing point and split both edges.
     """
+
     index: int  # Index in the augmented graph
     x: float  # Crossing x coordinate
     y: float  # Crossing y coordinate
@@ -41,6 +43,7 @@ class PlanarizedGraph:
     Contains the augmented graph with crossing vertices and
     mappings to recover the original structure.
     """
+
     num_original_nodes: int
     num_total_nodes: int  # Including crossing vertices
 
@@ -215,6 +218,7 @@ def planarize_graph(
     if positions is None:
         # Simple circular layout for crossing detection
         import math
+
         positions = []
         for i in range(num_nodes):
             angle = 2 * math.pi * i / num_nodes

@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+## [0.1.7]
+
 ### Added
 
 - **Random layout algorithm** (`basic/random.py`):
@@ -30,6 +32,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Test suite for Random layout** (`tests/test_random_layout.py`):
   - 21 tests covering basic functionality, configuration, fixed nodes, events, reproducibility
+
+- **Bipartite layout algorithm** (`bipartite/bipartite.py`):
+  - Places nodes in two parallel rows/columns for bipartite graphs
+  - Automatic bipartite detection using BFS coloring
+  - User-specified sets support (top_set, bottom_set parameters)
+  - Edge crossing minimization using barycenter heuristic
+  - Horizontal (top/bottom) or vertical (left/right) orientation
+  - Configurable layer_separation and node_separation
+  - Utility functions: `is_bipartite()`, `count_crossings()`
+  - Common use cases: user-item networks, author-paper, gene-disease
+  - O(n + m) complexity for layout, O(iterations × n) for crossing minimization
+
+- **Test suite for Bipartite layout** (`tests/test_bipartite.py`):
+  - 29 tests covering detection, user sets, crossing minimization, events
 
 - **Kandinsky orthogonal layout algorithm** (`orthogonal/kandinsky.py`):
   - Produces orthogonal drawings where edges use only horizontal/vertical segments
@@ -157,6 +173,16 @@ Kandinsky orthogonal layout performance (with Cython optimization):
 | 1000 nodes, 2495 edges | 3.63s |
 
 Initial implementation was 42x slower (151s for 1000 nodes). Optimizations: (1) cached box bounds to avoid repeated property access, (2) removed O(n×m×bends) redundant loop, (3) Cython-optimized edge crossing detection.
+
+Bipartite `count_crossings()` utility optimized from O(m²) to O(m log m):
+
+| Edges | Before | After | Speedup |
+|-------|--------|-------|---------|
+| 1,000 | 0.27s | 0.0015s | **180x** |
+| 5,000 | 6.6s | 0.0086s | **767x** |
+| 10,000 | 26s | 0.017s | **1529x** |
+
+Uses merge sort inversion counting instead of pairwise comparison. BipartiteLayout itself remains fast at 0.14s for 1000×1000 nodes (100k edges).
 
 ## [0.1.6] - Unified Cython Speedups and PyPI Publishing
 

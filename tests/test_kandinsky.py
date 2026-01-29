@@ -2,16 +2,20 @@
 Tests for Kandinsky orthogonal layout.
 """
 
-import math
-
-import pytest
-
-from graph_layout import KandinskyLayout, EventType
+from graph_layout import KandinskyLayout
 from graph_layout.orthogonal import (
-    Side, NodeBox, Port,
-    segments_intersect, find_edge_crossings, planarize_graph,
-    compute_faces, compute_orthogonal_representation, OrthogonalRepresentation,
-    compact_layout, compact_horizontal, compact_vertical, CompactionResult,
+    CompactionResult,
+    NodeBox,
+    OrthogonalRepresentation,
+    Side,
+    compact_horizontal,
+    compact_layout,
+    compact_vertical,
+    compute_faces,
+    compute_orthogonal_representation,
+    find_edge_crossings,
+    planarize_graph,
+    segments_intersect,
 )
 
 
@@ -322,15 +326,15 @@ class TestKandinskyImport:
 
     def test_import_from_package(self):
         """KandinskyLayout should be importable from package root."""
-        from graph_layout import KandinskyLayout as KL
+        from graph_layout import KandinskyLayout as KandinskyLayoutPkg
 
-        assert KL is KandinskyLayout
+        assert KandinskyLayoutPkg is KandinskyLayout
 
     def test_import_from_orthogonal_module(self):
         """KandinskyLayout should be importable from orthogonal module."""
-        from graph_layout.orthogonal import KandinskyLayout as KL
+        from graph_layout.orthogonal import KandinskyLayout as KandinskyLayoutMod
 
-        assert KL is KandinskyLayout
+        assert KandinskyLayoutMod is KandinskyLayout
 
 
 class TestSegmentsIntersect:
@@ -532,8 +536,8 @@ class TestOrthogonalRepresentation:
         """total_bends should count all bends across edges."""
         ortho_rep = OrthogonalRepresentation()
         ortho_rep.edge_bends[(0, 1)] = [1, -1]  # 2 bends
-        ortho_rep.edge_bends[(1, 2)] = [1]      # 1 bend
-        ortho_rep.edge_bends[(2, 3)] = []       # 0 bends
+        ortho_rep.edge_bends[(1, 2)] = [1]  # 1 bend
+        ortho_rep.edge_bends[(2, 3)] = []  # 0 bends
 
         assert ortho_rep.total_bends == 3
 

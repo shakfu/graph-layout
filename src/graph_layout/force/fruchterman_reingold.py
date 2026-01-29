@@ -30,7 +30,7 @@ from ..types import (
 
 # Try to import Cython-optimized functions
 try:
-    from .. import _speedups  # type: ignore[attr-defined]
+    from .. import _speedups
 
     _HAS_CYTHON = True
 except ImportError:

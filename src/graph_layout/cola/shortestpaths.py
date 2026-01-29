@@ -28,7 +28,7 @@ _Calculator: Any
 
 # Try Cython implementation first
 try:
-    from .. import _speedups  # type: ignore[attr-defined]
+    from .. import _speedups
 
     _Calculator = _speedups.Calculator
     _IMPLEMENTATION = "cython"

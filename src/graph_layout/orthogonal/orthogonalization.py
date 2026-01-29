@@ -18,15 +18,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
-from .types import Side
-
 
 class AngleType(Enum):
     """Angle types in orthogonal representation."""
-    DEGREE_90 = 1   # 90° angle (right angle)
+
+    DEGREE_90 = 1  # 90° angle (right angle)
     DEGREE_180 = 2  # 180° angle (straight)
     DEGREE_270 = 3  # 270° angle (reflex)
-    DEGREE_0 = 0    # 0° angle (Kandinsky only - same direction)
+    DEGREE_0 = 0  # 0° angle (Kandinsky only - same direction)
 
 
 @dataclass
@@ -39,6 +38,7 @@ class OrthogonalRepresentation:
     - Angle assignments at each vertex-face incidence
     - Bend sequences along each edge
     """
+
     # For each (vertex, face) pair: angle in units of 90°
     # angle = 1 means 90°, angle = 2 means 180°, etc.
     vertex_face_angles: dict[tuple[int, int], int] = field(default_factory=dict)
@@ -57,6 +57,7 @@ class OrthogonalRepresentation:
 @dataclass
 class Face:
     """A face in the planar embedding."""
+
     index: int
     vertices: list[int]  # Vertices in clockwise order
     edges: list[tuple[int, int]]  # Edges (as directed pairs) around face
@@ -71,6 +72,7 @@ class FlowNetwork:
     Nodes are vertices and faces of the graph.
     Arcs represent angle assignments and bends.
     """
+
     # Number of original graph vertices
     num_vertices: int
 
@@ -120,11 +122,14 @@ def compute_faces(
     if positions:
         # Sort neighbors by angle from each vertex
         import math
+
         for v in adj:
             vx, vy = positions[v]
+
             def angle_key(u: int) -> float:
                 ux, uy = positions[u]
                 return math.atan2(uy - vy, ux - vx)
+
             adj[v].sort(key=angle_key)
 
     # Find faces by walking around the embedding
@@ -335,7 +340,7 @@ def solve_min_cost_flow_simple(network: FlowNetwork) -> bool:
 
         while remaining_supply > 0:
             # Find shortest path to any demand node using Bellman-Ford
-            dist = {n: float('inf') for n in all_nodes}
+            dist = {n: float("inf") for n in all_nodes}
             parent: dict[int, Optional[int]] = {n: None for n in all_nodes}
             dist[supply_node] = 0
 
@@ -359,19 +364,19 @@ def solve_min_cost_flow_simple(network: FlowNetwork) -> bool:
 
             # Find reachable demand node
             best_demand = None
-            best_dist = float('inf')
+            best_dist = float("inf")
             for demand_node, demand_amount in demand_nodes:
                 if dist[demand_node] < best_dist and demand_amount > 0:
                     best_dist = dist[demand_node]
                     best_demand = demand_node
 
-            if best_demand is None or best_dist == float('inf'):
+            if best_demand is None or best_dist == float("inf"):
                 # No path found, flow might not be feasible
                 break
 
             # Find path
             path = []
-            curr = best_demand
+            curr: Optional[int] = best_demand
             while curr is not None and curr != supply_node:
                 prev = parent[curr]
                 if prev is not None:
@@ -464,7 +469,7 @@ def flow_to_orthogonal_rep(
 
         bends: list[int] = []
         # Positive flow means bends in one direction
-        bends.extend([1] * flow_12)   # Left turns
+        bends.extend([1] * flow_12)  # Left turns
         bends.extend([-1] * flow_21)  # Right turns
 
         if bends:

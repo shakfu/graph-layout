@@ -33,7 +33,7 @@ from ..types import (
 
 # Try to import Cython-optimized functions
 try:
-    from .. import _speedups  # type: ignore[attr-defined]
+    from .. import _speedups
 
     # Check that FA2-specific functions exist (module may be old compiled version)
     _HAS_CYTHON = hasattr(_speedups, "_compute_fa2_repulsive_forces")

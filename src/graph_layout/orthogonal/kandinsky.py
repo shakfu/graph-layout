@@ -12,12 +12,10 @@ from the same side of a node.
 
 from __future__ import annotations
 
-import math
-from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    pass
 
 from ..base import StaticLayout
 from ..types import (
@@ -497,18 +495,15 @@ class KandinskyLayout(StaticLayout):
 
         # Calculate grid dimensions
         num_layers = len(layers)
-        max_layer_size = max(len(layer) for layer in layers) if layers else 1
 
         # Calculate spacing
         cell_width = self._node_width + self._node_separation
         cell_height = self._node_height + self._layer_separation
 
-        # Calculate total size needed
-        total_width = max_layer_size * cell_width
+        # Calculate total height needed for vertical centering
         total_height = num_layers * cell_height
 
-        # Calculate offsets to center the layout
-        offset_x = (canvas_width - total_width) / 2 + cell_width / 2
+        # Calculate offset to center the layout vertically
         offset_y = (canvas_height - total_height) / 2 + cell_height / 2
 
         # Position nodes
@@ -620,8 +615,6 @@ class KandinskyLayout(StaticLayout):
 
             # Collect all bends along the path
             all_bends: list[tuple[float, float]] = []
-            first_src = orig_src
-            last_tgt = orig_tgt
 
             for i, aug_idx in enumerate(aug_edge_indices):
                 if aug_idx >= len(pg.edges):
@@ -696,9 +689,7 @@ class KandinskyLayout(StaticLayout):
 
         self._orthogonal_edges.append(ortho_edge)
 
-    def _determine_port_sides(
-        self, src_box: NodeBox, tgt_box: NodeBox
-    ) -> tuple[Side, Side]:
+    def _determine_port_sides(self, src_box: NodeBox, tgt_box: NodeBox) -> tuple[Side, Side]:
         """
         Determine which sides of source and target nodes to use for an edge.
 

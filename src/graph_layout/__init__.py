@@ -6,6 +6,7 @@ in network visualizations.
 
 Available algorithms:
 - basic: Simple utility layouts (Random)
+- bipartite: Two-row layouts for bipartite graphs
 - cola: Constraint-based graph layout (port of WebCola)
 - force: Force-directed layouts (Fruchterman-Reingold, Spring, Kamada-Kawai)
 - hierarchical: Tree and DAG layouts (Reingold-Tilford, Radial, Sugiyama)
@@ -14,7 +15,7 @@ Available algorithms:
 - orthogonal: Orthogonal layouts with horizontal/vertical edges (Kandinsky)
 """
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"
 
 # Shared types for all algorithms
 # Base classes for building layouts
@@ -26,6 +27,9 @@ from .base import (
 
 # Basic layouts
 from .basic import RandomLayout
+
+# Bipartite layouts
+from .bipartite import BipartiteLayout
 
 # Circular layouts
 from .circular import (
@@ -52,9 +56,6 @@ from .hierarchical import (
     SugiyamaLayout,
 )
 
-# Orthogonal layouts
-from .orthogonal import KandinskyLayout
-
 # Metrics for layout quality evaluation
 from .metrics import (
     angular_resolution,
@@ -64,6 +65,9 @@ from .metrics import (
     layout_quality_summary,
     stress,
 )
+
+# Orthogonal layouts
+from .orthogonal import KandinskyLayout
 
 # Preprocessing utilities
 from .preprocessing import (
@@ -130,6 +134,8 @@ __all__ = [
     "StaticLayout",
     # Basic layouts
     "RandomLayout",
+    # Bipartite layouts
+    "BipartiteLayout",
     # Cola (constraint-based layout)
     "Layout",
     "Layout3D",

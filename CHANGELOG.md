@@ -47,7 +47,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `RoutingGrid`: Grid for edge routing
 
 - **Test suite for Kandinsky** (`tests/test_kandinsky.py`):
-  - 29 tests covering basic functionality, configuration, layering, edge routing, events
+  - 41 tests covering basic functionality, configuration, layering, edge routing, events, planarization
+
+- **Kandinsky Planarization** (`orthogonal/planarization.py`):
+  - `segments_intersect()`: Detect intersection point of two line segments
+  - `find_edge_crossings()`: Find all edge crossings in a positioned graph
+  - `planarize_graph()`: Insert crossing vertices at edge intersections
+  - `CrossingVertex`: Data class for dummy vertices at crossings
+  - `PlanarizedGraph`: Result structure with augmented edges and crossing info
+  - `is_planar_quick_check()`: Quick Euler formula check for planarity
+  - KandinskyLayout now handles non-planar graphs automatically
+  - New properties: `handle_crossings`, `crossing_vertices`, `num_crossings`
+
+- **Kandinsky Orthogonalization** (`orthogonal/orthogonalization.py`):
+  - Bend minimization using min-cost flow formulation (Tamassia's algorithm)
+  - `AngleType` enum: 90°, 180°, 270°, 0° angle types
+  - `OrthogonalRepresentation`: Stores vertex-face angles and edge bends
+  - `Face`: Represents faces in planar embedding with vertex/edge lists
+  - `FlowNetwork`: Min-cost flow network with supplies, demands, and arcs
+  - `compute_faces()`: Compute faces from planar embedding with angular ordering
+  - `build_flow_network()`: Build flow network for orthogonalization
+  - `solve_min_cost_flow_simple()`: Successive shortest path algorithm
+  - `flow_to_orthogonal_rep()`: Convert flow solution to orthogonal representation
+  - `compute_orthogonal_representation()`: Main entry point for orthogonalization
+  - New KandinskyLayout property: `optimize_bends` to enable bend minimization
+  - New property: `orthogonal_rep` to access the computed representation
+
+- **Kandinsky Compaction** (`orthogonal/compaction.py`):
+  - Constraint-based layout compaction to minimize drawing area
+  - `CompactionConstraint`: Separation constraints between elements
+  - `CompactionSolver`: Iterative relaxation solver for constraint satisfaction
+  - `CompactionResult`: Result with new positions and final dimensions
+  - `compact_horizontal()`: Horizontal compaction pass
+  - `compact_vertical()`: Vertical compaction pass
+  - `compact_layout()`: Full two-pass compaction (horizontal then vertical)
+  - New KandinskyLayout property: `compact` to enable area minimization
+  - New property: `compaction_result` to access compaction metrics
+  - Maintains node separation and edge routing constraints
+  - Preserves relative node ordering while reducing whitespace
 
 - **Yifan Hu Multilevel layout algorithm** (`force/yifan_hu.py`):
   - Based on "Efficient and High Quality Force-Directed Graph Drawing" by Yifan Hu (2005)

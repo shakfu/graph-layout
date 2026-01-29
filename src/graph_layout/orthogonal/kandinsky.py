@@ -27,6 +27,19 @@ from ..types import (
     NodeLike,
     SizeType,
 )
+from .compaction import (
+    CompactionResult,
+    compact_layout,
+)
+from .orthogonalization import (
+    OrthogonalRepresentation,
+    compute_orthogonal_representation,
+)
+from .planarization import (
+    CrossingVertex,
+    PlanarizedGraph,
+    planarize_graph,
+)
 from .types import (
     NodeBox,
     OrthogonalEdge,
@@ -92,6 +105,9 @@ class KandinskyLayout(StaticLayout):
         node_separation: float = 60,
         edge_separation: float = 15,
         layer_separation: float = 80,
+        handle_crossings: bool = True,
+        optimize_bends: bool = True,
+        compact: bool = True,
     ) -> None:
         """
         Initialize Kandinsky layout.
@@ -110,6 +126,14 @@ class KandinskyLayout(StaticLayout):
             node_separation: Minimum horizontal gap between nodes
             edge_separation: Minimum gap between parallel edge segments
             layer_separation: Vertical gap between layers (for hierarchical arrangement)
+            handle_crossings: If True, detect and handle edge crossings by inserting
+                dummy vertices. This allows non-planar graphs to be drawn without
+                edge overlaps.
+            optimize_bends: If True, use min-cost flow algorithm to minimize the
+                number of bends in edge routing. This produces cleaner layouts but
+                takes more computation time.
+            compact: If True, apply compaction to reduce the total area of the
+                layout while maintaining node separation and edge routing.
         """
         super().__init__(
             nodes=nodes,
@@ -128,11 +152,18 @@ class KandinskyLayout(StaticLayout):
         self._node_separation = float(node_separation)
         self._edge_separation = float(edge_separation)
         self._layer_separation = float(layer_separation)
+        self._handle_crossings = bool(handle_crossings)
+        self._optimize_bends = bool(optimize_bends)
+        self._compact = bool(compact)
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
         self._node_boxes: list[NodeBox] = []
         self._routing_grid: Optional[RoutingGrid] = None
+        self._planarized_graph: Optional[PlanarizedGraph] = None
+        self._crossing_vertices: list[CrossingVertex] = []
+        self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
+        self._compaction_result: Optional[CompactionResult] = None
 
     # -------------------------------------------------------------------------
     # Properties
@@ -198,6 +229,61 @@ class KandinskyLayout(StaticLayout):
         """Get node box information."""
         return self._node_boxes
 
+    @property
+    def handle_crossings(self) -> bool:
+        """Get whether edge crossings are handled."""
+        return self._handle_crossings
+
+    @handle_crossings.setter
+    def handle_crossings(self, value: bool) -> None:
+        """Set whether to handle edge crossings."""
+        self._handle_crossings = bool(value)
+
+    @property
+    def crossing_vertices(self) -> list[CrossingVertex]:
+        """Get list of crossing vertices (dummy nodes at edge intersections)."""
+        return self._crossing_vertices
+
+    @property
+    def num_crossings(self) -> int:
+        """Get number of edge crossings detected."""
+        return len(self._crossing_vertices)
+
+    @property
+    def optimize_bends(self) -> bool:
+        """Get whether bend optimization is enabled."""
+        return self._optimize_bends
+
+    @optimize_bends.setter
+    def optimize_bends(self, value: bool) -> None:
+        """Set whether to optimize bends."""
+        self._optimize_bends = bool(value)
+
+    @property
+    def orthogonal_rep(self) -> Optional[OrthogonalRepresentation]:
+        """Get the computed orthogonal representation (if optimize_bends=True)."""
+        return self._orthogonal_rep
+
+    @property
+    def total_bends(self) -> int:
+        """Get total number of bends in the layout."""
+        return sum(len(e.bends) for e in self._orthogonal_edges)
+
+    @property
+    def compact(self) -> bool:
+        """Get whether compaction is enabled."""
+        return self._compact
+
+    @compact.setter
+    def compact(self, value: bool) -> None:
+        """Set whether to apply compaction."""
+        self._compact = bool(value)
+
+    @property
+    def compaction_result(self) -> Optional[CompactionResult]:
+        """Get the compaction result (if compact=True)."""
+        return self._compaction_result
+
     # -------------------------------------------------------------------------
     # Layout Computation
     # -------------------------------------------------------------------------
@@ -214,13 +300,129 @@ class KandinskyLayout(StaticLayout):
         # Phase 2: Position nodes on grid
         self._position_nodes(layers)
 
-        # Phase 3: Assign ports and route edges
+        # Phase 2.5: Planarization - detect and handle edge crossings
+        if self._handle_crossings:
+            self._planarize()
+
+        # Phase 3: Orthogonalization - compute optimal bend assignment
+        if self._optimize_bends:
+            self._compute_orthogonal_rep()
+
+        # Phase 4: Assign ports and route edges
         self._route_edges()
+
+        # Phase 5: Compaction - reduce layout area
+        if self._compact:
+            self._apply_compaction()
 
         # Update node positions from boxes
         for i, box in enumerate(self._node_boxes):
-            self._nodes[i].x = box.x
-            self._nodes[i].y = box.y
+            if i < len(self._nodes):  # Skip crossing vertices
+                self._nodes[i].x = box.x
+                self._nodes[i].y = box.y
+
+    def _compute_orthogonal_rep(self) -> None:
+        """
+        Compute optimal orthogonal representation using min-cost flow.
+
+        This determines the optimal assignment of angles at vertices
+        and bends along edges to minimize total bends.
+        """
+        n = len(self._nodes)
+        if n == 0 or not self._node_boxes:
+            return
+
+        # Get positions
+        positions = [(box.x, box.y) for box in self._node_boxes[:n]]
+
+        # Build edge list
+        edges: list[tuple[int, int]] = []
+        for link in self._links:
+            src = self._get_source_index(link)
+            tgt = self._get_target_index(link)
+            if 0 <= src < n and 0 <= tgt < n:
+                edges.append((src, tgt))
+
+        # Compute orthogonal representation
+        self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
+
+    def _apply_compaction(self) -> None:
+        """
+        Apply compaction to reduce the layout area.
+
+        This phase minimizes whitespace while maintaining:
+        - Node separation constraints
+        - Edge routing space
+        - Relative node ordering
+        """
+        if not self._node_boxes:
+            return
+
+        # Only compact original nodes (not crossing vertices)
+        n = len(self._nodes)
+        original_boxes = self._node_boxes[:n]
+
+        # Run compaction
+        self._compaction_result = compact_layout(
+            boxes=original_boxes,
+            edges=self._orthogonal_edges,
+            node_separation=self._node_separation,
+            layer_separation=self._layer_separation,
+            edge_separation=self._edge_separation,
+        )
+
+        # Update node box positions
+        for i, (new_x, new_y) in enumerate(self._compaction_result.node_positions):
+            if i < len(self._node_boxes):
+                old_box = self._node_boxes[i]
+                self._node_boxes[i] = NodeBox(
+                    index=old_box.index,
+                    x=new_x,
+                    y=new_y,
+                    width=old_box.width,
+                    height=old_box.height,
+                )
+
+        # Re-route edges with new positions
+        self._route_edges()
+
+    def _planarize(self) -> None:
+        """
+        Detect edge crossings and insert crossing vertices.
+
+        This allows non-planar graphs to be drawn with orthogonal edges
+        without overlapping edges.
+        """
+        n = len(self._nodes)
+        if n == 0 or not self._node_boxes:
+            return
+
+        # Get current positions
+        positions = [(box.x, box.y) for box in self._node_boxes]
+
+        # Build edge list
+        edges: list[tuple[int, int]] = []
+        for link in self._links:
+            src = self._get_source_index(link)
+            tgt = self._get_target_index(link)
+            if 0 <= src < n and 0 <= tgt < n:
+                edges.append((src, tgt))
+
+        # Planarize
+        self._planarized_graph = planarize_graph(n, edges, positions)
+        self._crossing_vertices = self._planarized_graph.crossings
+
+        # Add node boxes for crossing vertices
+        for cv in self._crossing_vertices:
+            # Crossing vertices are small (visual markers for the crossing)
+            box = NodeBox(
+                index=cv.index,
+                x=cv.x,
+                y=cv.y,
+                width=self._edge_separation,  # Small width
+                height=self._edge_separation,  # Small height
+            )
+            self._node_boxes.append(box)
 
     def _assign_layers(self) -> list[list[int]]:
         """
@@ -346,23 +548,23 @@ class KandinskyLayout(StaticLayout):
         if not self._node_boxes:
             return
 
-        # Group edges by source node to assign ports
-        edges_by_source: dict[int, list[tuple[int, int]]] = defaultdict(list)
-        edges_by_target: dict[int, list[tuple[int, int]]] = defaultdict(list)
+        # Determine which edges to route
+        if self._planarized_graph and self._planarized_graph.crossings:
+            # Use planarized edges (which go through crossing vertices)
+            self._route_planarized_edges()
+        else:
+            # Route original edges directly
+            self._route_original_edges()
+
+    def _route_original_edges(self) -> None:
+        """Route original edges without planarization."""
+        n = len(self._nodes)
 
         for edge_idx, link in enumerate(self._links):
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
-            if 0 <= src < len(self._node_boxes) and 0 <= tgt < len(self._node_boxes):
-                edges_by_source[src].append((edge_idx, tgt))
-                edges_by_target[tgt].append((edge_idx, src))
 
-        # Route each edge
-        for edge_idx, link in enumerate(self._links):
-            src = self._get_source_index(link)
-            tgt = self._get_target_index(link)
-
-            if not (0 <= src < len(self._node_boxes) and 0 <= tgt < len(self._node_boxes)):
+            if not (0 <= src < n and 0 <= tgt < n):
                 continue
 
             src_box = self._node_boxes[src]
@@ -391,6 +593,108 @@ class KandinskyLayout(StaticLayout):
             )
 
             self._orthogonal_edges.append(ortho_edge)
+
+    def _route_planarized_edges(self) -> None:
+        """Route edges through crossing vertices."""
+        if not self._planarized_graph:
+            return
+
+        pg = self._planarized_graph
+        n_original = len(self._nodes)
+
+        # For each original edge, route through its crossing vertices
+        for orig_edge_idx, link in enumerate(self._links):
+            orig_src = self._get_source_index(link)
+            orig_tgt = self._get_target_index(link)
+
+            if not (0 <= orig_src < n_original and 0 <= orig_tgt < n_original):
+                continue
+
+            # Get the path of augmented edges for this original edge
+            aug_edge_indices = pg.original_to_edges.get(orig_edge_idx, [])
+
+            if not aug_edge_indices:
+                # No planarization needed, route directly
+                self._route_single_edge(orig_src, orig_tgt, orig_edge_idx)
+                continue
+
+            # Collect all bends along the path
+            all_bends: list[tuple[float, float]] = []
+            first_src = orig_src
+            last_tgt = orig_tgt
+
+            for i, aug_idx in enumerate(aug_edge_indices):
+                if aug_idx >= len(pg.edges):
+                    continue
+
+                seg_src, seg_tgt = pg.edges[aug_idx]
+
+                if seg_src >= len(self._node_boxes) or seg_tgt >= len(self._node_boxes):
+                    continue
+
+                src_box = self._node_boxes[seg_src]
+                tgt_box = self._node_boxes[seg_tgt]
+
+                # For intermediate segments through crossing vertices,
+                # add the crossing point as a bend
+                if pg.is_crossing_vertex(seg_src):
+                    all_bends.append((src_box.x, src_box.y))
+                if pg.is_crossing_vertex(seg_tgt) and i < len(aug_edge_indices) - 1:
+                    all_bends.append((tgt_box.x, tgt_box.y))
+
+            # Create the edge with collected bends
+            src_box = self._node_boxes[orig_src]
+            tgt_box = self._node_boxes[orig_tgt]
+
+            src_side, tgt_side = self._determine_port_sides(src_box, tgt_box)
+            src_port = Port(node=orig_src, side=src_side, edge=orig_edge_idx)
+            tgt_port = Port(node=orig_tgt, side=tgt_side, edge=orig_edge_idx)
+
+            # Add orthogonal routing bends
+            src_pos = src_box.get_port_position(src_side)
+            tgt_pos = tgt_box.get_port_position(tgt_side)
+            route_bends = self._compute_edge_route(src_pos, tgt_pos, src_side, tgt_side)
+
+            # Merge crossing bends with route bends
+            # For now, just use crossing points as the main bends
+            final_bends = all_bends if all_bends else route_bends
+
+            ortho_edge = OrthogonalEdge(
+                source=orig_src,
+                target=orig_tgt,
+                source_port=src_port,
+                target_port=tgt_port,
+                bends=final_bends,
+            )
+
+            self._orthogonal_edges.append(ortho_edge)
+
+    def _route_single_edge(self, src: int, tgt: int, edge_idx: int) -> None:
+        """Route a single edge directly."""
+        if src >= len(self._node_boxes) or tgt >= len(self._node_boxes):
+            return
+
+        src_box = self._node_boxes[src]
+        tgt_box = self._node_boxes[tgt]
+
+        src_side, tgt_side = self._determine_port_sides(src_box, tgt_box)
+        src_port = Port(node=src, side=src_side, edge=edge_idx)
+        tgt_port = Port(node=tgt, side=tgt_side, edge=edge_idx)
+
+        src_pos = src_box.get_port_position(src_side)
+        tgt_pos = tgt_box.get_port_position(tgt_side)
+
+        bends = self._compute_edge_route(src_pos, tgt_pos, src_side, tgt_side)
+
+        ortho_edge = OrthogonalEdge(
+            source=src,
+            target=tgt,
+            source_port=src_port,
+            target_port=tgt_port,
+            bends=bends,
+        )
+
+        self._orthogonal_edges.append(ortho_edge)
 
     def _determine_port_sides(
         self, src_box: NodeBox, tgt_box: NodeBox

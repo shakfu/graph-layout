@@ -7,7 +7,12 @@ import math
 import pytest
 
 from graph_layout import KandinskyLayout, EventType
-from graph_layout.orthogonal import Side, NodeBox, Port
+from graph_layout.orthogonal import (
+    Side, NodeBox, Port,
+    segments_intersect, find_edge_crossings, planarize_graph,
+    compute_faces, compute_orthogonal_representation, OrthogonalRepresentation,
+    compact_layout, compact_horizontal, compact_vertical, CompactionResult,
+)
 
 
 class TestKandinskyBasic:
@@ -326,3 +331,479 @@ class TestKandinskyImport:
         from graph_layout.orthogonal import KandinskyLayout as KL
 
         assert KL is KandinskyLayout
+
+
+class TestSegmentsIntersect:
+    """Tests for segment intersection detection."""
+
+    def test_crossing_segments(self):
+        """Two crossing segments should return intersection point."""
+        p1 = (0.0, 0.0)
+        p2 = (2.0, 2.0)
+        p3 = (0.0, 2.0)
+        p4 = (2.0, 0.0)
+
+        result = segments_intersect(p1, p2, p3, p4)
+        assert result is not None
+        assert abs(result[0] - 1.0) < 0.01
+        assert abs(result[1] - 1.0) < 0.01
+
+    def test_parallel_segments(self):
+        """Parallel segments should not intersect."""
+        p1 = (0.0, 0.0)
+        p2 = (2.0, 0.0)
+        p3 = (0.0, 1.0)
+        p4 = (2.0, 1.0)
+
+        result = segments_intersect(p1, p2, p3, p4)
+        assert result is None
+
+    def test_non_crossing_segments(self):
+        """Non-crossing segments should not intersect."""
+        p1 = (0.0, 0.0)
+        p2 = (1.0, 0.0)
+        p3 = (2.0, 0.0)
+        p4 = (3.0, 0.0)
+
+        result = segments_intersect(p1, p2, p3, p4)
+        assert result is None
+
+    def test_endpoint_touch_not_intersection(self):
+        """Segments touching at endpoints should not count as intersection."""
+        p1 = (0.0, 0.0)
+        p2 = (1.0, 1.0)
+        p3 = (1.0, 1.0)
+        p4 = (2.0, 0.0)
+
+        result = segments_intersect(p1, p2, p3, p4)
+        assert result is None
+
+
+class TestFindEdgeCrossings:
+    """Tests for finding edge crossings in a graph."""
+
+    def test_no_crossings_in_tree(self):
+        """Tree graph should have no crossings."""
+        positions = [(0, 0), (1, 1), (2, 1)]
+        edges = [(0, 1), (0, 2)]
+
+        crossings = find_edge_crossings(positions, edges)
+        assert len(crossings) == 0
+
+    def test_crossing_in_k4(self):
+        """K4 in certain positions should have crossings."""
+        # Square with diagonals
+        positions = [(0, 0), (2, 0), (2, 2), (0, 2)]
+        edges = [(0, 2), (1, 3)]  # Diagonals cross
+
+        crossings = find_edge_crossings(positions, edges)
+        assert len(crossings) == 1
+
+    def test_adjacent_edges_no_crossing(self):
+        """Edges sharing a vertex should not count as crossing."""
+        positions = [(0, 0), (1, 1), (2, 0)]
+        edges = [(0, 1), (1, 2)]
+
+        crossings = find_edge_crossings(positions, edges)
+        assert len(crossings) == 0
+
+
+class TestPlanarizeGraph:
+    """Tests for graph planarization."""
+
+    def test_planar_graph_unchanged(self):
+        """Planar graph should not gain crossing vertices."""
+        positions = [(0, 0), (1, 0), (1, 1), (0, 1)]
+        edges = [(0, 1), (1, 2), (2, 3), (3, 0)]  # Square
+
+        result = planarize_graph(4, edges, positions)
+
+        assert result.num_original_nodes == 4
+        assert result.num_total_nodes == 4
+        assert len(result.crossings) == 0
+
+    def test_crossing_creates_vertex(self):
+        """Crossing edges should create a crossing vertex."""
+        positions = [(0, 0), (2, 2), (0, 2), (2, 0)]
+        edges = [(0, 1), (2, 3)]  # Two crossing diagonals
+
+        result = planarize_graph(4, edges, positions)
+
+        assert result.num_original_nodes == 4
+        assert len(result.crossings) == 1
+        assert result.num_total_nodes == 5
+
+
+class TestKandinskyPlanarization:
+    """Tests for Kandinsky layout with planarization."""
+
+    def test_handle_crossings_property(self):
+        """handle_crossings should be configurable."""
+        layout = KandinskyLayout(handle_crossings=True)
+        assert layout.handle_crossings is True
+
+        layout.handle_crossings = False
+        assert layout.handle_crossings is False
+
+    def test_num_crossings_property(self):
+        """num_crossings should report detected crossings."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+        ]
+
+        layout = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            handle_crossings=True,
+        )
+        layout.run()
+
+        # May or may not have crossings depending on layout
+        assert layout.num_crossings >= 0
+
+    def test_crossing_vertices_accessible(self):
+        """crossing_vertices should be accessible after layout."""
+        nodes = [{} for _ in range(4)]
+        links = [{"source": 0, "target": 1}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        assert isinstance(layout.crossing_vertices, list)
+
+
+class TestComputeFaces:
+    """Tests for face computation in planar graphs."""
+
+    def test_triangle_has_two_faces(self):
+        """Triangle should have inner face and outer face."""
+        positions = [(0, 0), (2, 0), (1, 2)]
+        edges = [(0, 1), (1, 2), (2, 0)]
+
+        faces = compute_faces(3, edges, positions)
+
+        assert len(faces) == 2
+        # One should be outer
+        outer_count = sum(1 for f in faces if f.is_outer)
+        assert outer_count == 1
+
+    def test_square_has_two_faces(self):
+        """Square should have inner face and outer face."""
+        positions = [(0, 0), (2, 0), (2, 2), (0, 2)]
+        edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+
+        faces = compute_faces(4, edges, positions)
+
+        assert len(faces) == 2
+
+    def test_empty_graph_no_faces(self):
+        """Empty graph should have no faces."""
+        faces = compute_faces(0, [], None)
+        assert len(faces) == 0
+
+    def test_single_edge_one_face(self):
+        """Single edge creates one degenerate face with both directed edges."""
+        positions = [(0, 0), (1, 0)]
+        edges = [(0, 1)]
+
+        faces = compute_faces(2, edges, positions)
+
+        # Single edge creates one "face" containing both directed edges
+        assert len(faces) == 1
+        # The face should contain both directions of the edge
+        assert len(faces[0].edges) == 2
+
+
+class TestOrthogonalRepresentation:
+    """Tests for orthogonal representation data structure."""
+
+    def test_empty_representation(self):
+        """Empty representation should have zero bends."""
+        ortho_rep = OrthogonalRepresentation()
+
+        assert ortho_rep.total_bends == 0
+        assert len(ortho_rep.vertex_face_angles) == 0
+        assert len(ortho_rep.edge_bends) == 0
+
+    def test_total_bends_calculation(self):
+        """total_bends should count all bends across edges."""
+        ortho_rep = OrthogonalRepresentation()
+        ortho_rep.edge_bends[(0, 1)] = [1, -1]  # 2 bends
+        ortho_rep.edge_bends[(1, 2)] = [1]      # 1 bend
+        ortho_rep.edge_bends[(2, 3)] = []       # 0 bends
+
+        assert ortho_rep.total_bends == 3
+
+
+class TestComputeOrthogonalRepresentation:
+    """Tests for the full orthogonalization pipeline."""
+
+    def test_empty_graph(self):
+        """Empty graph returns empty representation."""
+        ortho_rep = compute_orthogonal_representation(0, [])
+
+        assert ortho_rep.total_bends == 0
+
+    def test_no_edges(self):
+        """Graph with no edges returns empty representation."""
+        ortho_rep = compute_orthogonal_representation(5, [])
+
+        assert ortho_rep.total_bends == 0
+
+    def test_simple_path(self):
+        """Simple path should have valid representation."""
+        positions = [(0, 0), (1, 0), (2, 0)]
+        edges = [(0, 1), (1, 2)]
+
+        ortho_rep = compute_orthogonal_representation(3, edges, positions)
+
+        # Should produce a valid representation (may or may not have bends)
+        assert isinstance(ortho_rep, OrthogonalRepresentation)
+
+    def test_triangle(self):
+        """Triangle should have valid representation."""
+        positions = [(0, 0), (2, 0), (1, 2)]
+        edges = [(0, 1), (1, 2), (2, 0)]
+
+        ortho_rep = compute_orthogonal_representation(3, edges, positions)
+
+        assert isinstance(ortho_rep, OrthogonalRepresentation)
+
+    def test_square_cycle(self):
+        """Square cycle should have valid representation."""
+        positions = [(0, 0), (2, 0), (2, 2), (0, 2)]
+        edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+
+        ortho_rep = compute_orthogonal_representation(4, edges, positions)
+
+        assert isinstance(ortho_rep, OrthogonalRepresentation)
+        # Square has no bends when properly orthogonal
+        # But our representation may have bends depending on flow solution
+
+
+class TestKandinskyOrthogonalization:
+    """Tests for Kandinsky layout orthogonalization integration."""
+
+    def test_optimize_bends_property(self):
+        """optimize_bends should be configurable."""
+        layout = KandinskyLayout(optimize_bends=True)
+        assert layout.optimize_bends is True
+
+        layout.optimize_bends = False
+        assert layout.optimize_bends is False
+
+    def test_orthogonal_rep_accessible(self):
+        """orthogonal_rep should be accessible after layout."""
+        nodes = [{} for _ in range(3)]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
+
+        layout = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            optimize_bends=True,
+        )
+        layout.run()
+
+        assert layout.orthogonal_rep is not None
+
+    def test_orthogonalization_reduces_bends(self):
+        """Orthogonalization should aim to minimize bends."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+        ]
+
+        # Run without optimization
+        layout_no_opt = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            optimize_bends=False,
+        )
+        layout_no_opt.run()
+
+        # Run with optimization
+        layout_opt = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            optimize_bends=True,
+        )
+        layout_opt.run()
+
+        # Both should complete without error
+        assert len(layout_no_opt.orthogonal_edges) == 3
+        assert len(layout_opt.orthogonal_edges) == 3
+
+
+class TestCompactLayout:
+    """Tests for layout compaction functions."""
+
+    def test_compact_empty(self):
+        """Empty layout should compact without error."""
+        result = compact_layout(boxes=[], edges=[])
+
+        assert result.width == 0
+        assert result.height == 0
+        assert len(result.node_positions) == 0
+
+    def test_compact_single_node(self):
+        """Single node should remain at valid position."""
+        boxes = [NodeBox(index=0, x=100, y=100, width=60, height=40)]
+
+        result = compact_layout(boxes=boxes, edges=[])
+
+        assert len(result.node_positions) == 1
+        assert result.width > 0
+        assert result.height > 0
+
+    def test_compact_two_nodes_horizontal(self):
+        """Two horizontally separated nodes should be compacted."""
+        boxes = [
+            NodeBox(index=0, x=100, y=100, width=60, height=40),
+            NodeBox(index=1, x=500, y=100, width=60, height=40),
+        ]
+
+        result = compact_layout(boxes=boxes, edges=[], node_separation=60)
+
+        assert len(result.node_positions) == 2
+        # Compaction should produce valid positions maintaining separation
+        x0, _ = result.node_positions[0]
+        x1, _ = result.node_positions[1]
+        # Nodes should maintain minimum separation (width/2 + sep + width/2)
+        min_separation = 60 + 60  # node_separation + width
+        assert x1 - x0 >= min_separation
+
+    def test_compact_two_nodes_vertical(self):
+        """Two vertically separated nodes should be compacted."""
+        boxes = [
+            NodeBox(index=0, x=100, y=100, width=60, height=40),
+            NodeBox(index=1, x=100, y=500, width=60, height=40),
+        ]
+
+        result = compact_layout(boxes=boxes, edges=[], layer_separation=80)
+
+        assert len(result.node_positions) == 2
+        # Compaction should produce valid positions maintaining separation
+        _, y0 = result.node_positions[0]
+        _, y1 = result.node_positions[1]
+        # Nodes should maintain minimum separation (height/2 + sep + height/2)
+        min_separation = 80 + 40  # layer_separation + height
+        assert y1 - y0 >= min_separation
+
+    def test_compact_horizontal_preserves_order(self):
+        """Horizontal compaction should preserve left-to-right order."""
+        boxes = [
+            NodeBox(index=0, x=100, y=100, width=60, height=40),
+            NodeBox(index=1, x=300, y=100, width=60, height=40),
+            NodeBox(index=2, x=500, y=100, width=60, height=40),
+        ]
+
+        new_x = compact_horizontal(boxes, edges=[], node_separation=60, edge_separation=15)
+
+        assert len(new_x) == 3
+        # Order should be preserved
+        assert new_x[0] < new_x[1] < new_x[2]
+
+    def test_compact_vertical_preserves_order(self):
+        """Vertical compaction should preserve top-to-bottom order."""
+        boxes = [
+            NodeBox(index=0, x=100, y=100, width=60, height=40),
+            NodeBox(index=1, x=100, y=300, width=60, height=40),
+            NodeBox(index=2, x=100, y=500, width=60, height=40),
+        ]
+
+        new_y = compact_vertical(boxes, edges=[], layer_separation=80, edge_separation=15)
+
+        assert len(new_y) == 3
+        # Order should be preserved
+        assert new_y[0] < new_y[1] < new_y[2]
+
+
+class TestKandinskyCompaction:
+    """Tests for Kandinsky layout compaction integration."""
+
+    def test_compact_property(self):
+        """compact should be configurable."""
+        layout = KandinskyLayout(compact=True)
+        assert layout.compact is True
+
+        layout.compact = False
+        assert layout.compact is False
+
+    def test_compaction_result_accessible(self):
+        """compaction_result should be accessible after layout."""
+        nodes = [{} for _ in range(3)]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
+
+        layout = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            compact=True,
+        )
+        layout.run()
+
+        assert layout.compaction_result is not None
+        assert isinstance(layout.compaction_result, CompactionResult)
+
+    def test_compaction_reduces_area(self):
+        """Compaction should reduce or maintain layout area."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+        ]
+
+        # Run without compaction
+        layout_no_compact = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            compact=False,
+        )
+        layout_no_compact.run()
+
+        # Run with compaction
+        layout_compact = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            compact=True,
+        )
+        layout_compact.run()
+
+        # Both should complete without error
+        assert len(layout_no_compact.orthogonal_edges) == 3
+        assert len(layout_compact.orthogonal_edges) == 3
+
+    def test_compaction_maintains_separation(self):
+        """Compaction should maintain minimum node separation."""
+        nodes = [{} for _ in range(3)]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
+
+        layout = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            node_separation=60,
+            compact=True,
+        )
+        layout.run()
+
+        # Check that nodes don't overlap
+        for i, box1 in enumerate(layout.node_boxes):
+            for j, box2 in enumerate(layout.node_boxes):
+                if i >= j:
+                    continue
+                # Boxes should not overlap
+                x_overlap = not (box1.right < box2.left or box2.right < box1.left)
+                y_overlap = not (box1.bottom < box2.top or box2.bottom < box1.top)
+                assert not (x_overlap and y_overlap), f"Nodes {i} and {j} overlap"

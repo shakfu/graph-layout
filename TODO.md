@@ -19,8 +19,32 @@ Two parallel rows/columns for bipartite graphs.
 Edges restricted to horizontal/vertical segments. Complex but valuable for specific domains.
 
 - Essential for: UML diagrams, flowcharts, circuit schematics, ER diagrams
-- Algorithms: Kandinsky, GIOTTO, Topology-Shape-Metrics approach
 - Edge routing with bend minimization
+
+**Implementation Order:**
+
+1. **Kandinsky** ✅ MVP implemented
+   - Works on **any graph** (not just planar) - most practical
+   - Allows multiple edges per node side (handles high-degree nodes)
+   - Well-documented, used in commercial tools (yEd)
+   - Good for UML/ER diagrams where nodes often have many connections
+   - **Future improvements**: min-cost flow bend minimization, better compaction
+
+2. **Topology-Shape-Metrics (TSM)** (implement second)
+   - Three decoupled phases: planarization → orthogonalization → compaction
+   - Each phase can be improved independently
+   - Industry standard (used in OGDF library)
+   - Most flexible but higher complexity
+
+3. **GIOTTO** (defer or skip)
+   - Restricted to planar graphs with max degree 4
+   - Less practical for real-world use cases
+   - Academic interest mostly
+
+4. **Simple Visibility Representation** (optional foundation)
+   - Nodes as horizontal segments, edges as vertical
+   - O(n) for planar graphs
+   - Good learning stepping stone
 
 ### Stress Majorization
 

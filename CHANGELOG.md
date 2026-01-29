@@ -31,6 +31,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Test suite for Random layout** (`tests/test_random_layout.py`):
   - 21 tests covering basic functionality, configuration, fixed nodes, events, reproducibility
 
+- **Kandinsky orthogonal layout algorithm** (`orthogonal/kandinsky.py`):
+  - Produces orthogonal drawings where edges use only horizontal/vertical segments
+  - Supports vertices of arbitrary degree (unlike simpler orthogonal models)
+  - Three-phase approach: layer assignment, node placement, edge routing
+  - Configurable: node_width, node_height, node_separation, edge_separation, layer_separation
+  - Outputs OrthogonalEdge objects with port and bend information
+  - Ideal for UML diagrams, ER diagrams, flowcharts, circuit schematics
+
+- **Orthogonal layout types** (`orthogonal/types.py`):
+  - `Side` enum: NORTH, SOUTH, EAST, WEST
+  - `Port`: Connection point on node side
+  - `NodeBox`: Node as rectangle with edge access methods
+  - `OrthogonalEdge`: Edge with source/target ports and bend points
+  - `RoutingGrid`: Grid for edge routing
+
+- **Test suite for Kandinsky** (`tests/test_kandinsky.py`):
+  - 29 tests covering basic functionality, configuration, layering, edge routing, events
+
 - **Yifan Hu Multilevel layout algorithm** (`force/yifan_hu.py`):
   - Based on "Efficient and High Quality Force-Directed Graph Drawing" by Yifan Hu (2005)
   - Spring-electrical force model: repulsion C·K²/d, attraction d²/K

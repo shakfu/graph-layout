@@ -11,6 +11,7 @@ Available algorithms:
 - hierarchical: Tree and DAG layouts (Reingold-Tilford, Radial, Sugiyama)
 - circular: Circular and shell layouts
 - spectral: Spectral/eigenvector-based layouts
+- orthogonal: Orthogonal layouts with horizontal/vertical edges (Kandinsky)
 """
 
 __version__ = "0.1.6"
@@ -50,6 +51,9 @@ from .hierarchical import (
     ReingoldTilfordLayout,
     SugiyamaLayout,
 )
+
+# Orthogonal layouts
+from .orthogonal import KandinskyLayout
 
 # Metrics for layout quality evaluation
 from .metrics import (
@@ -145,6 +149,8 @@ __all__ = [
     "ShellLayout",
     # Spectral layouts
     "SpectralLayout",
+    # Orthogonal layouts
+    "KandinskyLayout",
     # Metrics
     "edge_crossings",
     "stress",

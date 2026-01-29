@@ -19,6 +19,7 @@ A collection of graph layout algorithms in Python.
 | **Circular** | `CircularLayout` | Nodes arranged on a circle |
 | | `ShellLayout` | Concentric circles by degree or grouping |
 | **Spectral** | `SpectralLayout` | Laplacian eigenvector embedding |
+| **Orthogonal** | `KandinskyLayout` | Edges use only horizontal/vertical segments |
 
 ## Installation
 
@@ -202,6 +203,28 @@ layout = SpectralLayout(
 layout.run()
 ```
 
+### Orthogonal Layout (Kandinsky)
+
+Kandinsky layout produces diagrams where all edges use only horizontal and vertical segments. Ideal for UML diagrams, flowcharts, and ER diagrams:
+
+```python
+from graph_layout import KandinskyLayout
+
+layout = KandinskyLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    node_width=60,
+    node_height=40,
+    node_separation=60,
+)
+layout.run()
+
+# Access edge routing information
+for edge in layout.orthogonal_edges:
+    print(f"Edge {edge.source}->{edge.target}: {len(edge.bends)} bends")
+```
+
 ## Visualization
 
 Generate visualization images for all algorithms:
@@ -228,6 +251,7 @@ This creates images in `./build/` showing each algorithm's output.
 | **Circular** | Ring structures, cycles | O(n) | Simple, predictable |
 | **Shell** | Grouped/stratified data | O(n) | Degree-based grouping |
 | **Spectral** | Clustering visualization | O(n^3) eigendecomp | Reveals structure |
+| **Kandinsky** | UML, flowcharts, ER diagrams | O(n²) | Orthogonal edges, any degree |
 
 ## Advanced Features
 
@@ -360,6 +384,8 @@ graph_layout/
         shell.py
     spectral/                # Spectral methods
         spectral.py
+    orthogonal/              # Orthogonal layouts
+        kandinsky.py         # Kandinsky orthogonal layout
 ```
 
 ## Performance

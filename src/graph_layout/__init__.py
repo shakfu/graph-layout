@@ -5,6 +5,7 @@ This package provides various graph layout algorithms for positioning nodes
 in network visualizations.
 
 Available algorithms:
+- basic: Simple utility layouts (Random)
 - cola: Constraint-based graph layout (port of WebCola)
 - force: Force-directed layouts (Fruchterman-Reingold, Spring, Kamada-Kawai)
 - hierarchical: Tree and DAG layouts (Reingold-Tilford, Radial, Sugiyama)
@@ -21,6 +22,9 @@ from .base import (
     IterativeLayout,
     StaticLayout,
 )
+
+# Basic layouts
+from .basic import RandomLayout
 
 # Circular layouts
 from .circular import (
@@ -120,6 +124,8 @@ __all__ = [
     "BaseLayout",
     "IterativeLayout",
     "StaticLayout",
+    # Basic layouts
+    "RandomLayout",
     # Cola (constraint-based layout)
     "Layout",
     "Layout3D",

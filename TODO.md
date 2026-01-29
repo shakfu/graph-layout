@@ -2,14 +2,6 @@
 
 ## High Priority
 
-### Random Layout
-
-Trivial but essential baseline. Random positions within canvas bounds.
-
-- Useful as starting point for iterative algorithms
-- Baseline for comparing layout quality metrics
-- Simple to implement (high value/effort ratio)
-
 ### Bipartite Layout
 
 Two parallel rows/columns for bipartite graphs.

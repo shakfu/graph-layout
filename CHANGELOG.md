@@ -19,6 +19,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **Random layout algorithm** (`basic/random.py`):
+  - Places nodes at uniformly random positions within canvas bounds
+  - Configurable margin parameter to keep nodes away from edges
+  - Respects fixed nodes (preserves their positions)
+  - Reproducible layouts with random_seed parameter
+  - Useful as baseline for comparing layout quality metrics
+  - Useful as starting point for iterative algorithms (force-directed, etc.)
+  - O(n) complexity
+
+- **Test suite for Random layout** (`tests/test_random_layout.py`):
+  - 21 tests covering basic functionality, configuration, fixed nodes, events, reproducibility
+
 - **Yifan Hu Multilevel layout algorithm** (`force/yifan_hu.py`):
   - Based on "Efficient and High Quality Force-Directed Graph Drawing" by Yifan Hu (2005)
   - Spring-electrical force model: repulsion C·K²/d, attraction d²/K

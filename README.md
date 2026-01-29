@@ -6,6 +6,7 @@ A collection of graph layout algorithms in Python.
 
 | Family | Algorithm | Description |
 |--------|-----------|-------------|
+| **Basic** | `RandomLayout` | Random positions within canvas (baseline/starting point) |
 | **Cola** | `Layout` | Constraint-based layout with overlap avoidance (port of [WebCola](https://github.com/tgdwyer/WebCola)) |
 | **Force-Directed** | `ForceAtlas2Layout` | Continuous layout with adaptive speeds (Gephi algorithm) |
 | | `FruchtermanReingoldLayout` | Classic force-directed with cooling temperature |
@@ -32,6 +33,29 @@ uv sync
 ```
 
 ## Quick Start
+
+### Random Layout (Baseline)
+
+Random layout places nodes at random positions. Useful as a baseline for comparing layout quality or as a starting point for iterative algorithms:
+
+```python
+from graph_layout import RandomLayout
+
+nodes = [{} for _ in range(10)]
+links = [{'source': i, 'target': (i + 1) % 10} for i in range(10)]
+
+layout = RandomLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    margin=50,        # Optional padding from edges
+    random_seed=42,   # For reproducible layouts
+)
+layout.run()
+
+for i, node in enumerate(layout.nodes):
+    print(f"Node {i}: ({node.x:.1f}, {node.y:.1f})")
+```
 
 ### Force-Directed Layout
 
@@ -192,6 +216,7 @@ This creates images in `./build/` showing each algorithm's output.
 
 | Algorithm | Best For | Complexity | Features |
 |-----------|----------|------------|----------|
+| **Random** | Baselines, starting points | O(n) | Uniform distribution, reproducible |
 | **Cola** | Constrained layouts, overlap avoidance | O(n^2) per iteration | Constraints, groups, 3D |
 | **ForceAtlas2** | Large networks, community detection | O(n log n) with Barnes-Hut | Adaptive speed, degree-weighted |
 | **Fruchterman-Reingold** | General graphs, aesthetics | O(n^2) per iteration | Temperature cooling |
@@ -311,6 +336,8 @@ graph_layout/
     __init__.py              # Top-level exports
     base.py                  # Base classes (BaseLayout, IterativeLayout, StaticLayout)
     types.py                 # Common types (Node, Link, Group, EventType)
+    basic/                   # Basic utility layouts
+        random.py            # RandomLayout
     cola/                    # Constraint-based layout (WebCola port)
         layout.py            # Main 2D layout
         layout3d.py          # 3D layout
@@ -337,7 +364,9 @@ graph_layout/
 
 ## Performance
 
-This project includes a cython _speedups.pyx module which gets translated to c. While it is optional, if it is built, it provides significant speedups over pure Python:
+### Cython Speedups
+
+This project includes a Cython `_speedups.pyx` module which provides significant speedups over pure Python:
 
 | Algorithm | Cython Speedup | Notes |
 |-----------|----------------|-------|
@@ -346,9 +375,31 @@ This project includes a cython _speedups.pyx module which gets translated to c. 
 | **Yifan Hu** | **5-7x faster** | Multilevel overhead in Python |
 | Shortest paths (Dijkstra) | **5x faster** | Priority queue operations |
 
-ForceAtlas2 and Yifan Hu use Barnes-Hut O(n log n) approximation by default for graphs >50 nodes. Yifan Hu is fastest for large graphs due to multilevel coarsening.
+### Benchmark Results
 
-For Fruchterman-Reingold with large graphs, enable Barnes-Hut approximation:
+Benchmarks on random scale-free graphs (Barabási-Albert model), 50 iterations:
+
+| Algorithm | 500 nodes | 1,000 nodes | 5,000 nodes |
+|-----------|-----------|-------------|-------------|
+| **Random** | 0.001s | 0.002s | 0.015s |
+| **Circular** | 0.001s | 0.002s | 0.015s |
+| **Yifan Hu** | 0.007s | 0.014s | **0.077s** |
+| **ForceAtlas2** | 0.031s | 0.066s | 0.402s |
+| **FR + Barnes-Hut** | 0.082s | 0.188s | 1.277s |
+| **Spectral** | 0.036s | 0.102s | 6.428s |
+| **Fruchterman-Reingold** | 0.059s | -- | -- |
+| **Kamada-Kawai** | 5.5s | -- | -- |
+
+*Note: FR and KK use O(n²) and are too slow for graphs >500 nodes without Barnes-Hut.*
+
+**Recommendations by graph size:**
+- **< 500 nodes**: Any algorithm works well
+- **500-2,000 nodes**: Use Yifan Hu, ForceAtlas2, or FR+Barnes-Hut
+- **> 2,000 nodes**: Use Yifan Hu (fastest) or ForceAtlas2 (best for communities)
+
+### Barnes-Hut Approximation
+
+ForceAtlas2 and Yifan Hu use Barnes-Hut O(n log n) approximation by default for graphs >50 nodes. For Fruchterman-Reingold, enable it manually:
 
 ```python
 layout = FruchtermanReingoldLayout(
@@ -357,6 +408,16 @@ layout = FruchtermanReingoldLayout(
     use_barnes_hut=True,
     barnes_hut_theta=0.5,  # 0=exact, higher=faster but less accurate
 )
+```
+
+### Running Benchmarks
+
+```bash
+# Generate benchmark graphs
+uv run python scripts/generate_benchmark_graphs.py
+
+# Run benchmarks
+uv run python scripts/benchmark_layouts.py --graphs "large_*"
 ```
 
 ## Development

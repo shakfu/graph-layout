@@ -1,0 +1,160 @@
+{
+  "graphs": [
+    {
+      "name": "small_random",
+      "description": "Small Erd\u0151s-R\u00e9nyi random graph (100 nodes)",
+      "num_nodes": 100,
+      "num_edges": 224,
+      "avg_degree": 4.48,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "small_scalefree",
+      "description": "Small Barab\u00e1si-Albert scale-free graph (100 nodes)",
+      "num_nodes": 100,
+      "num_edges": 294,
+      "avg_degree": 5.88,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "medium_random",
+      "description": "Medium Erd\u0151s-R\u00e9nyi random graph (500 nodes)",
+      "num_nodes": 500,
+      "num_edges": 1230,
+      "avg_degree": 4.92,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "medium_scalefree",
+      "description": "Medium Barab\u00e1si-Albert scale-free graph (500 nodes)",
+      "num_nodes": 500,
+      "num_edges": 1494,
+      "avg_degree": 5.976,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "medium_smallworld",
+      "description": "Medium Watts-Strogatz small-world graph (500 nodes)",
+      "num_nodes": 500,
+      "num_edges": 1500,
+      "avg_degree": 6.0,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "large_random",
+      "description": "Large Erd\u0151s-R\u00e9nyi random graph (1000 nodes)",
+      "num_nodes": 1000,
+      "num_edges": 2495,
+      "avg_degree": 4.99,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "large_scalefree",
+      "description": "Large Barab\u00e1si-Albert scale-free graph (1000 nodes)",
+      "num_nodes": 1000,
+      "num_edges": 2994,
+      "avg_degree": 5.988,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "large_smallworld",
+      "description": "Large Watts-Strogatz small-world graph (1000 nodes)",
+      "num_nodes": 1000,
+      "num_edges": 3000,
+      "avg_degree": 6.0,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "xlarge_scalefree",
+      "description": "Extra-large Barab\u00e1si-Albert scale-free graph (5000 nodes)",
+      "num_nodes": 5000,
+      "num_edges": 14994,
+      "avg_degree": 5.9976,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "xlarge_random",
+      "description": "Extra-large Erd\u0151s-R\u00e9nyi random graph (5000 nodes)",
+      "num_nodes": 5000,
+      "num_edges": 12158,
+      "avg_degree": 4.8632,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "grid_small",
+      "description": "Small 10x10 grid graph (100 nodes)",
+      "num_nodes": 100,
+      "num_edges": 180,
+      "avg_degree": 3.6,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    },
+    {
+      "name": "grid_medium",
+      "description": "Medium 30x30 grid graph (900 nodes)",
+      "num_nodes": 900,
+      "num_edges": 1740,
+      "avg_degree": 3.8666666666666667,
+      "formats": [
+        "json",
+        "csv",
+        "graphml",
+        "gml"
+      ]
+    }
+  ]
+}

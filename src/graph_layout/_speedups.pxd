@@ -66,7 +66,7 @@ cdef class Calculator:
 # Force-Directed Layout
 # =============================================================================
 
-cpdef void compute_repulsive_forces(
+cpdef void _compute_repulsive_forces(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -75,7 +75,7 @@ cpdef void compute_repulsive_forces(
     int n
 ) noexcept
 
-cpdef void compute_attractive_forces(
+cpdef void _compute_attractive_forces(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -86,7 +86,7 @@ cpdef void compute_attractive_forces(
     int m
 ) noexcept
 
-cpdef void apply_displacements(
+cpdef void _apply_displacements(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -137,7 +137,7 @@ cdef class FastQuadTree:
     cdef void _calc_force(self, QuadTreeNode node, double bx, double by, int body_index, double k_sq, double* fx, double* fy)
 
 
-cpdef void compute_repulsive_forces_barnes_hut(
+cpdef void _compute_repulsive_forces_barnes_hut(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,

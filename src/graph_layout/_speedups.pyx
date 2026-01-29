@@ -397,7 +397,7 @@ from libc.math cimport sqrt
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_repulsive_forces(
+cpdef void _compute_repulsive_forces(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -444,7 +444,7 @@ cpdef void compute_repulsive_forces(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_attractive_forces(
+cpdef void _compute_attractive_forces(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -497,7 +497,7 @@ cpdef void compute_attractive_forces(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void apply_displacements(
+cpdef void _apply_displacements(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -761,7 +761,7 @@ cdef class FastQuadTree:
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_repulsive_forces_barnes_hut(
+cpdef void _compute_repulsive_forces_barnes_hut(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -835,7 +835,7 @@ from libc.math cimport log
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_fa2_repulsive_forces(
+cpdef void _compute_fa2_repulsive_forces(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -890,7 +890,7 @@ cpdef void compute_fa2_repulsive_forces(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_fa2_repulsive_forces_overlap(
+cpdef void _compute_fa2_repulsive_forces_overlap(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -950,7 +950,7 @@ cpdef void compute_fa2_repulsive_forces_overlap(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_fa2_attractive_forces(
+cpdef void _compute_fa2_attractive_forces(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -1016,7 +1016,7 @@ cpdef void compute_fa2_attractive_forces(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_fa2_gravity(
+cpdef void _compute_fa2_gravity(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -1073,7 +1073,7 @@ cpdef void compute_fa2_gravity(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef tuple compute_fa2_swing_traction(
+cpdef tuple _compute_fa2_swing_traction(
     double[:] disp_x,
     double[:] disp_y,
     double[:] prev_disp_x,
@@ -1132,7 +1132,7 @@ cpdef tuple compute_fa2_swing_traction(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef double apply_fa2_displacements(
+cpdef double _apply_fa2_displacements(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,
@@ -1209,7 +1209,7 @@ cpdef double apply_fa2_displacements(
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef void compute_fa2_repulsive_forces_barnes_hut(
+cpdef void _compute_fa2_repulsive_forces_barnes_hut(
     double[:] pos_x,
     double[:] pos_y,
     double[:] disp_x,

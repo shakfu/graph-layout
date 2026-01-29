@@ -159,7 +159,7 @@ rebuild-cython:
 	@echo "Rebuilding Cython extension in place..."
 	@uv pip install --no-build-isolation -e .
 	@echo "Done. Verifying Cython module..."
-	@uv run python -c "from graph_layout import _speedups; print('Cython module loaded:', _speedups.__file__); print('FA2 functions:', hasattr(_speedups, 'compute_fa2_repulsive_forces'))"
+	@uv run python -c "from graph_layout import _speedups; print('Cython module loaded:', _speedups.__file__); print('FA2 functions:', hasattr(_speedups, '_compute_fa2_repulsive_forces'))"
 
 # Upload to TestPyPI
 publish-test:

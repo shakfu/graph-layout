@@ -11,6 +11,7 @@ A collection of graph layout algorithms in Python.
 | | `FruchtermanReingoldLayout` | Classic force-directed with cooling temperature |
 | | `KamadaKawaiLayout` | Stress minimization based on graph-theoretic distances |
 | | `SpringLayout` | Simple Hooke's law spring forces |
+| | `YifanHuLayout` | Multilevel force-directed for medium-large graphs |
 | **Hierarchical** | `SugiyamaLayout` | Layered DAG drawing (Sugiyama method) |
 | | `ReingoldTilfordLayout` | Classic tree layout |
 | | `RadialTreeLayout` | Radial tree with root at center |
@@ -74,6 +75,24 @@ layout = ForceAtlas2Layout(
     gravity=1.0,           # Pull toward center
     linlog_mode=True,      # Tighter clusters
     strong_gravity_mode=False,  # Distance-based gravity
+)
+layout.run()
+```
+
+### Yifan Hu Multilevel Layout
+
+Yifan Hu is ideal for medium-large graphs (1K-100K nodes) using multilevel coarsening:
+
+```python
+from graph_layout import YifanHuLayout
+
+layout = YifanHuLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    use_barnes_hut=True,       # O(n log n) approximation
+    coarsening_threshold=0.75, # Stop coarsening when ratio > 0.75
+    min_coarsest_size=10,      # Minimum nodes in coarsest graph
 )
 layout.run()
 ```
@@ -178,6 +197,7 @@ This creates images in `./build/` showing each algorithm's output.
 | **Fruchterman-Reingold** | General graphs, aesthetics | O(n^2) per iteration | Temperature cooling |
 | **Kamada-Kawai** | Small-medium graphs, stress minimization | O(n^2) per iteration | Graph-theoretic distances |
 | **Spring** | Simple layouts, baselines | O(n^2) per iteration | Hooke's law |
+| **Yifan Hu** | Medium-large graphs (1K-100K nodes) | O(n log n) with Barnes-Hut | Multilevel coarsening, adaptive step |
 | **Sugiyama** | DAGs, hierarchies | O(n^2) | Layer-based, crossing minimization |
 | **Reingold-Tilford** | Trees | O(n) | Compact, balanced |
 | **Circular** | Ring structures, cycles | O(n) | Simple, predictable |
@@ -303,6 +323,7 @@ graph_layout/
         fruchterman_reingold.py
         kamada_kawai.py
         spring.py
+        yifan_hu.py
     hierarchical/            # Tree and DAG layouts
         sugiyama.py
         reingold_tilford.py
@@ -316,15 +337,16 @@ graph_layout/
 
 ## Performance
 
-Cython extensions provide significant speedups over pure Python:
+This project includes a cython _speedups.pyx module which gets translated to c. While it is optional, if it is built, it provides significant speedups over pure Python:
 
-| Algorithm | Cython Speedup |
-|-----------|----------------|
-| **ForceAtlas2** | **12-20x faster** |
-| Fruchterman-Reingold | **10-15x faster** |
-| Shortest paths (Dijkstra) | **5x faster** |
+| Algorithm | Cython Speedup | Notes |
+|-----------|----------------|-------|
+| **Fruchterman-Reingold** | **50-60x faster** | O(n²) force calculations |
+| **ForceAtlas2** | **15-20x faster** | Degree-weighted forces |
+| **Yifan Hu** | **5-7x faster** | Multilevel overhead in Python |
+| Shortest paths (Dijkstra) | **5x faster** | Priority queue operations |
 
-ForceAtlas2 uses Barnes-Hut O(n log n) approximation by default for graphs >50 nodes, making it **2-3x faster than Fruchterman-Reingold** for large networks (1000+ nodes).
+ForceAtlas2 and Yifan Hu use Barnes-Hut O(n log n) approximation by default for graphs >50 nodes. Yifan Hu is fastest for large graphs due to multilevel coarsening.
 
 For Fruchterman-Reingold with large graphs, enable Barnes-Hut approximation:
 
@@ -343,7 +365,7 @@ layout = FruchtermanReingoldLayout(
 make test          # Run tests
 make typecheck     # Type checking
 make lint          # Lint code
-make verify        # Run all checks
+make qa            # Run all qualtiy checks
 ```
 
 ## Credits
@@ -352,6 +374,7 @@ make verify        # Run all checks
 - **ForceAtlas2**: Based on "ForceAtlas2, a Continuous Graph Layout Algorithm for Handy Network Visualization" by Jacomy et al. (2014)
 - **Fruchterman-Reingold**: Based on "Graph Drawing by Force-directed Placement" (1991)
 - **Kamada-Kawai**: Based on "An Algorithm for Drawing General Undirected Graphs" (1989)
+- **Yifan Hu**: Based on "Efficient and High Quality Force-Directed Graph Drawing" (2005)
 - **Sugiyama**: Based on "Methods for Visual Understanding of Hierarchical System Structures" (1981)
 - **Reingold-Tilford**: Based on "Tidier Drawings of Trees" (1981)
 

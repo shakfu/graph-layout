@@ -345,7 +345,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
         # Calculate repulsive forces
         if _HAS_CYTHON:
             if self._use_barnes_hut and n > 50:
-                _speedups.compute_repulsive_forces_barnes_hut(
+                _speedups._compute_repulsive_forces_barnes_hut(
                     self._pos_x,
                     self._pos_y,
                     self._disp_x,
@@ -355,18 +355,18 @@ class FruchtermanReingoldLayout(IterativeLayout):
                     self._barnes_hut_theta,
                 )
             else:
-                _speedups.compute_repulsive_forces(
+                _speedups._compute_repulsive_forces(
                     self._pos_x, self._pos_y, self._disp_x, self._disp_y, k_sq, n
                 )
         else:
             if self._use_barnes_hut and n > 50:
-                self._compute_repulsive_barnes_hut(k_sq)
+                self.compute_repulsive_barnes_hut(k_sq)
             else:
-                self._compute_repulsive_naive(n, k_sq)
+                self.compute_repulsive_naive(n, k_sq)
 
         # Calculate attractive forces along edges
         if _HAS_CYTHON and len(self._links) > 0:
-            _speedups.compute_attractive_forces(
+            _speedups._compute_attractive_forces(
                 self._pos_x,
                 self._pos_y,
                 self._disp_x,
@@ -411,7 +411,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
 
         # Apply displacements, limited by temperature
         if _HAS_CYTHON:
-            _speedups.apply_displacements(
+            _speedups._apply_displacements(
                 self._pos_x,
                 self._pos_y,
                 self._disp_x,
@@ -460,7 +460,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
 
         return False
 
-    def _compute_repulsive_naive(self, n: int, k_sq: float) -> None:
+    def compute_repulsive_naive(self, n: int, k_sq: float) -> None:
         """Compute repulsive forces using O(n^2) pairwise calculation."""
         assert self._disp_x is not None and self._disp_y is not None
         for i in range(n):
@@ -481,7 +481,7 @@ class FruchtermanReingoldLayout(IterativeLayout):
                     self._disp_x[j] -= fx
                     self._disp_y[j] -= fy
 
-    def _compute_repulsive_barnes_hut(self, k_sq: float) -> None:
+    def compute_repulsive_barnes_hut(self, k_sq: float) -> None:
         """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""
         assert self._disp_x is not None and self._disp_y is not None
         # Build quadtree from current node positions

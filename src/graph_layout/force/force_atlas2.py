@@ -36,7 +36,7 @@ try:
     from .. import _speedups  # type: ignore[attr-defined]
 
     # Check that FA2-specific functions exist (module may be old compiled version)
-    _HAS_CYTHON = hasattr(_speedups, "compute_fa2_repulsive_forces")
+    _HAS_CYTHON = hasattr(_speedups, "_compute_fa2_repulsive_forces")
 except ImportError:
     _HAS_CYTHON = False
 
@@ -389,7 +389,7 @@ class ForceAtlas2Layout(IterativeLayout):
         # Compute repulsive forces (degree-weighted)
         if _HAS_CYTHON:
             if self._use_barnes_hut and n > 50:
-                _speedups.compute_fa2_repulsive_forces_barnes_hut(
+                _speedups._compute_fa2_repulsive_forces_barnes_hut(
                     self._pos_x,
                     self._pos_y,
                     self._disp_x,
@@ -400,7 +400,7 @@ class ForceAtlas2Layout(IterativeLayout):
                     self._barnes_hut_theta,
                 )
             elif self._prevent_overlap:
-                _speedups.compute_fa2_repulsive_forces_overlap(
+                _speedups._compute_fa2_repulsive_forces_overlap(
                     self._pos_x,
                     self._pos_y,
                     self._disp_x,
@@ -411,7 +411,7 @@ class ForceAtlas2Layout(IterativeLayout):
                     n,
                 )
             else:
-                _speedups.compute_fa2_repulsive_forces(
+                _speedups._compute_fa2_repulsive_forces(
                     self._pos_x,
                     self._pos_y,
                     self._disp_x,
@@ -422,13 +422,13 @@ class ForceAtlas2Layout(IterativeLayout):
                 )
         else:
             if self._use_barnes_hut and n > 50:
-                self._compute_repulsive_barnes_hut()
+                self.compute_repulsive_barnes_hut()
             else:
-                self._compute_repulsive_naive()
+                self.compute_repulsive_naive()
 
         # Compute attractive forces
         if _HAS_CYTHON and m > 0:
-            _speedups.compute_fa2_attractive_forces(
+            _speedups._compute_fa2_attractive_forces(
                 self._pos_x,
                 self._pos_y,
                 self._disp_x,
@@ -441,13 +441,13 @@ class ForceAtlas2Layout(IterativeLayout):
                 m,
             )
         else:
-            self._compute_attractive_forces()
+            self.compute_attractive_forces()
 
         # Compute gravity forces
         if _HAS_CYTHON:
             cx = self._canvas_size[0] / 2
             cy = self._canvas_size[1] / 2
-            _speedups.compute_fa2_gravity(
+            _speedups._compute_fa2_gravity(
                 self._pos_x,
                 self._pos_y,
                 self._disp_x,
@@ -460,11 +460,11 @@ class ForceAtlas2Layout(IterativeLayout):
                 n,
             )
         else:
-            self._compute_gravity_forces()
+            self.compute_gravity_forces()
 
         # Calculate swing and traction, update speeds
         if _HAS_CYTHON:
-            total_swing, total_traction = _speedups.compute_fa2_swing_traction(
+            total_swing, total_traction = _speedups._compute_fa2_swing_traction(
                 self._disp_x,
                 self._disp_y,
                 self._prev_disp_x,
@@ -473,7 +473,7 @@ class ForceAtlas2Layout(IterativeLayout):
                 n,
             )
         else:
-            total_swing, total_traction = self._compute_swing_traction()
+            total_swing, total_traction = self.compute_swing_traction()
 
         # Update global speed
         if total_swing > 0:
@@ -483,7 +483,7 @@ class ForceAtlas2Layout(IterativeLayout):
 
         # Apply displacements with adaptive per-node speeds
         if _HAS_CYTHON:
-            total_displacement = _speedups.apply_fa2_displacements(
+            total_displacement = _speedups._apply_fa2_displacements(
                 self._pos_x,
                 self._pos_y,
                 self._disp_x,
@@ -500,7 +500,7 @@ class ForceAtlas2Layout(IterativeLayout):
                 node.x = float(self._pos_x[i])
                 node.y = float(self._pos_y[i])
         else:
-            total_displacement = self._apply_displacements(total_swing)
+            total_displacement = self.apply_displacements(total_swing)
 
         self._iteration += 1
 
@@ -518,7 +518,7 @@ class ForceAtlas2Layout(IterativeLayout):
 
         return False
 
-    def _compute_repulsive_naive(self) -> None:
+    def compute_repulsive_naive(self) -> None:
         """Compute degree-weighted repulsive forces using O(n^2) pairwise calculation."""
         assert self._pos_x is not None
         assert self._pos_y is not None
@@ -564,7 +564,7 @@ class ForceAtlas2Layout(IterativeLayout):
                     self._disp_x[j] -= fx
                     self._disp_y[j] -= fy
 
-    def _compute_repulsive_barnes_hut(self) -> None:
+    def compute_repulsive_barnes_hut(self) -> None:
         """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""
         assert self._pos_x is not None
         assert self._pos_y is not None
@@ -586,7 +586,7 @@ class ForceAtlas2Layout(IterativeLayout):
             self._disp_x[i] += fx
             self._disp_y[i] += fy
 
-    def _compute_attractive_forces(self) -> None:
+    def compute_attractive_forces(self) -> None:
         """Compute attractive forces along edges."""
         assert self._pos_x is not None
         assert self._pos_y is not None
@@ -629,7 +629,7 @@ class ForceAtlas2Layout(IterativeLayout):
             self._disp_x[tgt] += fx
             self._disp_y[tgt] += fy
 
-    def _compute_gravity_forces(self) -> None:
+    def compute_gravity_forces(self) -> None:
         """Compute gravity forces toward center."""
         assert self._pos_x is not None
         assert self._pos_y is not None
@@ -666,7 +666,7 @@ class ForceAtlas2Layout(IterativeLayout):
             self._disp_x[i] += (dx / dist) * force
             self._disp_y[i] += (dy / dist) * force
 
-    def _compute_swing_traction(self) -> tuple[float, float]:
+    def compute_swing_traction(self) -> tuple[float, float]:
         """
         Compute global swing and traction for adaptive speed.
 
@@ -707,7 +707,7 @@ class ForceAtlas2Layout(IterativeLayout):
 
         return total_swing, total_traction
 
-    def _apply_displacements(self, total_swing: float) -> float:
+    def apply_displacements(self, total_swing: float) -> float:
         """
         Apply displacements with adaptive per-node speeds.
 

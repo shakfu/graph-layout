@@ -37,6 +37,7 @@ from .force import (
     FruchtermanReingoldLayout,
     KamadaKawaiLayout,
     SpringLayout,
+    YifanHuLayout,
 )
 
 # Hierarchical layouts
@@ -128,6 +129,7 @@ __all__ = [
     "FruchtermanReingoldLayout",
     "SpringLayout",
     "KamadaKawaiLayout",
+    "YifanHuLayout",
     # Hierarchical layouts
     "ReingoldTilfordLayout",
     "RadialTreeLayout",

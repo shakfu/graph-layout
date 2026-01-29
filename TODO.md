@@ -2,25 +2,7 @@
 
 ## High Priority
 
-### 1. ForceAtlas2 Layout
-
-Implement Gephi's ForceAtlas2 algorithm. This is the most commonly used algorithm for social network visualization and handles large clustered graphs better than Fruchterman-Reingold.
-
-- LinLog mode for better cluster separation
-- Gravity to prevent disconnected components drifting
-- Barnes-Hut optimization for O(n log n) performance
-- Reference: [Jacomy et al. 2014](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0098679)
-
-### 2. Yifan Hu Multilevel Layout
-
-Fast multilevel force-directed algorithm for medium-large graphs (1K-100K nodes).
-
-- Coarsening phase: collapse graph iteratively
-- Layout phase: layout coarsest graph
-- Refinement phase: uncoarsen and refine positions
-- Reference: [Yifan Hu 2005](https://yifanhu.net/PUB/graph_draw_small.pdf)
-
-### 3. Random Layout
+### Random Layout
 
 Trivial but essential baseline. Random positions within canvas bounds.
 
@@ -28,7 +10,7 @@ Trivial but essential baseline. Random positions within canvas bounds.
 - Baseline for comparing layout quality metrics
 - Simple to implement (high value/effort ratio)
 
-### 4. Bipartite Layout
+### Bipartite Layout
 
 Two parallel rows/columns for bipartite graphs.
 
@@ -40,7 +22,7 @@ Two parallel rows/columns for bipartite graphs.
 
 ## Medium Priority
 
-### 5. Orthogonal Layout
+### Orthogonal Layout
 
 Edges restricted to horizontal/vertical segments. Complex but valuable for specific domains.
 
@@ -48,7 +30,7 @@ Edges restricted to horizontal/vertical segments. Complex but valuable for speci
 - Algorithms: Kandinsky, GIOTTO, Topology-Shape-Metrics approach
 - Edge routing with bend minimization
 
-### 6. Stress Majorization
+### Stress Majorization
 
 Iterative stress minimization that converges faster than Kamada-Kawai with similar quality.
 
@@ -56,7 +38,7 @@ Iterative stress minimization that converges faster than Kamada-Kawai with simil
 - Handles weighted graphs well
 - Reference: [Gansner et al. 2004](https://graphviz.org/Documentation/GKN04.pdf)
 
-### 7. Complete Type Annotations
+### Complete Type Annotations
 
 Finish typing the internal Cola module files that currently have `ignore_errors = true`:
 
@@ -66,11 +48,11 @@ Finish typing the internal Cola module files that currently have `ignore_errors 
 
 **Known issues**: 146 mypy errors when strict checking is enabled. Main causes: Optional handling, Union types from getter/setter pattern, dynamic attribute access on ported JavaScript objects.
 
-### 8. API Documentation
+### API Documentation
 
 Generate API reference documentation using Sphinx or MkDocs.
 
-### 9. Property-Based Tests
+### Property-Based Tests
 
 Add Hypothesis tests for robustness:
 
@@ -82,7 +64,7 @@ Add Hypothesis tests for robustness:
 
 ## Low Priority
 
-### 10. Export Formats
+### Export Formats
 
 Add export functionality:
 
@@ -90,21 +72,21 @@ Add export functionality:
 - DOT (Graphviz) export
 - GraphML export
 
-### 11. Incremental Layout
+### Incremental Layout
 
 Support graph modifications without full re-layout:
 
 - Add/remove nodes dynamically
 - Preserve existing positions where possible
 
-### 12. GPU Acceleration
+### GPU Acceleration
 
 Consider CuPy backend for large graphs:
 
 - Parallel force calculations
 - CUDA/Metal compute shaders
 
-### 13. Pivot MDS
+### Pivot MDS
 
 Fast MDS approximation using pivot nodes. Useful when spectral layout is too slow for large graphs.
 

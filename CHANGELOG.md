@@ -19,6 +19,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **Yifan Hu Multilevel layout algorithm** (`force/yifan_hu.py`):
+  - Based on "Efficient and High Quality Force-Directed Graph Drawing" by Yifan Hu (2005)
+  - Spring-electrical force model: repulsion C·K²/d, attraction d²/K
+  - Multilevel coarsening using edge collapsing with maximal matching
+  - Adaptive step length control (increases after 5 progress iterations)
+  - Barnes-Hut O(n log n) approximation enabled by default for graphs >50 nodes
+  - Configurable parameters: optimal_distance, relative_strength, step_ratio, convergence_tolerance
+  - Multilevel parameters: coarsening_threshold (ρ=0.75), min_coarsest_size, level_iterations
+  - Cython-accelerated force calculations with pure Python fallback
+  - Ideal for medium-large graphs (1K-100K nodes)
+
+- **Test suite for Yifan Hu** (`tests/test_yifan_hu.py`):
+  - 21 tests covering basic functionality, configuration, fixed nodes, events, reproducibility
+  - Algorithm-specific tests: multilevel coarsening, adaptive step, Barnes-Hut, cluster separation
+
 - **ForceAtlas2 layout algorithm** (`force/force_atlas2.py`):
   - Based on the Gephi ForceAtlas2 paper by Jacomy et al. (2014)
   - Degree-weighted repulsion: hubs repel more strongly
@@ -30,13 +45,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Barnes-Hut O(n log n) approximation enabled by default for graphs >50 nodes
 
 - **Cython-optimized ForceAtlas2 functions** in `_speedups.pyx`:
-  - `compute_fa2_repulsive_forces()` - O(n^2) degree-weighted repulsion
-  - `compute_fa2_repulsive_forces_overlap()` - with overlap prevention
-  - `compute_fa2_repulsive_forces_barnes_hut()` - O(n log n) approximation
-  - `compute_fa2_attractive_forces()` - linear/linlog attraction with edge weights
-  - `compute_fa2_gravity()` - degree-weighted gravity (normal and strong modes)
-  - `compute_fa2_swing_traction()` - adaptive speed calculation
-  - `apply_fa2_displacements()` - per-node speed application
+  - `_compute_fa2_repulsive_forces()` - O(n^2) degree-weighted repulsion
+  - `_compute_fa2_repulsive_forces_overlap()` - with overlap prevention
+  - `_compute_fa2_repulsive_forces_barnes_hut()` - O(n log n) approximation
+  - `_compute_fa2_attractive_forces()` - linear/linlog attraction with edge weights
+  - `_compute_fa2_gravity()` - degree-weighted gravity (normal and strong modes)
+  - `_compute_fa2_swing_traction()` - adaptive speed calculation
+  - `_apply_fa2_displacements()` - per-node speed application
   - Graceful fallback to pure Python when Cython not available
 
 - **New Makefile target**: `make rebuild-cython` - removes old .c/.so files and rebuilds Cython extensions fresh
@@ -47,22 +62,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 
+- **Cython function naming convention**: All Cython speedup functions now use underscore prefix (e.g., `_compute_repulsive_forces`) to indicate internal implementation. Pure Python fallback methods have no underscore prefix (e.g., `compute_repulsive_naive`). This clarifies that Cython functions are internal optimizations while Python methods are the public fallback API.
+
 - **CI wheel build time reduced from 2h 50m to 16m** by replacing QEMU emulation with native GitHub ARM runners (`ubuntu-24.04-arm`) for Linux aarch64 builds
 
 ### Performance
 
-ForceAtlas2 with Cython optimization (100 iterations):
+Cython speedups over pure Python (200 nodes, 50 iterations):
 
-| Graph Size | ForceAtlas2 | Fruchterman-Reingold |
-|------------|-------------|----------------------|
-| 100 nodes  | 0.020s | 0.013s |
-| 500 nodes  | 0.089s | 0.124s |
-| 1000 nodes | 0.138s | 0.293s |
-| 2000 nodes | 0.298s | 1.035s |
+| Algorithm | Cython Speedup |
+|-----------|----------------|
+| Fruchterman-Reingold | **50-60x faster** |
+| ForceAtlas2 | **15-20x faster** |
+| Yifan Hu | **5-7x faster** |
 
-ForceAtlas2 is **2-3x faster** than FR for large graphs due to Barnes-Hut being enabled by default.
-
-Pure Python fallback is ~20x slower but functionally equivalent.
+ForceAtlas2 and Yifan Hu use Barnes-Hut O(n log n) by default for graphs >50 nodes. Yifan Hu is fastest for large graphs due to multilevel coarsening reducing the problem size before force calculation.
 
 ## [0.1.6] - Unified Cython Speedups and PyPI Publishing
 

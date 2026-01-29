@@ -17,9 +17,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Added
+
+- **ForceAtlas2 layout algorithm** (`force/force_atlas2.py`):
+  - Based on the Gephi ForceAtlas2 paper by Jacomy et al. (2014)
+  - Degree-weighted repulsion: hubs repel more strongly
+  - Adaptive per-node speed based on swing/traction (no temperature cooling)
+  - LinLog mode for tighter community clusters
+  - Strong gravity mode to prevent component drift
+  - Edge weight influence control
+  - Overlap prevention option
+  - Barnes-Hut O(n log n) approximation enabled by default for graphs >50 nodes
+
+- **Cython-optimized ForceAtlas2 functions** in `_speedups.pyx`:
+  - `compute_fa2_repulsive_forces()` - O(n^2) degree-weighted repulsion
+  - `compute_fa2_repulsive_forces_overlap()` - with overlap prevention
+  - `compute_fa2_repulsive_forces_barnes_hut()` - O(n log n) approximation
+  - `compute_fa2_attractive_forces()` - linear/linlog attraction with edge weights
+  - `compute_fa2_gravity()` - degree-weighted gravity (normal and strong modes)
+  - `compute_fa2_swing_traction()` - adaptive speed calculation
+  - `apply_fa2_displacements()` - per-node speed application
+  - Graceful fallback to pure Python when Cython not available
+
+- **New Makefile target**: `make rebuild-cython` - removes old .c/.so files and rebuilds Cython extensions fresh
+
+- **Test suite for ForceAtlas2** (`tests/test_force_atlas2.py`):
+  - 21 tests covering basic functionality, configuration, fixed nodes, events, reproducibility
+  - Algorithm-specific tests: LinLog mode, strong gravity, degree-weighted repulsion, Barnes-Hut
+
 ### Changed
 
 - **CI wheel build time reduced from 2h 50m to 16m** by replacing QEMU emulation with native GitHub ARM runners (`ubuntu-24.04-arm`) for Linux aarch64 builds
+
+### Performance
+
+ForceAtlas2 with Cython optimization (100 iterations):
+
+| Graph Size | ForceAtlas2 | Fruchterman-Reingold |
+|------------|-------------|----------------------|
+| 100 nodes  | 0.020s | 0.013s |
+| 500 nodes  | 0.089s | 0.124s |
+| 1000 nodes | 0.138s | 0.293s |
+| 2000 nodes | 0.298s | 1.035s |
+
+ForceAtlas2 is **2-3x faster** than FR for large graphs due to Barnes-Hut being enabled by default.
+
+Pure Python fallback is ~20x slower but functionally equivalent.
 
 ## [0.1.6] - Unified Cython Speedups and PyPI Publishing
 

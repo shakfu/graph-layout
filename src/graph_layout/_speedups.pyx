@@ -9,6 +9,7 @@ This module provides high-performance implementations of:
 - Priority Queue (Pairing Heap) for Dijkstra's algorithm
 - Shortest paths calculation using Dijkstra's algorithm
 - Force calculations for Fruchterman-Reingold layout
+- Force calculations for ForceAtlas2 layout
 - QuadTree for Barnes-Hut force approximation
 
 These are used by various layout algorithms for performance-critical operations.
@@ -821,5 +822,456 @@ cpdef void compute_repulsive_forces_barnes_hut(
     # Calculate forces
     for i in range(n):
         fx, fy = tree.calculate_force(pos_x[i], pos_y[i], i, k_sq)
+        disp_x[i] += fx
+        disp_y[i] += fy
+
+
+# =============================================================================
+# ForceAtlas2 Layout Calculations
+# =============================================================================
+
+from libc.math cimport log
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef void compute_fa2_repulsive_forces(
+    double[:] pos_x,
+    double[:] pos_y,
+    double[:] disp_x,
+    double[:] disp_y,
+    double[:] degrees,
+    double scaling,
+    int n
+) noexcept:
+    """
+    Compute degree-weighted repulsive forces for ForceAtlas2 (O(n^2)).
+
+    ForceAtlas2 repulsion: scaling * (deg_i + 1) * (deg_j + 1) / distance
+
+    Args:
+        pos_x: Array of node x positions
+        pos_y: Array of node y positions
+        disp_x: Array to accumulate x displacements (modified in place)
+        disp_y: Array to accumulate y displacements (modified in place)
+        degrees: Array of node degrees
+        scaling: Repulsion scaling factor
+        n: Number of nodes
+    """
+    cdef int i, j
+    cdef double dx, dy, dist_sq, dist, force, fx, fy
+    cdef double deg_i, deg_j, deg_factor
+
+    for i in range(n):
+        deg_i = degrees[i] + 1.0
+        for j in range(i + 1, n):
+            dx = pos_x[i] - pos_x[j]
+            dy = pos_y[i] - pos_y[j]
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq < 1e-10:
+                dist_sq = 1e-10
+
+            dist = sqrt(dist_sq)
+            deg_j = degrees[j] + 1.0
+            deg_factor = deg_i * deg_j
+
+            # ForceAtlas2 repulsion: scaling * (deg_i + 1) * (deg_j + 1) / distance
+            force = scaling * deg_factor / dist
+
+            fx = (dx / dist) * force
+            fy = (dy / dist) * force
+
+            disp_x[i] += fx
+            disp_y[i] += fy
+            disp_x[j] -= fx
+            disp_y[j] -= fy
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef void compute_fa2_repulsive_forces_overlap(
+    double[:] pos_x,
+    double[:] pos_y,
+    double[:] disp_x,
+    double[:] disp_y,
+    double[:] degrees,
+    double[:] sizes,
+    double scaling,
+    int n
+) noexcept:
+    """
+    Compute degree-weighted repulsive forces with overlap prevention for ForceAtlas2.
+
+    Args:
+        pos_x: Array of node x positions
+        pos_y: Array of node y positions
+        disp_x: Array to accumulate x displacements (modified in place)
+        disp_y: Array to accumulate y displacements (modified in place)
+        degrees: Array of node degrees
+        sizes: Array of node sizes (radii)
+        scaling: Repulsion scaling factor
+        n: Number of nodes
+    """
+    cdef int i, j
+    cdef double dx, dy, dist_sq, dist, adjusted_dist, force, fx, fy
+    cdef double deg_i, deg_j, deg_factor, overlap_dist
+
+    for i in range(n):
+        deg_i = degrees[i] + 1.0
+        for j in range(i + 1, n):
+            dx = pos_x[i] - pos_x[j]
+            dy = pos_y[i] - pos_y[j]
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq < 1e-10:
+                dist_sq = 1e-10
+
+            dist = sqrt(dist_sq)
+
+            # Subtract node radii from distance
+            overlap_dist = sizes[i] + sizes[j]
+            adjusted_dist = dist - overlap_dist
+            if adjusted_dist < 0.01:
+                adjusted_dist = 0.01
+
+            deg_j = degrees[j] + 1.0
+            deg_factor = deg_i * deg_j
+            force = scaling * deg_factor / adjusted_dist
+
+            fx = (dx / dist) * force
+            fy = (dy / dist) * force
+
+            disp_x[i] += fx
+            disp_y[i] += fy
+            disp_x[j] -= fx
+            disp_y[j] -= fy
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef void compute_fa2_attractive_forces(
+    double[:] pos_x,
+    double[:] pos_y,
+    double[:] disp_x,
+    double[:] disp_y,
+    int[:] sources,
+    int[:] targets,
+    double[:] weights,
+    double edge_weight_influence,
+    bint linlog_mode,
+    int m
+) noexcept:
+    """
+    Compute attractive forces along edges for ForceAtlas2.
+
+    Linear mode: force = weight * distance
+    LinLog mode: force = weight * log(1 + distance)
+
+    Args:
+        pos_x: Array of node x positions
+        pos_y: Array of node y positions
+        disp_x: Array to accumulate x displacements (modified in place)
+        disp_y: Array to accumulate y displacements (modified in place)
+        sources: Array of source node indices for each edge
+        targets: Array of target node indices for each edge
+        weights: Array of edge weights
+        edge_weight_influence: How much weight affects attraction (0 to 1)
+        linlog_mode: Whether to use log attraction
+        m: Number of edges
+    """
+    cdef int e, src, tgt
+    cdef double dx, dy, dist, force, fx, fy, weight
+
+    for e in range(m):
+        src = sources[e]
+        tgt = targets[e]
+
+        dx = pos_x[src] - pos_x[tgt]
+        dy = pos_y[src] - pos_y[tgt]
+        dist = sqrt(dx * dx + dy * dy)
+
+        if dist < 0.01:
+            continue
+
+        # Apply edge weight influence
+        weight = weights[e]
+        if edge_weight_influence < 1.0:
+            weight = weight ** edge_weight_influence
+
+        # ForceAtlas2 attraction
+        if linlog_mode:
+            force = weight * log(1.0 + dist)
+        else:
+            force = weight * dist
+
+        fx = (dx / dist) * force
+        fy = (dy / dist) * force
+
+        disp_x[src] -= fx
+        disp_y[src] -= fy
+        disp_x[tgt] += fx
+        disp_y[tgt] += fy
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef void compute_fa2_gravity(
+    double[:] pos_x,
+    double[:] pos_y,
+    double[:] disp_x,
+    double[:] disp_y,
+    double[:] degrees,
+    double gravity,
+    double cx,
+    double cy,
+    bint strong_gravity_mode,
+    int n
+) noexcept:
+    """
+    Compute gravity forces toward center for ForceAtlas2.
+
+    Gravity is degree-weighted: gravity * (deg + 1)
+    Strong gravity mode: constant force regardless of distance
+    Normal mode: force scales with distance
+
+    Args:
+        pos_x: Array of node x positions
+        pos_y: Array of node y positions
+        disp_x: Array to accumulate x displacements (modified in place)
+        disp_y: Array to accumulate y displacements (modified in place)
+        degrees: Array of node degrees
+        gravity: Gravity strength
+        cx, cy: Center coordinates
+        strong_gravity_mode: Whether to use constant gravity
+        n: Number of nodes
+    """
+    cdef int i
+    cdef double dx, dy, dist, force, deg_factor
+
+    if gravity <= 0:
+        return
+
+    for i in range(n):
+        dx = cx - pos_x[i]
+        dy = cy - pos_y[i]
+        dist = sqrt(dx * dx + dy * dy)
+
+        if dist < 0.01:
+            continue
+
+        deg_factor = degrees[i] + 1.0
+
+        if strong_gravity_mode:
+            force = gravity * deg_factor
+        else:
+            force = gravity * deg_factor * dist
+
+        disp_x[i] += (dx / dist) * force
+        disp_y[i] += (dy / dist) * force
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple compute_fa2_swing_traction(
+    double[:] disp_x,
+    double[:] disp_y,
+    double[:] prev_disp_x,
+    double[:] prev_disp_y,
+    double[:] degrees,
+    int n
+):
+    """
+    Compute global swing and traction for adaptive speed.
+
+    Swing measures oscillation (force direction changing).
+    Traction measures consistent movement (force direction stable).
+
+    Args:
+        disp_x: Array of current x displacements
+        disp_y: Array of current y displacements
+        prev_disp_x: Array of previous x displacements
+        prev_disp_y: Array of previous y displacements
+        degrees: Array of node degrees
+        n: Number of nodes
+
+    Returns:
+        (total_swing, total_traction) tuple
+    """
+    cdef int i
+    cdef double fx, fy, pfx, pfy
+    cdef double swing_x, swing_y, swing
+    cdef double trac_x, trac_y, traction
+    cdef double deg_factor
+    cdef double total_swing = 0.0
+    cdef double total_traction = 0.0
+
+    for i in range(n):
+        fx = disp_x[i]
+        fy = disp_y[i]
+        pfx = prev_disp_x[i]
+        pfy = prev_disp_y[i]
+
+        # Swing: |F(t) - F(t-1)|
+        swing_x = fx - pfx
+        swing_y = fy - pfy
+        swing = sqrt(swing_x * swing_x + swing_y * swing_y)
+
+        # Traction: |F(t) + F(t-1)| / 2
+        trac_x = (fx + pfx) / 2.0
+        trac_y = (fy + pfy) / 2.0
+        traction = sqrt(trac_x * trac_x + trac_y * trac_y)
+
+        # Weight by degree
+        deg_factor = degrees[i] + 1.0
+        total_swing += deg_factor * swing
+        total_traction += deg_factor * traction
+
+    return (total_swing, total_traction)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef double apply_fa2_displacements(
+    double[:] pos_x,
+    double[:] pos_y,
+    double[:] disp_x,
+    double[:] disp_y,
+    double[:] prev_disp_x,
+    double[:] prev_disp_y,
+    unsigned char[:] fixed,
+    double global_speed,
+    double max_displacement,
+    int n
+) noexcept:
+    """
+    Apply displacements with adaptive per-node speeds for ForceAtlas2.
+
+    Per-node speed: global_speed / (1 + global_speed * sqrt(swing))
+
+    Args:
+        pos_x: Array of node x positions (modified in place)
+        pos_y: Array of node y positions (modified in place)
+        disp_x: Array of x displacements
+        disp_y: Array of y displacements
+        prev_disp_x: Array of previous x displacements
+        prev_disp_y: Array of previous y displacements
+        fixed: Array of fixed flags (1 = fixed, 0 = free)
+        global_speed: Global adaptive speed
+        max_displacement: Maximum displacement per iteration
+        n: Number of nodes
+
+    Returns:
+        Total displacement (for convergence checking)
+    """
+    cdef int i
+    cdef double fx, fy, pfx, pfy
+    cdef double swing_x, swing_y, node_swing
+    cdef double force_mag, node_speed, displacement, dx, dy
+    cdef double total_displacement = 0.0
+
+    for i in range(n):
+        if fixed[i]:
+            continue
+
+        fx = disp_x[i]
+        fy = disp_y[i]
+        force_mag = sqrt(fx * fx + fy * fy)
+
+        if force_mag < 0.01:
+            continue
+
+        # Compute per-node swing
+        pfx = prev_disp_x[i]
+        pfy = prev_disp_y[i]
+        swing_x = fx - pfx
+        swing_y = fy - pfy
+        node_swing = sqrt(swing_x * swing_x + swing_y * swing_y)
+
+        # Per-node speed: global_speed / (1 + global_speed * sqrt(swing))
+        node_speed = global_speed / (1.0 + global_speed * sqrt(node_swing))
+
+        # Limit displacement
+        displacement = force_mag * node_speed
+        if displacement > max_displacement:
+            displacement = max_displacement
+
+        # Apply displacement
+        dx = (fx / force_mag) * displacement
+        dy = (fy / force_mag) * displacement
+
+        pos_x[i] += dx
+        pos_y[i] += dy
+        total_displacement += displacement
+
+    return total_displacement
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef void compute_fa2_repulsive_forces_barnes_hut(
+    double[:] pos_x,
+    double[:] pos_y,
+    double[:] disp_x,
+    double[:] disp_y,
+    double[:] degrees,
+    double scaling,
+    int n,
+    double theta=1.2,
+    double padding=10.0
+) noexcept:
+    """
+    Compute degree-weighted repulsive forces using Barnes-Hut O(n log n) approximation.
+
+    Args:
+        pos_x: Array of node x positions
+        pos_y: Array of node y positions
+        disp_x: Array to accumulate x displacements (modified in place)
+        disp_y: Array to accumulate y displacements (modified in place)
+        degrees: Array of node degrees
+        scaling: Repulsion scaling factor
+        n: Number of nodes
+        theta: Barnes-Hut accuracy parameter (FA2 uses 1.2 by default)
+        padding: Padding around bounding box
+    """
+    cdef double min_x, min_y, max_x, max_y
+    cdef double fx, fy, deg_i
+    cdef int i
+    cdef FastQuadTree tree
+
+    if n == 0:
+        return
+
+    # Find bounds
+    min_x = pos_x[0]
+    max_x = pos_x[0]
+    min_y = pos_y[0]
+    max_y = pos_y[0]
+
+    for i in range(1, n):
+        if pos_x[i] < min_x:
+            min_x = pos_x[i]
+        elif pos_x[i] > max_x:
+            max_x = pos_x[i]
+        if pos_y[i] < min_y:
+            min_y = pos_y[i]
+        elif pos_y[i] > max_y:
+            max_y = pos_y[i]
+
+    min_x -= padding
+    min_y -= padding
+    max_x += padding
+    max_y += padding
+
+    # Build tree with degree+1 as mass for degree-weighted repulsion
+    tree = FastQuadTree(min_x, min_y, max_x, max_y, theta)
+    for i in range(n):
+        deg_i = degrees[i] + 1.0
+        tree.insert(pos_x[i], pos_y[i], deg_i, i)
+    tree.compute_mass_distribution()
+
+    # Calculate forces (scaling factor applied here)
+    for i in range(n):
+        fx, fy = tree.calculate_force(pos_x[i], pos_y[i], i, scaling)
         disp_x[i] += fx
         disp_y[i] += fy

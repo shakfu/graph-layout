@@ -3,7 +3,7 @@
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
 		lint format check typecheck all dev sync build publish publish-test \
-		wheel-check
+		wheel-check rebuild-cython qa
 
 # Source and test directories
 SRC_DIR := src/graph_layout
@@ -32,20 +32,21 @@ help:
 	@echo "  make lint         - Lint code with ruff"
 	@echo "  make check        - Run all checks (format check + lint)"
 	@echo "  make typecheck    - Run mypy type checking"
-	@echo "  make verify       - Run all verification (check + typecheck + test)"
+	@echo "  make qa           - Run all QA checks (check + typecheck + test)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean        - Remove build artifacts and cache files"
 	@echo "  make distclean    - Remove all generated files including .venv"
 	@echo ""
 	@echo "Development:"
-	@echo "  make all          - Run full CI pipeline (sync + verify)"
+	@echo "  make all          - Run full CI pipeline (sync + qa)"
 	@echo "  make fix          - Auto-fix formatting and linting issues"
 	@echo ""
 	@echo "Publishing:"
-	@echo "  make build        - Build sdist and wheel"
-	@echo "  make publish-test - Upload to TestPyPI"
-	@echo "  make publish      - Upload to PyPI"
+	@echo "  make build          - Build sdist and wheel"
+	@echo "  make rebuild-cython - Rebuild with fresh Cython compilation"
+	@echo "  make publish-test   - Upload to TestPyPI"
+	@echo "  make publish        - Upload to PyPI"
 
 # Sync all dependencies from lockfile (runtime + dev)
 sync:
@@ -99,8 +100,8 @@ fix:
 	@uv run ruff format $(ALL_DIRS)
 	@uv run ruff check --fix $(ALL_DIRS)
 
-# Run all verification steps
-verify: check typecheck test
+# Run all QA checks
+qa: test lint typecheck format
 
 wheel-check:
 	@uv run twine check dist/*.whl
@@ -125,10 +126,10 @@ distclean: clean
 	@rm -rf .venv/
 
 # Full CI pipeline
-all: sync verify
+all: sync qa
 
 # Quick development check before commit
-pre-commit: fix verify
+pre-commit: fix qa
 
 # Show Python and package versions
 version:
@@ -145,6 +146,20 @@ version:
 build: clean
 	@uv build
 	@uv run twine check dist/*.whl
+
+# Rebuild with fresh Cython compilation (removes old generated .c and .so files)
+rebuild-cython:
+	@echo "Removing generated Cython files (.c and .so)..."
+	@rm -f $(SRC_DIR)/_speedups.c
+	@rm -f $(SRC_DIR)/_speedups*.so
+	@echo "Cleaning build artifacts..."
+	@rm -rf build/
+	@echo "Installing build dependencies..."
+	@uv pip install setuptools cython numpy
+	@echo "Rebuilding Cython extension in place..."
+	@uv pip install --no-build-isolation -e .
+	@echo "Done. Verifying Cython module..."
+	@uv run python -c "from graph_layout import _speedups; print('Cython module loaded:', _speedups.__file__); print('FA2 functions:', hasattr(_speedups, 'compute_fa2_repulsive_forces'))"
 
 # Upload to TestPyPI
 publish-test:

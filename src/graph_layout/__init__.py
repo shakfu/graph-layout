@@ -33,6 +33,7 @@ from .cola import ColaLayoutAdapter, Layout, Layout3D
 
 # Force-directed layouts
 from .force import (
+    ForceAtlas2Layout,
     FruchtermanReingoldLayout,
     KamadaKawaiLayout,
     SpringLayout,
@@ -123,6 +124,7 @@ __all__ = [
     "Layout3D",
     "ColaLayoutAdapter",
     # Force-directed layouts
+    "ForceAtlas2Layout",
     "FruchtermanReingoldLayout",
     "SpringLayout",
     "KamadaKawaiLayout",

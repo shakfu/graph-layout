@@ -1275,3 +1275,93 @@ cpdef void _compute_fa2_repulsive_forces_barnes_hut(
         fx, fy = tree.calculate_force(pos_x[i], pos_y[i], i, scaling)
         disp_x[i] += fx
         disp_y[i] += fy
+
+
+# =============================================================================
+# Orthogonal Layout Functions (Kandinsky)
+# =============================================================================
+
+def _segments_intersect(
+    double p1x, double p1y,
+    double p2x, double p2y,
+    double p3x, double p3y,
+    double p4x, double p4y,
+):
+    """
+    Check if two line segments intersect and return intersection point.
+
+    Uses parametric line intersection formula.
+    Segments are (p1, p2) and (p3, p4).
+
+    Returns:
+        Tuple (x, y) of intersection point, or None if no intersection
+    """
+    cdef double d1x, d1y, d2x, d2y
+    cdef double denom, t, u
+    cdef double ix, iy
+    cdef double eps = 1e-10
+
+    d1x = p2x - p1x
+    d1y = p2y - p1y
+    d2x = p4x - p3x
+    d2y = p4y - p3y
+
+    denom = d1x * d2y - d1y * d2x
+
+    if denom > -eps and denom < eps:
+        # Lines are parallel
+        return None
+
+    t = ((p3x - p1x) * d2y - (p3y - p1y) * d2x) / denom
+    u = ((p3x - p1x) * d1y - (p3y - p1y) * d1x) / denom
+
+    # Check if intersection is within both segments (excluding endpoints)
+    if t > eps and t < 1.0 - eps and u > eps and u < 1.0 - eps:
+        ix = p1x + t * d1x
+        iy = p1y + t * d1y
+        return (ix, iy)
+
+    return None
+
+
+def _find_edge_crossings(
+    list positions,
+    list edges,
+):
+    """
+    Find all edge crossings in a positioned graph.
+
+    Args:
+        positions: List of (x, y) tuples for each vertex
+        edges: List of (u, v) edge tuples
+
+    Returns:
+        List of (edge_i, edge_j, x, y) tuples for each crossing
+    """
+    cdef int num_edges = len(edges)
+    cdef int i, j
+    cdef int u1, v1, u2, v2
+    cdef double p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y
+
+    crossings = []
+
+    for i in range(num_edges):
+        u1, v1 = edges[i]
+        p1x, p1y = positions[u1]
+        p2x, p2y = positions[v1]
+
+        for j in range(i + 1, num_edges):
+            u2, v2 = edges[j]
+
+            # Skip edges that share a vertex (they can't cross in interior)
+            if u1 == u2 or u1 == v2 or v1 == u2 or v1 == v2:
+                continue
+
+            p3x, p3y = positions[u2]
+            p4x, p4y = positions[v2]
+
+            result = _segments_intersect(p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y)
+            if result is not None:
+                crossings.append((i, j, result[0], result[1]))
+
+    return crossings

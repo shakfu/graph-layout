@@ -125,8 +125,16 @@ def compact_horizontal(
     if n == 0:
         return []
 
+    # Pre-cache box bounds for performance (avoid repeated property access)
+    box_x = [box.x for box in boxes]
+    box_y = [box.y for box in boxes]
+    box_width = [box.width for box in boxes]
+    box_height = [box.height for box in boxes]
+    box_top = [box_y[i] - box_height[i] / 2 for i in range(n)]
+    box_bottom = [box_y[i] + box_height[i] / 2 for i in range(n)]
+
     # Sort boxes by x-coordinate to establish ordering
-    sorted_indices = sorted(range(n), key=lambda i: boxes[i].x)
+    sorted_indices = sorted(range(n), key=lambda i: box_x[i])
 
     # Build constraints from left-to-right ordering
     constraints: list[CompactionConstraint] = []
@@ -135,36 +143,20 @@ def compact_horizontal(
         left_idx = sorted_indices[i]
         right_idx = sorted_indices[i + 1]
 
-        left_box = boxes[left_idx]
-        right_box = boxes[right_idx]
-
         # Check if they overlap vertically (need horizontal separation)
-        if _boxes_overlap_vertically(left_box, right_box):
+        # Using cached bounds instead of property access
+        if not (box_bottom[left_idx] < box_top[right_idx] or
+                box_bottom[right_idx] < box_top[left_idx]):
             # Gap = half of left width + separation + half of right width
-            gap = left_box.width / 2 + node_separation + right_box.width / 2
+            gap = box_width[left_idx] / 2 + node_separation + box_width[right_idx] / 2
             constraints.append(CompactionConstraint(
                 left=left_idx,
                 right=right_idx,
                 gap=gap,
             ))
 
-    # Add constraints from edge bends
-    # Edges passing between nodes need space
-    for edge in edges:
-        for bend in edge.bends:
-            if isinstance(bend, tuple) and len(bend) == 2:
-                bx, by = bend
-                # Find nodes that this bend passes between
-                for i in range(n):
-                    box = boxes[i]
-                    # If bend is horizontally adjacent to node
-                    if (box.top <= by <= box.bottom and
-                        abs(bx - box.right) < node_separation):
-                        # Need separation between node and bend channel
-                        pass  # Simplified: rely on node separation
-
     # Initial positions
-    initial_x = [box.x for box in boxes]
+    initial_x = box_x[:]
 
     # Solve constraints
     solver = CompactionSolver(n, initial_x, constraints)
@@ -172,7 +164,7 @@ def compact_horizontal(
 
     # Shift to minimize total width (move everything left as much as possible)
     if new_x:
-        min_x = min(new_x[i] - boxes[i].width / 2 for i in range(n))
+        min_x = min(new_x[i] - box_width[i] / 2 for i in range(n))
         # Don't shift into negative, but minimize whitespace on left
         if min_x > node_separation:
             shift = min_x - node_separation
@@ -203,8 +195,16 @@ def compact_vertical(
     if n == 0:
         return []
 
+    # Pre-cache box bounds for performance (avoid repeated property access)
+    box_x = [box.x for box in boxes]
+    box_y = [box.y for box in boxes]
+    box_width = [box.width for box in boxes]
+    box_height = [box.height for box in boxes]
+    box_left = [box_x[i] - box_width[i] / 2 for i in range(n)]
+    box_right = [box_x[i] + box_width[i] / 2 for i in range(n)]
+
     # Sort boxes by y-coordinate to establish ordering
-    sorted_indices = sorted(range(n), key=lambda i: boxes[i].y)
+    sorted_indices = sorted(range(n), key=lambda i: box_y[i])
 
     # Build constraints from top-to-bottom ordering
     constraints: list[CompactionConstraint] = []
@@ -213,13 +213,12 @@ def compact_vertical(
         top_idx = sorted_indices[i]
         bottom_idx = sorted_indices[i + 1]
 
-        top_box = boxes[top_idx]
-        bottom_box = boxes[bottom_idx]
-
         # Check if they overlap horizontally (need vertical separation)
-        if _boxes_overlap_horizontally(top_box, bottom_box):
+        # Using cached bounds instead of property access
+        if not (box_right[top_idx] < box_left[bottom_idx] or
+                box_right[bottom_idx] < box_left[top_idx]):
             # Gap = half of top height + separation + half of bottom height
-            gap = top_box.height / 2 + layer_separation + bottom_box.height / 2
+            gap = box_height[top_idx] / 2 + layer_separation + box_height[bottom_idx] / 2
             constraints.append(CompactionConstraint(
                 left=top_idx,
                 right=bottom_idx,
@@ -227,7 +226,7 @@ def compact_vertical(
             ))
 
     # Initial positions
-    initial_y = [box.y for box in boxes]
+    initial_y = box_y[:]
 
     # Solve constraints
     solver = CompactionSolver(n, initial_y, constraints)
@@ -235,7 +234,7 @@ def compact_vertical(
 
     # Shift to minimize total height
     if new_y:
-        min_y = min(new_y[i] - boxes[i].height / 2 for i in range(n))
+        min_y = min(new_y[i] - box_height[i] / 2 for i in range(n))
         if min_y > layer_separation:
             shift = min_y - layer_separation
             new_y = [y - shift for y in new_y]

@@ -10,6 +10,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+# Try to import Cython-optimized functions
+try:
+    from .._speedups import _segments_intersect, _find_edge_crossings
+    _USE_CYTHON = True
+except ImportError:
+    _USE_CYTHON = False
+
 
 @dataclass
 class CrossingVertex:
@@ -54,15 +61,16 @@ class PlanarizedGraph:
         return node >= self.num_original_nodes
 
 
-def segments_intersect(
+def _segments_intersect_py(
     p1: tuple[float, float],
     p2: tuple[float, float],
     p3: tuple[float, float],
     p4: tuple[float, float],
 ) -> Optional[tuple[float, float]]:
     """
-    Check if two line segments intersect and return intersection point.
+    Pure Python implementation of segment intersection.
 
+    Check if two line segments intersect and return intersection point.
     Segments are (p1, p2) and (p3, p4).
 
     Returns:
@@ -93,11 +101,33 @@ def segments_intersect(
     return None
 
 
-def find_edge_crossings(
+def segments_intersect(
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[float, float],
+    p4: tuple[float, float],
+) -> Optional[tuple[float, float]]:
+    """
+    Check if two line segments intersect and return intersection point.
+
+    Uses Cython-optimized implementation when available.
+    Segments are (p1, p2) and (p3, p4).
+
+    Returns:
+        Intersection point (x, y) if segments intersect, None otherwise
+    """
+    if _USE_CYTHON:
+        return _segments_intersect(p1[0], p1[1], p2[0], p2[1], p3[0], p3[1], p4[0], p4[1])
+    return _segments_intersect_py(p1, p2, p3, p4)
+
+
+def _find_edge_crossings_py(
     positions: list[tuple[float, float]],
     edges: list[tuple[int, int]],
 ) -> list[tuple[int, int, float, float]]:
     """
+    Pure Python implementation of edge crossing detection.
+
     Find all edge crossings in a graph with given positions.
 
     Args:
@@ -124,11 +154,32 @@ def find_edge_crossings(
             p3 = positions[s2]
             p4 = positions[t2]
 
-            intersection = segments_intersect(p1, p2, p3, p4)
+            intersection = _segments_intersect_py(p1, p2, p3, p4)
             if intersection:
                 crossings.append((i, j, intersection[0], intersection[1]))
 
     return crossings
+
+
+def find_edge_crossings(
+    positions: list[tuple[float, float]],
+    edges: list[tuple[int, int]],
+) -> list[tuple[int, int, float, float]]:
+    """
+    Find all edge crossings in a graph with given positions.
+
+    Uses Cython-optimized implementation when available.
+
+    Args:
+        positions: List of (x, y) positions for each node
+        edges: List of (source, target) edges
+
+    Returns:
+        List of (edge1_idx, edge2_idx, cross_x, cross_y) for each crossing
+    """
+    if _USE_CYTHON:
+        return _find_edge_crossings(positions, edges)
+    return _find_edge_crossings_py(positions, edges)
 
 
 def planarize_graph(

@@ -1,8 +1,8 @@
-# Kandinsky Orthogonal Layout Implementation Plan
+# Kandinsky Orthogonal Layout Implementation
 
 ## Overview
 
-The Kandinsky model is an orthogonal graph drawing algorithm that handles graphs with vertices of arbitrary degree (unlike GIOTTO which is limited to degree ≤ 4). It uses the **Topology-Shape-Metrics (TSM)** approach with three phases.
+The Kandinsky model is an orthogonal graph drawing algorithm that handles graphs with vertices of arbitrary degree (unlike GIOTTO which is limited to degree ≤ 4). It uses the **Topology-Shape-Metrics (TSM)** approach with multiple phases.
 
 ## Algorithm Background
 
@@ -19,227 +19,326 @@ The Kandinsky model is an orthogonal graph drawing algorithm that handles graphs
 - Tamassia (1987): Min-cost flow for orthogonal drawings
 - Eiglsperger (2003): 2-approximation algorithm for Kandinsky bend minimization
 
-## The Three Phases (TSM Approach)
-
-### Phase 1: Planarization
-
-**Goal**: Convert input graph to a planar embedding
-
-**Steps**:
-1. If graph is already planar, compute planar embedding
-2. If non-planar, insert dummy "crossing vertices" where edges cross
-3. Use planarity testing (Boyer-Myrvold or similar)
-
-**Output**: Planar embedding with faces identified
-
-### Phase 2: Orthogonalization
-
-**Goal**: Assign orthogonal shape (angles and bends) to edges
-
-**The Orthogonal Representation**:
-- For each edge at each vertex: assign angle (90°, 180°, 270°, or 0° for Kandinsky)
-- For each edge: assign number of bends and their directions
-- Constraint: angles around each vertex sum to 360°
-- Constraint: angles around each face sum to (n-2)×180° for inner faces
-
-**Kandinsky-Specific**:
-- Allows 0° angles between consecutive edges (needed for degree > 4)
-- Multiple edges can exit from same side of a vertex
-- Uses "port" concept: edges grouped by exit side
-
-**Min-Cost Flow Formulation** (Tamassia):
-```
-- Vertices supply flow: 4 - degree(v)
-- Faces consume flow: #vertices_on_face - 4 (inner), +4 (outer)
-- Arc (v, F): capacity 2, cost 0 (corner angles)
-- Arc (F, F'): capacity 4, cost 1 (bends on edge between faces)
-```
-
-**For Kandinsky**: Use 2-approximation algorithm since exact is NP-complete
-
-### Phase 3: Compaction
-
-**Goal**: Assign x,y coordinates minimizing area/edge length
-
-**Approach**:
-1. Build constraint graph for horizontal segments
-2. Build constraint graph for vertical segments
-3. Compute coordinates via longest path or ILP
-
-**Output**: Final (x, y) coordinates for all vertices
-
-## Implementation Plan
+## Implementation
 
 ### File Structure
 
 ```
-src/graph_layout/
-├── orthogonal/
-│   ├── __init__.py
-│   ├── kandinsky.py           # Main KandinskyLayout class
-│   ├── planarization.py       # Phase 1: Planarization
-│   ├── orthogonalization.py   # Phase 2: Orthogonal representation
-│   ├── compaction.py          # Phase 3: Coordinate assignment
-│   ├── planarity.py           # Planarity testing utilities
-│   └── types.py               # OrthogonalRep, Face, Port, etc.
+src/graph_layout/orthogonal/
+├── __init__.py              # Module exports
+├── kandinsky.py             # Main KandinskyLayout class
+├── types.py                 # Core data structures (Side, Port, NodeBox, OrthogonalEdge)
+├── planarization.py         # Edge crossing detection and vertex insertion
+├── orthogonalization.py     # Bend minimization via min-cost flow (Tamassia)
+└── compaction.py            # Constraint-based layout compaction
 ```
 
-### Data Structures
+### Data Structures (`types.py`)
+
+```python
+class Side(Enum):
+    """Side of a node box."""
+    NORTH = "north"
+    SOUTH = "south"
+    EAST = "east"
+    WEST = "west"
+
+@dataclass
+class Port:
+    """A connection point on a node side."""
+    node: int           # Node index
+    side: Side          # Which side of the node
+    edge: int           # Edge index using this port
+    offset: float = 0.0 # Position along the side
+
+@dataclass
+class NodeBox:
+    """A node represented as a rectangle."""
+    index: int
+    x: float            # Center x
+    y: float            # Center y
+    width: float
+    height: float
+
+    @property
+    def left(self) -> float: ...
+    @property
+    def right(self) -> float: ...
+    @property
+    def top(self) -> float: ...
+    @property
+    def bottom(self) -> float: ...
+
+    def get_port_position(self, side: Side) -> tuple[float, float]: ...
+
+@dataclass
+class OrthogonalEdge:
+    """An edge with orthogonal routing."""
+    source: int
+    target: int
+    source_port: Port
+    target_port: Port
+    bends: list[tuple[float, float]]  # Bend point coordinates
+```
+
+### Planarization (`planarization.py`)
+
+Handles non-planar graphs by detecting edge crossings and inserting dummy vertices.
 
 ```python
 @dataclass
-class Port:
-    """A port where edges connect to a vertex side."""
-    vertex: int
-    side: Literal["north", "south", "east", "west"]
-    edges: list[int]  # Edge indices using this port
+class CrossingVertex:
+    """A dummy vertex at an edge crossing."""
+    index: int
+    x: float
+    y: float
+    edge1: tuple[int, int]
+    edge2: tuple[int, int]
 
 @dataclass
-class OrthogonalRep:
-    """Orthogonal representation of a graph."""
-    # For each vertex: list of (edge, angle) in clockwise order
-    vertex_angles: dict[int, list[tuple[int, int]]]  # angle in {0, 90, 180, 270}
-    # For each edge: list of bend angles
-    edge_bends: dict[int, list[int]]  # +1 = left turn, -1 = right turn
+class PlanarizedGraph:
+    """Result of planarizing a graph."""
+    num_original_nodes: int
+    num_total_nodes: int
+    edges: list[tuple[int, int]]
+    crossings: list[CrossingVertex]
+    edge_to_original: dict[int, int]
+    original_to_edges: dict[int, list[int]]
+
+def segments_intersect(p1, p2, p3, p4) -> Optional[tuple[float, float]]:
+    """Check if two line segments intersect. Uses Cython when available."""
+
+def find_edge_crossings(positions, edges) -> list[tuple[int, int, float, float]]:
+    """Find all edge crossings. Uses Cython when available."""
+
+def planarize_graph(num_nodes, edges, positions) -> PlanarizedGraph:
+    """Insert crossing vertices at edge intersections."""
+```
+
+### Orthogonalization (`orthogonalization.py`)
+
+Implements bend minimization using Tamassia's min-cost flow formulation.
+
+```python
+@dataclass
+class OrthogonalRepresentation:
+    """Orthogonal representation storing angles and bends."""
+    vertex_face_angles: dict[tuple[int, int], int]  # (vertex, face) -> angle units
+    edge_bends: dict[tuple[int, int], list[int]]    # (u, v) -> bend directions
+
+    @property
+    def total_bends(self) -> int: ...
 
 @dataclass
 class Face:
     """A face in the planar embedding."""
-    vertices: list[int]  # Vertices in order around face
-    edges: list[int]     # Edges in order around face
-    is_outer: bool
+    index: int
+    vertices: list[int]
+    edges: list[tuple[int, int]]
+    is_outer: bool = False
 
 @dataclass
-class PlanarEmbedding:
-    """Planar embedding with faces."""
-    adj_order: dict[int, list[int]]  # Clockwise edge order at each vertex
+class FlowNetwork:
+    """Min-cost flow network for orthogonalization."""
+    num_vertices: int
     faces: list[Face]
-    outer_face: int  # Index of outer face
+    supplies: dict[int, int]           # Node supplies/demands
+    arcs: dict[tuple[int, int], tuple[int, int]]  # (cap, cost)
+    flow: dict[tuple[int, int], int]   # Solution
+
+def compute_faces(num_nodes, edges, positions) -> list[Face]:
+    """Compute faces of planar embedding with angular ordering."""
+
+def build_flow_network(num_nodes, edges, faces) -> FlowNetwork:
+    """Build min-cost flow network for orthogonalization."""
+
+def solve_min_cost_flow_simple(network) -> bool:
+    """Solve using successive shortest path algorithm."""
+
+def compute_orthogonal_representation(num_nodes, edges, positions) -> OrthogonalRepresentation:
+    """Main entry point - compute optimal orthogonal representation."""
 ```
 
-### Class: KandinskyLayout
+### Compaction (`compaction.py`)
+
+Reduces layout area while maintaining constraints.
+
+```python
+@dataclass
+class CompactionConstraint:
+    """A separation constraint: left + gap <= right."""
+    left: int
+    right: int
+    gap: float
+    is_hard: bool = True
+
+@dataclass
+class CompactionResult:
+    """Result of compaction."""
+    node_positions: list[tuple[float, float]]
+    width: float
+    height: float
+    iterations: int
+
+class CompactionSolver:
+    """Iterative relaxation solver for constraints."""
+    def solve(self) -> tuple[list[float], int]: ...
+
+def compact_horizontal(boxes, edges, node_separation, edge_separation) -> list[float]:
+    """Compact horizontally, returns new x-coordinates."""
+
+def compact_vertical(boxes, edges, layer_separation, edge_separation) -> list[float]:
+    """Compact vertically, returns new y-coordinates."""
+
+def compact_layout(boxes, edges, ...) -> CompactionResult:
+    """Full two-pass compaction (horizontal then vertical)."""
+```
+
+### Main Layout Class (`kandinsky.py`)
 
 ```python
 class KandinskyLayout(StaticLayout):
     """
     Kandinsky orthogonal layout algorithm.
 
-    Produces orthogonal drawings where edges use only horizontal
-    and vertical segments. Suitable for UML, ER diagrams, flowcharts.
-
     Parameters:
-        node_width: Width of node boxes (default: 40)
-        node_height: Height of node boxes (default: 30)
-        node_separation: Minimum gap between nodes (default: 40)
-        edge_separation: Minimum gap between parallel edges (default: 10)
-        bend_cost: Weight for bend minimization (default: 1.0)
-        compaction: Compaction strategy ("longest_path" or "ilp")
+        node_width: Width of node boxes (default: 60)
+        node_height: Height of node boxes (default: 40)
+        node_separation: Minimum gap between nodes (default: 60)
+        edge_separation: Minimum gap between parallel edges (default: 15)
+        layer_separation: Vertical gap between layers (default: 80)
+        handle_crossings: Detect and handle edge crossings (default: True)
+        optimize_bends: Use min-cost flow for bend minimization (default: True)
+        compact: Apply compaction to reduce area (default: True)
+
+    Properties:
+        orthogonal_edges: List of OrthogonalEdge with routing info
+        node_boxes: List of NodeBox with position/size info
+        crossing_vertices: List of CrossingVertex (dummy nodes)
+        num_crossings: Number of edge crossings detected
+        orthogonal_rep: The computed OrthogonalRepresentation
+        compaction_result: The CompactionResult
+        total_bends: Total number of bends across all edges
     """
 ```
 
-### Implementation Phases
-
-#### Phase 1: MVP (Simplified)
-
-1. **Assume planar input** (skip planarization)
-2. **Simple orthogonalization**:
-   - Assign ports based on relative positions
-   - Use greedy bend assignment
-3. **Grid compaction**:
-   - Place nodes on integer grid
-   - Route edges with simple pathfinding
-
-**Deliverable**: Working layout for simple planar graphs
-
-#### Phase 2: Full Planarization
-
-1. Implement planarity testing (or use existing library)
-2. Implement crossing vertex insertion
-3. Handle non-planar graphs
-
-#### Phase 3: Optimal Orthogonalization
-
-1. Implement min-cost flow formulation
-2. Implement Kandinsky 2-approximation
-3. Better bend minimization
-
-#### Phase 4: Advanced Compaction
-
-1. Constraint-based compaction
-2. ILP-based optimal compaction (optional)
-3. Edge routing improvements
-
-### Algorithm Pseudocode
+## Algorithm Flow
 
 ```
-KANDINSKY_LAYOUT(G, width, height):
-    # Phase 1: Planarization
-    if not is_planar(G):
-        G_planar, crossings = planarize(G)
-    else:
-        G_planar = G
-        crossings = []
+KandinskyLayout._compute():
+    1. Layer Assignment
+       - Topological ordering using longest path
+       - Nodes assigned to layers based on DAG structure
 
-    embedding = compute_planar_embedding(G_planar)
-    faces = compute_faces(embedding)
+    2. Node Positioning
+       - Position nodes on grid based on layers
+       - Center layout within canvas
 
-    # Phase 2: Orthogonalization
-    ortho_rep = compute_orthogonal_rep(G_planar, embedding, faces)
+    3. Planarization (if handle_crossings=True)
+       - Find all edge crossings using segment intersection
+       - Insert CrossingVertex at each crossing point
+       - Split edges through crossing vertices
 
-    # Phase 3: Compaction
-    coordinates = compact(ortho_rep, width, height)
+    4. Orthogonalization (if optimize_bends=True)
+       - Compute faces of planar embedding
+       - Build min-cost flow network
+       - Solve for optimal angle/bend assignment
+       - Extract OrthogonalRepresentation
 
-    # Map back crossing vertices to edge bends
-    coordinates = restore_crossings(coordinates, crossings)
+    5. Compaction (if compact=True)
+       - Horizontal pass: minimize width
+       - Vertical pass: minimize height
+       - Update node positions
 
-    return coordinates
+    6. Edge Routing
+       - Determine port sides based on relative positions
+       - Compute orthogonal routes with bends
+       - Create OrthogonalEdge objects
 ```
 
-### Edge Routing
+## Performance
 
-For edges between vertices:
-1. Determine exit port (N/S/E/W) based on orthogonal rep
-2. Route using only horizontal/vertical segments
-3. Insert bends as needed
-4. Avoid crossing other edges and nodes
+The implementation includes several optimizations:
 
-### Test Cases
+### Pure Python Optimizations
+- **Cached box bounds**: Pre-compute `top`, `bottom`, `left`, `right` to avoid repeated property access
+- **Removed redundant loops**: Eliminated O(n×edges×bends) loop in compaction
 
-1. **Simple graphs**: Path, cycle, tree
-2. **Planar graphs**: K4, grid, outerplanar
-3. **High-degree vertices**: Star graph, complete bipartite
-4. **Real-world examples**: Simple UML class diagram, ER diagram
+### Cython Optimizations (`_speedups.pyx`)
+- `_segments_intersect()`: Fast line segment intersection
+- `_find_edge_crossings()`: O(m²) crossing detection
 
-### Dependencies
+### Benchmark Results
 
-- May need: NetworkX for planarity testing (optional, can implement)
-- Existing: NumPy for coordinate calculations
+| Graph Size | Time |
+|------------|------|
+| 100 nodes, 224 edges | 0.045s |
+| 500 nodes, 1230 edges | 0.78s |
+| 1000 nodes, 2495 edges | 3.63s |
 
-### Complexity
+**Optimization impact**: 42x speedup from initial implementation (151s → 3.6s for 1000 nodes)
 
-- Planarization: O(n²) worst case for crossing minimization
-- Orthogonalization: O(n²) for flow network
-- Compaction: O(n) for longest path, higher for ILP
+## Test Coverage
 
-### Open Questions
+65 tests in `tests/test_kandinsky.py` covering:
+- Basic functionality (layout runs, positions assigned)
+- Configuration properties
+- Layer assignment
+- Edge routing and bends
+- Event system
+- NodeBox and Side utilities
+- Segment intersection
+- Edge crossing detection
+- Graph planarization
+- Face computation
+- Orthogonal representation
+- Compaction
 
-1. Should we use NetworkX for planarity testing or implement our own?
-2. How to handle disconnected graphs?
-3. Should edge labels be considered?
-4. Port constraints from user (e.g., "edge must exit from north")?
+## Usage Example
+
+```python
+from graph_layout import KandinskyLayout
+
+nodes = [{} for _ in range(5)]
+links = [
+    {"source": 0, "target": 1},
+    {"source": 1, "target": 2},
+    {"source": 2, "target": 3},
+    {"source": 3, "target": 4},
+]
+
+layout = KandinskyLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    node_width=60,
+    node_height=40,
+    handle_crossings=True,
+    optimize_bends=True,
+    compact=True,
+)
+layout.run()
+
+# Access results
+for edge in layout.orthogonal_edges:
+    print(f"Edge {edge.source}->{edge.target}: {len(edge.bends)} bends")
+
+print(f"Total bends: {layout.total_bends}")
+print(f"Edge crossings: {layout.num_crossings}")
+```
+
+## Future Improvements
+
+Potential enhancements:
+1. **ILP-based compaction**: Optimal area minimization (currently uses heuristic)
+2. **Port constraints**: Allow user to specify edge exit sides
+3. **Edge labels**: Consider label placement in routing
+4. **Incremental layout**: Support for dynamic graph updates
+5. **More Cython optimization**: Optimize `solve_min_cost_flow_simple()` and `_route_planarized_edges()`
 
 ## References
 
 - [Orthogonal Graph Drawing with Constraints](https://publikationen.uni-tuebingen.de/xmlui/bitstream/handle/10900/49366/pdf/diss.pdf) - Comprehensive thesis
 - [Implementing an Algorithm for Orthogonal Graph Layout](https://rtsys.informatik.uni-kiel.de/~biblio/downloads/theses/ocl-bt.pdf) - Implementation guide
-- [yFiles Orthogonal Layout](https://www.yfiles.com/the-yfiles-sdk/features/automatic-layouts/orthogonal-layout) - Commercial reference
-- [Tom Sawyer Orthogonal Drawing Models](https://blog.tomsawyer.com/orthogonal-drawing-models) - Model comparison
 - [OGDF Library](https://ogdf.uos.de/) - Open source C++ implementation
-
-## Milestones
-
-1. **Week 1**: Data structures, simple grid placement (no bends)
-2. **Week 2**: Basic orthogonalization with greedy bends
-3. **Week 3**: Proper min-cost flow orthogonalization
-4. **Week 4**: Planarization for non-planar graphs
-5. **Week 5**: Compaction improvements, testing, documentation
+- Tamassia, R. (1987). "On embedding a graph in the grid with the minimum number of bends"

@@ -205,7 +205,7 @@ layout.run()
 
 ### Orthogonal Layout (Kandinsky)
 
-Kandinsky layout produces diagrams where all edges use only horizontal and vertical segments. Ideal for UML diagrams, flowcharts, and ER diagrams:
+Kandinsky layout produces diagrams where all edges use only horizontal and vertical segments. Ideal for UML diagrams, flowcharts, and ER diagrams. Uses a TSM (Topology-Shape-Metrics) approach:
 
 ```python
 from graph_layout import KandinskyLayout
@@ -217,12 +217,19 @@ layout = KandinskyLayout(
     node_width=60,
     node_height=40,
     node_separation=60,
+    handle_crossings=True,   # Insert crossing vertices for non-planar graphs
+    optimize_bends=True,     # Minimize bends using min-cost flow
+    compact=True,            # Compact layout to reduce area
 )
 layout.run()
 
 # Access edge routing information
 for edge in layout.orthogonal_edges:
     print(f"Edge {edge.source}->{edge.target}: {len(edge.bends)} bends")
+
+# Check crossing information
+print(f"Edge crossings detected: {layout.num_crossings}")
+print(f"Total bends: {layout.total_bends}")
 ```
 
 ## Visualization
@@ -251,7 +258,7 @@ This creates images in `./build/` showing each algorithm's output.
 | **Circular** | Ring structures, cycles | O(n) | Simple, predictable |
 | **Shell** | Grouped/stratified data | O(n) | Degree-based grouping |
 | **Spectral** | Clustering visualization | O(n^3) eigendecomp | Reveals structure |
-| **Kandinsky** | UML, flowcharts, ER diagrams | O(n²) | Orthogonal edges, any degree |
+| **Kandinsky** | UML, flowcharts, ER diagrams | O(m²) | Orthogonal edges, bend minimization, compaction |
 
 ## Advanced Features
 
@@ -385,7 +392,11 @@ graph_layout/
     spectral/                # Spectral methods
         spectral.py
     orthogonal/              # Orthogonal layouts
-        kandinsky.py         # Kandinsky orthogonal layout
+        kandinsky.py         # Main Kandinsky layout class
+        types.py             # NodeBox, Port, OrthogonalEdge, Side
+        planarization.py     # Edge crossing detection and vertex insertion
+        orthogonalization.py # Bend minimization via min-cost flow
+        compaction.py        # Layout area minimization
 ```
 
 ## Performance
@@ -415,8 +426,9 @@ Benchmarks on random scale-free graphs (Barabási-Albert model), 50 iterations:
 | **Spectral** | 0.036s | 0.102s | 6.428s |
 | **Fruchterman-Reingold** | 0.059s | -- | -- |
 | **Kamada-Kawai** | 5.5s | -- | -- |
+| **Kandinsky** | 0.78s | 3.6s | -- |
 
-*Note: FR and KK use O(n²) and are too slow for graphs >500 nodes without Barnes-Hut.*
+*Note: FR and KK use O(n²) and are too slow for graphs >500 nodes without Barnes-Hut. Kandinsky uses O(m²) for edge crossing detection.*
 
 **Recommendations by graph size:**
 - **< 500 nodes**: Any algorithm works well
@@ -464,6 +476,7 @@ make qa            # Run all qualtiy checks
 - **Yifan Hu**: Based on "Efficient and High Quality Force-Directed Graph Drawing" (2005)
 - **Sugiyama**: Based on "Methods for Visual Understanding of Hierarchical System Structures" (1981)
 - **Reingold-Tilford**: Based on "Tidier Drawings of Trees" (1981)
+- **Kandinsky**: Based on the Kandinsky model and Tamassia's bend minimization algorithm (1987)
 
 ## License
 

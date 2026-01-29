@@ -47,7 +47,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `RoutingGrid`: Grid for edge routing
 
 - **Test suite for Kandinsky** (`tests/test_kandinsky.py`):
-  - 41 tests covering basic functionality, configuration, layering, edge routing, events, planarization
+  - 65 tests covering basic functionality, configuration, layering, edge routing, events
+  - Tests for planarization, orthogonalization, and compaction phases
 
 - **Kandinsky Planarization** (`orthogonal/planarization.py`):
   - `segments_intersect()`: Detect intersection point of two line segments
@@ -82,9 +83,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `compact_vertical()`: Vertical compaction pass
   - `compact_layout()`: Full two-pass compaction (horizontal then vertical)
   - New KandinskyLayout property: `compact` to enable area minimization
-  - New property: `compaction_result` to access compaction metrics
-  - Maintains node separation and edge routing constraints
-  - Preserves relative node ordering while reducing whitespace
+
+- **Cython-optimized Kandinsky functions** in `_speedups.pyx`:
+  - `_segments_intersect()`: Fast line segment intersection detection
+  - `_find_edge_crossings()`: O(m²) edge crossing detection with Cython speedup
+  - Automatic fallback to pure Python when Cython unavailable
 
 - **Yifan Hu Multilevel layout algorithm** (`force/yifan_hu.py`):
   - Based on "Efficient and High Quality Force-Directed Graph Drawing" by Yifan Hu (2005)
@@ -144,6 +147,16 @@ Cython speedups over pure Python (200 nodes, 50 iterations):
 | Yifan Hu | **5-7x faster** |
 
 ForceAtlas2 and Yifan Hu use Barnes-Hut O(n log n) by default for graphs >50 nodes. Yifan Hu is fastest for large graphs due to multilevel coarsening reducing the problem size before force calculation.
+
+Kandinsky orthogonal layout performance (with Cython optimization):
+
+| Graph Size | Time |
+|------------|------|
+| 100 nodes, 224 edges | 0.045s |
+| 500 nodes, 1230 edges | 0.78s |
+| 1000 nodes, 2495 edges | 3.63s |
+
+Initial implementation was 42x slower (151s for 1000 nodes). Optimizations: (1) cached box bounds to avoid repeated property access, (2) removed O(n×m×bends) redundant loop, (3) Cython-optimized edge crossing detection.
 
 ## [0.1.6] - Unified Cython Speedups and PyPI Publishing
 

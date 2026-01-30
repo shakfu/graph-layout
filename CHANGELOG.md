@@ -17,6 +17,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+## [0.1.7]
+
+### Fixed
+
+- **Type annotations** for clean `make typecheck`:
+  - Added `cast()` for Cython function returns in `planarization.py` (segments_intersect, find_edge_crossings)
+  - Added `cast()` for link attribute access in `preprocessing.py` (_default_get_source, _default_get_target)
+  - Added generic type parameters to `yifan_hu.py` (dict -> dict[str, Any] for coarsening hierarchy)
+  - Extended mypy `ignore_errors` for legacy cola modules (linklengths, handledisconnected, geom, rectangle, powergraph, layout3d, adapter)
+  - Added ruff N806 exception for `orthogonal/*.py` to allow mathematical variable names in ILP formulation
+
 ### Added
 
 - **Port Constraints for Kandinsky** (`orthogonal/kandinsky.py`):
@@ -51,19 +62,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - 3x3 Grid and Ladder Graph examples for GIOTTO algorithm
   - Kandinsky (ILP) layout variant
   - Updated legend with new features section
-
-### Fixed
-
-- **Type annotations** for clean `make typecheck`:
-  - Added `cast()` for Cython function returns in `planarization.py` (segments_intersect, find_edge_crossings)
-  - Added `cast()` for link attribute access in `preprocessing.py` (_default_get_source, _default_get_target)
-  - Added generic type parameters to `yifan_hu.py` (dict -> dict[str, Any] for coarsening hierarchy)
-  - Extended mypy `ignore_errors` for legacy cola modules (linklengths, handledisconnected, geom, rectangle, powergraph, layout3d, adapter)
-  - Added ruff N806 exception for `orthogonal/*.py` to allow mathematical variable names in ILP formulation
-
-## [0.1.7]
-
-### Added
 
 - **Graph showcase script** (`scripts/showcase.py`):
   - Creates a html 'showcase' page of svg graphs before and after the application of the various layout algorithms in the package.

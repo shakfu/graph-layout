@@ -93,7 +93,7 @@ check:
 
 # Run mypy type checking
 typecheck:
-	@uv run mypy $(SRC_DIR)
+	@uv run mypy --strict $(SRC_DIR)
 
 # Fix formatting and linting issues automatically
 fix:

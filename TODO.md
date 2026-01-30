@@ -2,22 +2,6 @@
 
 ## High Priority
 
-### Bipartite Layout (Complete)
-
-Two parallel rows/columns for bipartite graphs.
-
-1. **BipartiteLayout** [x] Fully implemented (`bipartite/bipartite.py`)
-   - Automatic bipartite detection using BFS coloring
-   - User-specified sets support (top_set, bottom_set)
-   - Edge crossing minimization using barycenter heuristic
-   - Horizontal (top/bottom rows) or vertical (left/right columns) orientation
-   - Configurable layer_separation and node_separation
-   - Utility functions: `is_bipartite()`, `count_crossings()`
-   - `count_crossings()` optimized from O(m²) to O(m log m) using merge sort inversion counting (188x speedup for 10k edges)
-   - 29 tests covering detection, minimization, configuration
-
----
-
 ## Medium Priority
 
 ### Orthogonal Layout (Complete)

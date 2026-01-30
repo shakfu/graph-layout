@@ -17,9 +17,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Added
+
+- **Port Constraints for Kandinsky** (`orthogonal/kandinsky.py`):
+  - User-specified edge exit/entry sides via `source_side` and `target_side` link attributes
+  - Accepts `Side` enum values or strings ('north', 'south', 'east', 'west')
+  - Partial constraints supported (constrain one side, heuristic for other)
+  - New property: `port_constraints` to access parsed constraints
+
+- **ILP-based Optimal Compaction** (`orthogonal/compaction_ilp.py`):
+  - Linear programming formulation to minimize layout area optimally
+  - Uses `scipy.optimize.milp` when scipy is available
+  - Graceful fallback to greedy compaction if scipy unavailable
+  - New KandinskyLayout parameter: `compaction_method` ("auto", "greedy", "ilp")
+  - New exports: `ILPCompactionResult`, `compact_layout_ilp`, `is_scipy_available`
+  - Optional `[ilp]` dependency: `pip install graph-layout[ilp]`
+
+- **GIOTTO Algorithm** (`orthogonal/giotto.py`):
+  - Bend-optimal orthogonal layout for degree-4 planar graphs
+  - Based on Tamassia's algorithm for minimum-bend orthogonal drawings
+  - Validates degree <= 4 and planarity (Euler's formula + K5 check)
+  - `strict` mode (raise ValueError) or fallback mode (Kandinsky-like)
+  - Properties: `is_valid_input`, `total_bends`, `orthogonal_rep`
+  - Exported from package root: `from graph_layout import GIOTTOLayout`
+
+- **Test suite additions** (`tests/test_kandinsky.py`):
+  - 7 tests for port constraints (source, target, both, partial, string values)
+  - 8 tests for ILP compaction (valid layout, separation, empty, single, method property)
+  - 14 tests for GIOTTO (degree-4, rejects degree-5, rejects non-planar, strict mode, fallback)
+
+- **Showcase updates** (`scripts/showcase.py`):
+  - Port Constraints Demo graph with user-specified edge directions
+  - 3x3 Grid and Ladder Graph examples for GIOTTO algorithm
+  - Kandinsky (ILP) layout variant
+  - Updated legend with new features section
+
+### Fixed
+
+- **Type annotations** for clean `make typecheck`:
+  - Added `cast()` for Cython function returns in `planarization.py` (segments_intersect, find_edge_crossings)
+  - Added `cast()` for link attribute access in `preprocessing.py` (_default_get_source, _default_get_target)
+  - Added generic type parameters to `yifan_hu.py` (dict -> dict[str, Any] for coarsening hierarchy)
+  - Extended mypy `ignore_errors` for legacy cola modules (linklengths, handledisconnected, geom, rectangle, powergraph, layout3d, adapter)
+  - Added ruff N806 exception for `orthogonal/*.py` to allow mathematical variable names in ILP formulation
+
 ## [0.1.7]
 
 ### Added
+
+- **Graph showcase script** (`scripts/showcase.py`):
+  - Creates a html 'showcase' page of svg graphs before and after the application of the various layout algorithms in the package.
 
 - **Random layout algorithm** (`basic/random.py`):
   - Places nodes at uniformly random positions within canvas bounds

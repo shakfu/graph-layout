@@ -67,7 +67,7 @@ from .metrics import (
 )
 
 # Orthogonal layouts
-from .orthogonal import KandinskyLayout
+from .orthogonal import GIOTTOLayout, KandinskyLayout
 
 # Preprocessing utilities
 from .preprocessing import (
@@ -156,6 +156,7 @@ __all__ = [
     # Spectral layouts
     "SpectralLayout",
     # Orthogonal layouts
+    "GIOTTOLayout",
     "KandinskyLayout",
     # Metrics
     "edge_crossings",

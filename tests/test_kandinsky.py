@@ -2,18 +2,23 @@
 Tests for Kandinsky orthogonal layout.
 """
 
-from graph_layout import KandinskyLayout
+import pytest
+
+from graph_layout import GIOTTOLayout, KandinskyLayout
 from graph_layout.orthogonal import (
     CompactionResult,
+    ILPCompactionResult,
     NodeBox,
     OrthogonalRepresentation,
     Side,
     compact_horizontal,
     compact_layout,
+    compact_layout_ilp,
     compact_vertical,
     compute_faces,
     compute_orthogonal_representation,
     find_edge_crossings,
+    is_scipy_available,
     planarize_graph,
     segments_intersect,
 )
@@ -811,3 +816,358 @@ class TestKandinskyCompaction:
                 x_overlap = not (box1.right < box2.left or box2.right < box1.left)
                 y_overlap = not (box1.bottom < box2.top or box2.bottom < box1.top)
                 assert not (x_overlap and y_overlap), f"Nodes {i} and {j} overlap"
+
+
+class TestPortConstraints:
+    """Tests for user-specified port constraints."""
+
+    def test_source_side_constraint(self):
+        """Edge should exit from specified source side."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1, "source_side": Side.EAST}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        edge = layout.orthogonal_edges[0]
+        assert edge.source_port.side == Side.EAST
+
+    def test_target_side_constraint(self):
+        """Edge should enter from specified target side."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1, "target_side": Side.WEST}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        edge = layout.orthogonal_edges[0]
+        assert edge.target_port.side == Side.WEST
+
+    def test_both_sides_constrained(self):
+        """Both source and target sides should be constrained."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1, "source_side": Side.SOUTH, "target_side": Side.NORTH}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        edge = layout.orthogonal_edges[0]
+        assert edge.source_port.side == Side.SOUTH
+        assert edge.target_port.side == Side.NORTH
+
+    def test_partial_constraint_source_only(self):
+        """Source constrained, target uses heuristic."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1, "source_side": Side.NORTH}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        edge = layout.orthogonal_edges[0]
+        assert edge.source_port.side == Side.NORTH
+        # Target should be a valid side (heuristic-based)
+        assert edge.target_port.side in Side
+
+    def test_no_constraint_uses_heuristic(self):
+        """No constraint should use heuristic (default behavior)."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1}]  # No constraints
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        # Should complete without error and use heuristic
+        assert len(layout.orthogonal_edges) == 1
+        edge = layout.orthogonal_edges[0]
+        assert edge.source_port.side in Side
+        assert edge.target_port.side in Side
+
+    def test_string_side_constraint(self):
+        """String values should be accepted for side constraints."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1, "source_side": "east", "target_side": "west"}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        edge = layout.orthogonal_edges[0]
+        assert edge.source_port.side == Side.EAST
+        assert edge.target_port.side == Side.WEST
+
+    def test_port_constraints_property(self):
+        """Port constraints should be accessible."""
+        nodes = [{}, {}]
+        links = [{"source": 0, "target": 1, "source_side": Side.SOUTH}]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+
+        assert (0, 1) in layout.port_constraints
+        src_constraint, tgt_constraint = layout.port_constraints[(0, 1)]
+        assert src_constraint == Side.SOUTH
+        assert tgt_constraint is None
+
+
+class TestILPCompaction:
+    """Tests for ILP-based compaction."""
+
+    def test_ilp_produces_valid_layout(self):
+        """ILP compaction should produce valid layout without overlaps."""
+        boxes = [
+            NodeBox(index=0, x=100, y=100, width=60, height=40),
+            NodeBox(index=1, x=300, y=100, width=60, height=40),
+            NodeBox(index=2, x=200, y=300, width=60, height=40),
+        ]
+
+        result = compact_layout_ilp(boxes=boxes, edges=[], node_separation=60)
+
+        assert isinstance(result, ILPCompactionResult)
+        assert len(result.node_positions) == 3
+        assert result.width > 0
+        assert result.height > 0
+
+    def test_ilp_respects_separation(self):
+        """ILP compaction should maintain minimum separation."""
+        boxes = [
+            NodeBox(index=0, x=100, y=100, width=60, height=40),
+            NodeBox(index=1, x=500, y=100, width=60, height=40),
+        ]
+
+        result = compact_layout_ilp(boxes=boxes, edges=[], node_separation=60)
+
+        x0, y0 = result.node_positions[0]
+        x1, y1 = result.node_positions[1]
+
+        # Minimum horizontal separation: w1/2 + sep + w2/2 = 30 + 60 + 30 = 120
+        assert x1 - x0 >= 120 or abs(y1 - y0) > 40  # Either separated or not overlapping
+
+    def test_ilp_empty_graph(self):
+        """ILP compaction should handle empty input."""
+        result = compact_layout_ilp(boxes=[], edges=[])
+
+        assert result.optimal is True
+        assert result.solver_status == "empty_graph"
+        assert result.width == 0
+        assert result.height == 0
+
+    def test_ilp_single_node(self):
+        """ILP compaction should handle single node."""
+        boxes = [NodeBox(index=0, x=100, y=100, width=60, height=40)]
+
+        result = compact_layout_ilp(boxes=boxes, edges=[])
+
+        assert len(result.node_positions) == 1
+        assert result.width > 0
+        assert result.height > 0
+
+    def test_is_scipy_available_function(self):
+        """is_scipy_available should return bool."""
+        result = is_scipy_available()
+        assert isinstance(result, bool)
+
+    def test_compaction_method_property(self):
+        """compaction_method should be configurable."""
+        layout = KandinskyLayout(compaction_method="greedy")
+        assert layout.compaction_method == "greedy"
+
+        layout.compaction_method = "auto"
+        assert layout.compaction_method == "auto"
+
+        layout.compaction_method = "ilp"
+        assert layout.compaction_method == "ilp"
+
+    def test_invalid_compaction_method_raises(self):
+        """Invalid compaction method should raise ValueError."""
+        layout = KandinskyLayout()
+
+        with pytest.raises(ValueError):
+            layout.compaction_method = "invalid"
+
+    def test_greedy_compaction_method(self):
+        """Greedy compaction method should work."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+        ]
+
+        layout = KandinskyLayout(
+            nodes=nodes,
+            links=links,
+            size=(800, 600),
+            compact=True,
+            compaction_method="greedy",
+        )
+        layout.run()
+
+        assert layout.compaction_result is not None
+        assert len(layout.node_boxes) == 4
+
+
+class TestGIOTTOLayout:
+    """Tests for GIOTTO orthogonal layout algorithm."""
+
+    def test_degree_4_grid_graph(self):
+        """Valid degree-4 planar graph should produce layout."""
+        # 2x2 grid graph
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},  # Top edge
+            {"source": 2, "target": 3},  # Bottom edge
+            {"source": 0, "target": 2},  # Left edge
+            {"source": 1, "target": 3},  # Right edge
+        ]
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        assert layout.is_valid_input is True
+        assert len(layout.node_boxes) == 4
+        assert len(layout.orthogonal_edges) == 4
+
+    def test_rejects_degree_5(self):
+        """Degree > 4 should raise ValueError in strict mode."""
+        # Star graph with center having degree 5
+        nodes = [{} for _ in range(6)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 0, "target": 3},
+            {"source": 0, "target": 4},
+            {"source": 0, "target": 5},
+        ]
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600), strict=True)
+
+        with pytest.raises(ValueError, match="max degree 4"):
+            layout.run()
+
+    def test_rejects_non_planar_k5(self):
+        """K5 (complete graph on 5 vertices) should raise ValueError."""
+        # K5 - every pair of 5 vertices connected
+        nodes = [{} for _ in range(5)]
+        links = []
+        for i in range(5):
+            for j in range(i + 1, 5):
+                links.append({"source": i, "target": j})
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600), strict=True)
+
+        # K5 has 10 edges, which violates Euler's formula (E <= 3V - 6 = 9)
+        # So it will fail the planarity check first
+        with pytest.raises(ValueError, match="planar"):
+            layout.run()
+
+    def test_strict_false_fallback_degree_5(self):
+        """Degree > 4 should fall back to Kandinsky-like in non-strict mode."""
+        nodes = [{} for _ in range(6)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 0, "target": 3},
+            {"source": 0, "target": 4},
+            {"source": 0, "target": 5},
+        ]
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600), strict=False)
+        layout.run()
+
+        assert layout.is_valid_input is False
+        assert len(layout.node_boxes) == 6
+        # All nodes should have positions
+        for node in layout.nodes:
+            assert node.x is not None
+            assert node.y is not None
+
+    def test_strict_false_fallback_non_planar(self):
+        """Non-planar graph should fall back in non-strict mode."""
+        # Dense graph that fails planarity check
+        nodes = [{} for _ in range(5)]
+        links = []
+        for i in range(5):
+            for j in range(i + 1, 5):
+                links.append({"source": i, "target": j})
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600), strict=False)
+        layout.run()
+
+        assert layout.is_valid_input is False
+        # Should still produce a layout
+        assert len(layout.node_boxes) == 5
+
+    def test_empty_graph(self):
+        """Empty graph should work."""
+        layout = GIOTTOLayout(nodes=[], links=[], size=(800, 600))
+        layout.run()
+
+        assert layout.is_valid_input is True
+        assert len(layout.node_boxes) == 0
+
+    def test_single_node(self):
+        """Single node should work."""
+        layout = GIOTTOLayout(nodes=[{}], size=(800, 600))
+        layout.run()
+
+        assert layout.is_valid_input is True
+        assert len(layout.node_boxes) == 1
+
+    def test_simple_path(self):
+        """Simple path (degree <= 2) should work."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+        ]
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        assert layout.is_valid_input is True
+        assert len(layout.orthogonal_edges) == 3
+
+    def test_total_bends_property(self):
+        """total_bends should count bends."""
+        nodes = [{} for _ in range(3)]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
+
+        layout = GIOTTOLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        assert layout.total_bends >= 0
+
+    def test_strict_property(self):
+        """strict property should be configurable."""
+        layout = GIOTTOLayout(strict=True)
+        assert layout.strict is True
+
+        layout.strict = False
+        assert layout.strict is False
+
+    def test_configuration_properties(self):
+        """Configuration properties should work."""
+        layout = GIOTTOLayout(
+            node_width=100,
+            node_height=50,
+            node_separation=80,
+            edge_separation=20,
+            layer_separation=100,
+        )
+
+        assert layout.node_width == 100
+        assert layout.node_height == 50
+        assert layout.node_separation == 80
+        assert layout.edge_separation == 20
+        assert layout.layer_separation == 100
+
+    def test_import_from_package_root(self):
+        """GIOTTOLayout should be importable from package root."""
+        from graph_layout import GIOTTOLayout as GIOTTOLayoutPkg
+
+        assert GIOTTOLayoutPkg is GIOTTOLayout
+
+    def test_import_from_orthogonal_module(self):
+        """GIOTTOLayout should be importable from orthogonal module."""
+        from graph_layout.orthogonal import GIOTTOLayout as GIOTTOLayoutMod
+
+        assert GIOTTOLayoutMod is GIOTTOLayout

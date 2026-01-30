@@ -319,7 +319,7 @@ class YifanHuLayout(IterativeLayout):
 
         return self
 
-    def _build_coarsening_hierarchy(self) -> list[dict]:
+    def _build_coarsening_hierarchy(self) -> list[dict[str, Any]]:
         """
         Build hierarchy of coarsened graphs.
 
@@ -372,7 +372,7 @@ class YifanHuLayout(IterativeLayout):
         adjacency: list[list[int]],
         sources: list[int],
         targets: list[int],
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Coarsen graph using edge collapsing with maximal matching.
 
@@ -447,7 +447,7 @@ class YifanHuLayout(IterativeLayout):
             "parent_mapping": None,
         }
 
-    def _run_multilevel(self, levels: list[dict], random_init: bool = True) -> None:
+    def _run_multilevel(self, levels: list[dict[str, Any]], random_init: bool = True) -> None:
         """
         Run the multilevel algorithm.
 

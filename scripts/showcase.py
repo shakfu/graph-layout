@@ -27,6 +27,7 @@ from graph_layout import (
     ColaLayoutAdapter,
     ForceAtlas2Layout,
     FruchtermanReingoldLayout,
+    GIOTTOLayout,
     KamadaKawaiLayout,
     KandinskyLayout,
     RadialTreeLayout,
@@ -38,6 +39,7 @@ from graph_layout import (
     YifanHuLayout,
 )
 from graph_layout.cola import Layout as ColaLayout
+from graph_layout.orthogonal import Side, is_scipy_available
 
 # Output directory
 BUILD_DIR = Path(__file__).parent.parent / "build"
@@ -157,6 +159,32 @@ LAYOUTS: list[LayoutSpec] = [
         params={"node_width": 30, "node_height": 20, "node_separation": 40},
         description="Orthogonal edges (horizontal/vertical only)",
         suitable_for=("general", "tree"),
+    ),
+    LayoutSpec(
+        name="Kandinsky (ILP)",
+        cls=KandinskyLayout,
+        params={
+            "node_width": 30,
+            "node_height": 20,
+            "node_separation": 40,
+            "compaction_method": "ilp",
+        },
+        description="Orthogonal with ILP-based optimal compaction",
+        suitable_for=("general", "tree"),
+    ),
+    LayoutSpec(
+        name="Kandinsky (Port Constraints)",
+        cls=KandinskyLayout,
+        params={"node_width": 30, "node_height": 20, "node_separation": 40},
+        description="User-specified edge exit/entry sides",
+        suitable_for=("port_constraints",),
+    ),
+    LayoutSpec(
+        name="GIOTTO",
+        cls=GIOTTOLayout,
+        params={"node_width": 30, "node_height": 20, "node_separation": 40},
+        description="Bend-optimal for degree-4 planar graphs",
+        suitable_for=("degree4_planar",),
     ),
     # Cola (constraint-based)
     LayoutSpec(
@@ -288,22 +316,106 @@ def generate_petersen_graph() -> tuple[list[dict], list[dict]]:
     return nodes, links
 
 
+def generate_port_constraints_graph() -> tuple[list[dict], list[dict]]:
+    """Generate a graph with user-specified port constraints.
+
+    This demonstrates the new port constraints feature where users can
+    specify which side of a node an edge should exit/enter from.
+    """
+    nodes = [{} for _ in range(6)]
+    # Links with explicit port constraints
+    links = [
+        # Edge 0->1: exit from EAST, enter from WEST (horizontal connection)
+        {"source": 0, "target": 1, "source_side": "east", "target_side": "west"},
+        # Edge 1->2: exit from SOUTH, enter from NORTH (vertical connection)
+        {"source": 1, "target": 2, "source_side": "south", "target_side": "north"},
+        # Edge 2->3: exit from EAST, enter from WEST
+        {"source": 2, "target": 3, "source_side": "east", "target_side": "west"},
+        # Edge 0->4: exit from SOUTH, enter from NORTH
+        {"source": 0, "target": 4, "source_side": "south", "target_side": "north"},
+        # Edge 4->5: exit from EAST, enter from WEST
+        {"source": 4, "target": 5, "source_side": "east", "target_side": "west"},
+        # Edge 3->5: exit from SOUTH, enter from NORTH
+        {"source": 3, "target": 5, "source_side": "south", "target_side": "north"},
+    ]
+    return nodes, links
+
+
+def generate_degree4_planar_graph() -> tuple[list[dict], list[dict]]:
+    """Generate a degree-4 planar graph suitable for GIOTTO.
+
+    This is a 3x3 grid graph where every interior node has degree 4,
+    corner nodes have degree 2, and edge nodes have degree 3.
+    All degrees are <= 4, and the graph is planar.
+    """
+    rows, cols = 3, 3
+    nodes = [{} for _ in range(rows * cols)]
+    links = []
+
+    for r in range(rows):
+        for c in range(cols):
+            i = r * cols + c
+            # Connect to right neighbor
+            if c < cols - 1:
+                links.append({"source": i, "target": i + 1})
+            # Connect to bottom neighbor
+            if r < rows - 1:
+                links.append({"source": i, "target": i + cols})
+
+    return nodes, links
+
+
+def generate_ladder_graph() -> tuple[list[dict], list[dict]]:
+    """Generate a ladder graph (degree-4 planar, good for GIOTTO).
+
+    A ladder graph has exactly degree 3 for endpoints and degree 3-4 for
+    interior nodes, making it suitable for GIOTTO.
+    """
+    rungs = 5
+    nodes = [{} for _ in range(rungs * 2)]
+    links = []
+
+    for i in range(rungs):
+        left = i * 2
+        right = i * 2 + 1
+        # Rung connecting left and right
+        links.append({"source": left, "target": right})
+        # Rails connecting to next rung
+        if i < rungs - 1:
+            links.append({"source": left, "target": left + 2})
+            links.append({"source": right, "target": right + 2})
+
+    return nodes, links
+
+
 def run_layout(spec: LayoutSpec, nodes: list[dict], links: list[dict]) -> Any:
     """Run a layout algorithm and return the layout object."""
     random.seed(42)  # Reproducible
 
     # Create fresh copies
     node_data = [{} for _ in nodes]
-    link_data = [{"source": l["source"], "target": l["target"]} for l in links]
+
+    # Preserve port constraints if present in links
+    link_data = []
+    for l in links:
+        link_copy = {"source": l["source"], "target": l["target"]}
+        # Copy port constraint attributes if present
+        if "source_side" in l:
+            link_copy["source_side"] = l["source_side"]
+        if "target_side" in l:
+            link_copy["target_side"] = l["target_side"]
+        link_data.append(link_copy)
 
     if spec.uses_cola_api:
-        # Cola uses different API
+        # Cola uses different API (no port constraints)
         node_data = [
             {"x": random.uniform(100, SVG_WIDTH - 100), "y": random.uniform(100, SVG_HEIGHT - 100), "width": 15, "height": 15}
             for _ in nodes
         ]
+        # Strip port constraints for Cola
+        cola_links = [{"source": l["source"], "target": l["target"]} for l in link_data]
         layout = ColaLayout()
-        layout.nodes(node_data).links(link_data).size([SVG_WIDTH, SVG_HEIGHT])
+        layout.nodes(node_data).links(cola_links).size([SVG_WIDTH, SVG_HEIGHT])
         layout.link_distance(spec.params.get("link_distance", 80))
         layout.start(20, 0, 20, 0, False)
         return layout
@@ -528,8 +640,14 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
                 <li><strong>Circular:</strong> Circular, Shell</li>
                 <li><strong>Spectral:</strong> Laplacian eigenvector</li>
                 <li><strong>Hierarchical:</strong> Sugiyama, Reingold-Tilford, Radial</li>
-                <li><strong>Orthogonal:</strong> Kandinsky</li>
+                <li><strong>Orthogonal:</strong> Kandinsky, Kandinsky (ILP), GIOTTO</li>
                 <li><strong>Constraint-based:</strong> Cola</li>
+            </ul>
+            <h3 style="margin-top: 1rem;">New Features</h3>
+            <ul>
+                <li><strong>Port Constraints:</strong> User-specified edge exit/entry sides</li>
+                <li><strong>ILP Compaction:</strong> Optimal area minimization (requires scipy)</li>
+                <li><strong>GIOTTO:</strong> Bend-optimal for degree-4 planar graphs</li>
             </ul>
         </div>
 """
@@ -565,6 +683,9 @@ def main() -> None:
         "Tree (15 nodes)": generate_tree_graph(),
         "Grid (4x4)": generate_grid_graph(4, 4),
         "Bipartite (5+5)": generate_bipartite_graph(),
+        "Port Constraints Demo": generate_port_constraints_graph(),
+        "3x3 Grid (GIOTTO)": generate_degree4_planar_graph(),
+        "Ladder Graph (GIOTTO)": generate_ladder_graph(),
     }
 
     # Which layouts to use for which graph types
@@ -574,6 +695,9 @@ def main() -> None:
         "Tree (15 nodes)": ("tree", "general"),
         "Grid (4x4)": ("general",),
         "Bipartite (5+5)": ("bipartite", "general"),
+        "Port Constraints Demo": ("port_constraints",),
+        "3x3 Grid (GIOTTO)": ("degree4_planar",),
+        "Ladder Graph (GIOTTO)": ("degree4_planar",),
     }
 
     sections = []
@@ -593,7 +717,7 @@ def main() -> None:
             try:
                 print(f"  Running {spec.name}...")
                 layout = run_layout(spec, nodes, links)
-                show_ortho = isinstance(layout, KandinskyLayout)
+                show_ortho = isinstance(layout, (KandinskyLayout, GIOTTOLayout))
                 svg = layout_to_svg(layout, spec, graph_name, show_orthogonal=show_ortho)
                 svgs.append(svg)
             except Exception as e:

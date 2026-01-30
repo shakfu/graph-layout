@@ -14,7 +14,7 @@ used directly for graph analysis and manipulation.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Callable, Optional, Sequence, TypeVar
+from typing import Any, Callable, Optional, Sequence, TypeVar, cast
 
 from .types import LinkLike
 
@@ -23,12 +23,12 @@ T = TypeVar("T")
 
 def _default_get_source(link: Any) -> int:
     """Default function to extract source index from a link."""
-    return link["source"] if isinstance(link, dict) else link.source
+    return cast(int, link["source"] if isinstance(link, dict) else link.source)
 
 
 def _default_get_target(link: Any) -> int:
     """Default function to extract target index from a link."""
-    return link["target"] if isinstance(link, dict) else link.target
+    return cast(int, link["target"] if isinstance(link, dict) else link.target)
 
 
 # =============================================================================

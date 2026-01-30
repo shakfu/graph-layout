@@ -8,7 +8,7 @@ handling non-planar graphs in orthogonal layouts.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, cast
 
 # Try to import Cython-optimized functions
 try:
@@ -120,7 +120,8 @@ def segments_intersect(
         Intersection point (x, y) if segments intersect, None otherwise
     """
     if _USE_CYTHON:
-        return _segments_intersect(p1[0], p1[1], p2[0], p2[1], p3[0], p3[1], p4[0], p4[1])
+        result = _segments_intersect(p1[0], p1[1], p2[0], p2[1], p3[0], p3[1], p4[0], p4[1])
+        return cast(Optional[tuple[float, float]], result)
     return _segments_intersect_py(p1, p2, p3, p4)
 
 
@@ -181,7 +182,8 @@ def find_edge_crossings(
         List of (edge1_idx, edge2_idx, cross_x, cross_y) for each crossing
     """
     if _USE_CYTHON:
-        return _find_edge_crossings(positions, edges)
+        result = _find_edge_crossings(positions, edges)
+        return cast(list[tuple[int, int, float, float]], result)
     return _find_edge_crossings_py(positions, edges)
 
 

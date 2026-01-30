@@ -21,12 +21,16 @@ A collection of graph layout algorithms in Python.
 | | `ShellLayout` | Concentric circles by degree or grouping |
 | **Spectral** | `SpectralLayout` | Laplacian eigenvector embedding |
 | **Orthogonal** | `KandinskyLayout` | Edges use only horizontal/vertical segments |
+| | `GIOTTOLayout` | Bend-optimal for degree-4 planar graphs |
 
 ## Installation
 
 ```bash
 # Standard installation (includes Cython extensions for best performance)
 pip install graph-layout
+
+# With ILP compaction support (for optimal Kandinsky area minimization)
+pip install graph-layout[ilp]
 
 # Development installation
 git clone https://github.com/shakfu/graph-layout.git
@@ -261,6 +265,7 @@ layout = KandinskyLayout(
     handle_crossings=True,   # Insert crossing vertices for non-planar graphs
     optimize_bends=True,     # Minimize bends using min-cost flow
     compact=True,            # Compact layout to reduce area
+    compaction_method="auto", # "auto", "greedy", or "ilp" (ILP requires scipy)
 )
 layout.run()
 
@@ -271,6 +276,68 @@ for edge in layout.orthogonal_edges:
 # Check crossing information
 print(f"Edge crossings detected: {layout.num_crossings}")
 print(f"Total bends: {layout.total_bends}")
+```
+
+#### Port Constraints
+
+Specify which side of a node edges should exit/enter from:
+
+```python
+from graph_layout import KandinskyLayout
+from graph_layout.orthogonal import Side
+
+# Links with explicit port constraints
+links = [
+    {"source": 0, "target": 1, "source_side": Side.EAST, "target_side": Side.WEST},
+    {"source": 1, "target": 2, "source_side": "south", "target_side": "north"},  # Strings work too
+    {"source": 2, "target": 3},  # No constraint - uses heuristic
+]
+
+layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+layout.run()
+
+# Verify constraints were applied
+edge = layout.orthogonal_edges[0]
+print(f"Edge exits from: {edge.source_port.side}")  # Side.EAST
+```
+
+### GIOTTO Layout (Degree-4 Planar)
+
+GIOTTO produces bend-optimal orthogonal drawings for planar graphs where every node has at most 4 edges (degree <= 4). Based on Tamassia's algorithm:
+
+```python
+from graph_layout import GIOTTOLayout
+
+# 3x3 grid graph (degree-4 planar)
+nodes = [{} for _ in range(9)]
+links = [
+    # Horizontal edges
+    {"source": 0, "target": 1}, {"source": 1, "target": 2},
+    {"source": 3, "target": 4}, {"source": 4, "target": 5},
+    {"source": 6, "target": 7}, {"source": 7, "target": 8},
+    # Vertical edges
+    {"source": 0, "target": 3}, {"source": 1, "target": 4}, {"source": 2, "target": 5},
+    {"source": 3, "target": 6}, {"source": 4, "target": 7}, {"source": 5, "target": 8},
+]
+
+layout = GIOTTOLayout(
+    nodes=nodes,
+    links=links,
+    size=(800, 600),
+    strict=True,  # Raise error if graph doesn't meet requirements
+)
+layout.run()
+
+print(f"Valid input: {layout.is_valid_input}")
+print(f"Total bends: {layout.total_bends}")
+```
+
+Use `strict=False` to fall back to Kandinsky-like behavior for graphs that don't meet GIOTTO's requirements:
+
+```python
+# Graph with degree > 4 - would raise error with strict=True
+layout = GIOTTOLayout(nodes=nodes, links=links, strict=False)
+layout.run()  # Falls back to Kandinsky-like algorithm
 ```
 
 ## Visualization
@@ -300,7 +367,8 @@ This creates images in `./build/` showing each algorithm's output.
 | **Circular** | Ring structures, cycles | O(n) | Simple, predictable |
 | **Shell** | Grouped/stratified data | O(n) | Degree-based grouping |
 | **Spectral** | Clustering visualization | O(n^3) eigendecomp | Reveals structure |
-| **Kandinsky** | UML, flowcharts, ER diagrams | O(m²) | Orthogonal edges, bend minimization, compaction |
+| **Kandinsky** | UML, flowcharts, ER diagrams | O(m²) | Orthogonal edges, bend minimization, compaction, port constraints |
+| **GIOTTO** | Degree-4 planar graphs | O(m²) | Bend-optimal orthogonal, validates planarity |
 
 ## Advanced Features
 
@@ -436,11 +504,13 @@ graph_layout/
     spectral/                # Spectral methods
         spectral.py
     orthogonal/              # Orthogonal layouts
-        kandinsky.py         # Main Kandinsky layout class
+        kandinsky.py         # Kandinsky layout (arbitrary degree)
+        giotto.py            # GIOTTO layout (degree-4 planar, bend-optimal)
         types.py             # NodeBox, Port, OrthogonalEdge, Side
         planarization.py     # Edge crossing detection and vertex insertion
         orthogonalization.py # Bend minimization via min-cost flow
-        compaction.py        # Layout area minimization
+        compaction.py        # Greedy layout area minimization
+        compaction_ilp.py    # ILP-based optimal area minimization
 ```
 
 ## Performance
@@ -531,6 +601,7 @@ make qa            # Run all qualtiy checks
 - **Sugiyama**: Based on "Methods for Visual Understanding of Hierarchical System Structures" (1981)
 - **Reingold-Tilford**: Based on "Tidier Drawings of Trees" (1981)
 - **Kandinsky**: Based on the Kandinsky model and Tamassia's bend minimization algorithm (1987)
+- **GIOTTO**: Based on Tamassia's "On Embedding a Graph in the Grid with the Minimum Number of Bends" (1987)
 
 ## License
 

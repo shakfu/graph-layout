@@ -23,6 +23,12 @@ from .compaction import (
     compact_layout,
     compact_vertical,
 )
+from .compaction_ilp import (
+    ILPCompactionResult,
+    compact_layout_ilp,
+    is_scipy_available,
+)
+from .giotto import GIOTTOLayout
 from .kandinsky import KandinskyLayout
 from .orthogonalization import (
     AngleType,
@@ -55,6 +61,7 @@ from .types import (
 
 __all__ = [
     # Layouts
+    "GIOTTOLayout",
     "KandinskyLayout",
     # Compaction
     "CompactionConstraint",
@@ -63,6 +70,10 @@ __all__ = [
     "compact_horizontal",
     "compact_vertical",
     "compact_layout",
+    # ILP Compaction
+    "ILPCompactionResult",
+    "compact_layout_ilp",
+    "is_scipy_available",
     # Orthogonalization
     "AngleType",
     "Face",

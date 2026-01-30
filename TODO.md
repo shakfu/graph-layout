@@ -4,23 +4,13 @@
 
 ## Medium Priority
 
-### Orthogonal Layout (Complete)
+### Export Formats
 
-Edges restricted to horizontal/vertical segments.
+Add export functionality:
 
-1. **Kandinsky** [x] Fully implemented (`orthogonal/kandinsky.py`)
-   - Works on **any graph** (not just planar, not limited to degree 4)
-   - Full TSM pipeline: planarization → orthogonalization → compaction
-   - Planarization: edge crossing detection, dummy vertex insertion
-   - Orthogonalization: min-cost flow bend minimization (Tamassia's algorithm)
-   - Compaction: constraint-based area minimization
-   - Cython-optimized edge crossing detection (42x speedup)
-   - 65 tests, benchmarked at 3.6s for 1000 nodes
-
-**Future orthogonal improvements** (low priority):
-- ILP-based optimal compaction
-- Port constraints (user-specified edge exit sides)
-- GIOTTO for degree-4 planar graphs (academic interest)
+- SVG export
+- DOT (Graphviz) export
+- GraphML export
 
 ### Stress Majorization
 
@@ -55,14 +45,6 @@ Add Hypothesis tests for robustness:
 ---
 
 ## Low Priority
-
-### Export Formats
-
-Add export functionality:
-
-- SVG export
-- DOT (Graphviz) export
-- GraphML export
 
 ### Incremental Layout
 

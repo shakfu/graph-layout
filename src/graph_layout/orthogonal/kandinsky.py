@@ -29,6 +29,10 @@ from .compaction import (
     CompactionResult,
     compact_layout,
 )
+from .compaction_ilp import (
+    compact_layout_ilp,
+    is_scipy_available,
+)
 from .orthogonalization import (
     OrthogonalRepresentation,
     compute_orthogonal_representation,
@@ -45,6 +49,9 @@ from .types import (
     RoutingGrid,
     Side,
 )
+
+# Type alias for port constraints
+PortConstraint = tuple[Optional[Side], Optional[Side]]  # (source_side, target_side)
 
 
 class KandinskyLayout(StaticLayout):
@@ -106,6 +113,7 @@ class KandinskyLayout(StaticLayout):
         handle_crossings: bool = True,
         optimize_bends: bool = True,
         compact: bool = True,
+        compaction_method: str = "auto",
     ) -> None:
         """
         Initialize Kandinsky layout.
@@ -132,6 +140,10 @@ class KandinskyLayout(StaticLayout):
                 takes more computation time.
             compact: If True, apply compaction to reduce the total area of the
                 layout while maintaining node separation and edge routing.
+            compaction_method: Method to use for compaction. Options:
+                - "auto": Use ILP if scipy is available, otherwise greedy
+                - "greedy": Always use greedy constraint-based compaction
+                - "ilp": Use ILP-based optimal compaction (requires scipy)
         """
         super().__init__(
             nodes=nodes,
@@ -153,6 +165,7 @@ class KandinskyLayout(StaticLayout):
         self._handle_crossings = bool(handle_crossings)
         self._optimize_bends = bool(optimize_bends)
         self._compact = bool(compact)
+        self._compaction_method = compaction_method
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
@@ -162,6 +175,10 @@ class KandinskyLayout(StaticLayout):
         self._crossing_vertices: list[CrossingVertex] = []
         self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
         self._compaction_result: Optional[CompactionResult] = None
+
+        # Port constraints: maps (source, target) to (source_side, target_side)
+        self._port_constraints: dict[tuple[int, int], PortConstraint] = {}
+        self._parse_port_constraints()
 
     # -------------------------------------------------------------------------
     # Properties
@@ -282,6 +299,96 @@ class KandinskyLayout(StaticLayout):
         """Get the compaction result (if compact=True)."""
         return self._compaction_result
 
+    @property
+    def compaction_method(self) -> str:
+        """Get the compaction method."""
+        return self._compaction_method
+
+    @compaction_method.setter
+    def compaction_method(self, value: str) -> None:
+        """Set the compaction method."""
+        if value not in ("auto", "greedy", "ilp"):
+            raise ValueError(f"Invalid compaction method: {value}")
+        self._compaction_method = value
+
+    @property
+    def port_constraints(self) -> dict[tuple[int, int], PortConstraint]:
+        """Get the parsed port constraints."""
+        return self._port_constraints
+
+    # -------------------------------------------------------------------------
+    # Port Constraints Parsing
+    # -------------------------------------------------------------------------
+
+    def _parse_port_constraints(self) -> None:
+        """
+        Parse port constraints from link attributes.
+
+        Links can specify source_side and/or target_side as Side enum values
+        or strings ('north', 'south', 'east', 'west').
+        """
+        self._port_constraints.clear()
+
+        n = len(self._nodes)
+        for link in self._links:
+            src = self._get_source_index(link)
+            tgt = self._get_target_index(link)
+
+            if not (0 <= src < n and 0 <= tgt < n):
+                continue
+
+            # Get source_side constraint
+            source_side = self._parse_side_constraint(link, "source_side")
+
+            # Get target_side constraint
+            target_side = self._parse_side_constraint(link, "target_side")
+
+            # Only store if at least one constraint is specified
+            if source_side is not None or target_side is not None:
+                self._port_constraints[(src, tgt)] = (source_side, target_side)
+
+    def _parse_side_constraint(self, link: Any, attr_name: str) -> Optional[Side]:
+        """
+        Parse a side constraint from a link attribute.
+
+        Args:
+            link: The link object
+            attr_name: Attribute name ('source_side' or 'target_side')
+
+        Returns:
+            Side enum value or None if not specified
+        """
+        # Try to get attribute from link (supports both dict and object)
+        value = None
+        if isinstance(link, dict):
+            value = link.get(attr_name)
+        else:
+            value = getattr(link, attr_name, None)
+
+        if value is None:
+            return None
+
+        # Handle Side enum directly
+        if isinstance(value, Side):
+            return value
+
+        # Handle string values
+        if isinstance(value, str):
+            value_lower = value.lower()
+            side_map = {
+                "north": Side.NORTH,
+                "south": Side.SOUTH,
+                "east": Side.EAST,
+                "west": Side.WEST,
+                "n": Side.NORTH,
+                "s": Side.SOUTH,
+                "e": Side.EAST,
+                "w": Side.WEST,
+            }
+            return side_map.get(value_lower)
+
+        return None
+
     # -------------------------------------------------------------------------
     # Layout Computation
     # -------------------------------------------------------------------------
@@ -352,6 +459,11 @@ class KandinskyLayout(StaticLayout):
         - Node separation constraints
         - Edge routing space
         - Relative node ordering
+
+        The compaction method is determined by the compaction_method parameter:
+        - "auto": Use ILP if scipy is available, otherwise greedy
+        - "greedy": Always use greedy constraint-based compaction
+        - "ilp": Use ILP-based optimal compaction (requires scipy)
         """
         if not self._node_boxes:
             return
@@ -360,14 +472,38 @@ class KandinskyLayout(StaticLayout):
         n = len(self._nodes)
         original_boxes = self._node_boxes[:n]
 
-        # Run compaction
-        self._compaction_result = compact_layout(
-            boxes=original_boxes,
-            edges=self._orthogonal_edges,
-            node_separation=self._node_separation,
-            layer_separation=self._layer_separation,
-            edge_separation=self._edge_separation,
-        )
+        # Determine which compaction method to use
+        use_ilp = False
+        if self._compaction_method == "ilp":
+            use_ilp = True
+        elif self._compaction_method == "auto":
+            use_ilp = is_scipy_available()
+        # else: "greedy" - use_ilp stays False
+
+        # Run compaction with appropriate method
+        if use_ilp:
+            ilp_result = compact_layout_ilp(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
+            # Store as CompactionResult for API compatibility
+            self._compaction_result = CompactionResult(
+                node_positions=ilp_result.node_positions,
+                width=ilp_result.width,
+                height=ilp_result.height,
+                iterations=1 if ilp_result.optimal else 2,
+            )
+        else:
+            self._compaction_result = compact_layout(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
 
         # Update node box positions
         for i, (new_x, new_y) in enumerate(self._compaction_result.node_positions):
@@ -565,8 +701,8 @@ class KandinskyLayout(StaticLayout):
             src_box = self._node_boxes[src]
             tgt_box = self._node_boxes[tgt]
 
-            # Determine best sides based on relative positions
-            src_side, tgt_side = self._determine_port_sides(src_box, tgt_box)
+            # Determine best sides based on relative positions (with port constraints)
+            src_side, tgt_side = self._determine_port_sides(src_box, tgt_box, edge_key=(src, tgt))
 
             # Calculate port positions
             src_port = Port(node=src, side=src_side, edge=edge_idx)
@@ -639,7 +775,9 @@ class KandinskyLayout(StaticLayout):
             src_box = self._node_boxes[orig_src]
             tgt_box = self._node_boxes[orig_tgt]
 
-            src_side, tgt_side = self._determine_port_sides(src_box, tgt_box)
+            src_side, tgt_side = self._determine_port_sides(
+                src_box, tgt_box, edge_key=(orig_src, orig_tgt)
+            )
             src_port = Port(node=orig_src, side=src_side, edge=orig_edge_idx)
             tgt_port = Port(node=orig_tgt, side=tgt_side, edge=orig_edge_idx)
 
@@ -670,7 +808,7 @@ class KandinskyLayout(StaticLayout):
         src_box = self._node_boxes[src]
         tgt_box = self._node_boxes[tgt]
 
-        src_side, tgt_side = self._determine_port_sides(src_box, tgt_box)
+        src_side, tgt_side = self._determine_port_sides(src_box, tgt_box, edge_key=(src, tgt))
         src_port = Port(node=src, side=src_side, edge=edge_idx)
         tgt_port = Port(node=tgt, side=tgt_side, edge=edge_idx)
 
@@ -689,12 +827,46 @@ class KandinskyLayout(StaticLayout):
 
         self._orthogonal_edges.append(ortho_edge)
 
-    def _determine_port_sides(self, src_box: NodeBox, tgt_box: NodeBox) -> tuple[Side, Side]:
+    def _determine_port_sides(
+        self,
+        src_box: NodeBox,
+        tgt_box: NodeBox,
+        edge_key: Optional[tuple[int, int]] = None,
+    ) -> tuple[Side, Side]:
         """
         Determine which sides of source and target nodes to use for an edge.
 
-        Uses relative position heuristic: if target is below source, exit
-        from south and enter from north, etc.
+        First checks for user-specified port constraints, then falls back to
+        relative position heuristic: if target is below source, exit from south
+        and enter from north, etc.
+
+        Args:
+            src_box: Source node box
+            tgt_box: Target node box
+            edge_key: Optional (source, target) tuple to look up port constraints
+
+        Returns:
+            Tuple of (source_side, target_side)
+        """
+        # Check for user-specified constraints
+        if edge_key is not None and edge_key in self._port_constraints:
+            constrained_src, constrained_tgt = self._port_constraints[edge_key]
+
+            # Compute heuristic sides for any unconstrained directions
+            heuristic_src, heuristic_tgt = self._compute_heuristic_sides(src_box, tgt_box)
+
+            # Use constraints where specified, otherwise use heuristic
+            final_src = constrained_src if constrained_src is not None else heuristic_src
+            final_tgt = constrained_tgt if constrained_tgt is not None else heuristic_tgt
+
+            return (final_src, final_tgt)
+
+        # No constraints, use pure heuristic
+        return self._compute_heuristic_sides(src_box, tgt_box)
+
+    def _compute_heuristic_sides(self, src_box: NodeBox, tgt_box: NodeBox) -> tuple[Side, Side]:
+        """
+        Compute port sides using relative position heuristic.
 
         Args:
             src_box: Source node box

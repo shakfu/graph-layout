@@ -440,6 +440,63 @@ layout = Layout3D(nodes, links, ideal_link_length=1.0)
 layout.start(iterations=100)
 ```
 
+### Export Formats
+
+All layout classes support exporting to SVG, DOT (Graphviz), and GraphML formats via methods:
+
+```python
+from graph_layout import CircularLayout
+
+# Create and run a layout
+layout = CircularLayout(
+    nodes=[{"index": i} for i in range(5)],
+    links=[{"source": i, "target": (i + 1) % 5} for i in range(5)],
+    size=(400, 400),
+).run()
+
+# Export to SVG (web/print)
+svg = layout.to_svg(node_color="#4a90d9", show_labels=True)
+with open("graph.svg", "w") as f:
+    f.write(svg)
+
+# Export to DOT (Graphviz)
+dot = layout.to_dot(directed=False, include_positions=True)
+with open("graph.dot", "w") as f:
+    f.write(dot)
+
+# Export to GraphML (interchange format)
+graphml = layout.to_graphml(include_positions=True)
+with open("graph.graphml", "w") as f:
+    f.write(graphml)
+```
+
+Orthogonal layouts (KandinskyLayout, GIOTTOLayout) automatically use orthogonal-specific export with rectangular nodes and bend points:
+
+```python
+from graph_layout import KandinskyLayout
+
+layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600)).run()
+
+# SVG with orthogonal edges (polylines with bends)
+svg = layout.to_svg()  # Automatically uses orthogonal rendering
+
+# GraphML with bend point data
+graphml = layout.to_graphml()  # Includes bend coordinates and port sides
+
+# DOT with splines=ortho
+dot = layout.to_dot()  # Uses box nodes and ortho splines
+```
+
+Standalone functions are also available:
+
+```python
+from graph_layout import to_svg, to_dot, to_graphml
+
+svg = to_svg(layout, node_color="#ff0000")
+dot = to_dot(layout, directed=True)
+graphml = to_graphml(layout)
+```
+
 ### Configuration via Properties
 
 All layout algorithms support configuration via constructor parameters and properties:
@@ -511,6 +568,10 @@ graph_layout/
         orthogonalization.py # Bend minimization via min-cost flow
         compaction.py        # Greedy layout area minimization
         compaction_ilp.py    # ILP-based optimal area minimization
+    export/                  # Export to various formats
+        svg.py               # to_svg, to_svg_orthogonal
+        dot.py               # to_dot, to_dot_orthogonal (Graphviz)
+        graphml.py           # to_graphml, to_graphml_orthogonal
 ```
 
 ## Performance

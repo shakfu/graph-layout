@@ -30,6 +30,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **Export Formats** (`export/`):
+  - Method-based API on all layout classes:
+    - `layout.to_svg()` - Export to SVG format
+    - `layout.to_dot()` - Export to DOT (Graphviz) format
+    - `layout.to_graphml()` - Export to GraphML format
+  - SVG export (`to_svg`, `to_svg_orthogonal`):
+    - Generates SVG representations of graph layouts
+    - Customizable node shapes (circle, rect), colors, stroke widths
+    - Support for node labels with font customization
+    - Background color support
+    - Special handling for orthogonal layouts with bends
+  - DOT/Graphviz export (`to_dot`, `to_dot_orthogonal`):
+    - Generates DOT format for Graphviz tools
+    - Directed and undirected graph support
+    - Position embedding for exact layout reproduction
+    - Custom node/edge attribute callbacks
+    - Orthogonal variant with `splines=ortho` setting
+  - GraphML export (`to_graphml`, `to_graphml_orthogonal`):
+    - XML-based format for graph data interchange
+    - Node positions, sizes, and labels as data keys
+    - Edge weights and lengths
+    - Orthogonal variant includes bend points and port sides
+  - Standalone functions also available: `from graph_layout import to_svg, to_dot, to_graphml`
+  - KandinskyLayout and GIOTTOLayout override export methods to use orthogonal-specific output
+
+- **Test suite for export** (`tests/test_export.py`):
+  - 56 tests covering SVG, DOT, and GraphML export
+  - Tests for both function and method-based APIs
+  - Edge cases: empty graphs, single nodes, self-loops, special characters
+
 - **Port Constraints for Kandinsky** (`orthogonal/kandinsky.py`):
   - User-specified edge exit/entry sides via `source_side` and `target_side` link attributes
   - Accepts `Side` enum values or strings ('north', 'south', 'east', 'west')

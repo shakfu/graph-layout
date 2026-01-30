@@ -389,6 +389,85 @@ class BaseLayout(ABC):
                 adj[tgt].append(src)
         return adj
 
+    # -------------------------------------------------------------------------
+    # Export Methods
+    # -------------------------------------------------------------------------
+
+    def to_svg(self, **kwargs: Any) -> str:
+        """
+        Export layout to SVG format.
+
+        Args:
+            node_radius: Radius for circular nodes (default 20)
+            node_color: Fill color for nodes (default "#4a90d9")
+            node_stroke: Stroke color for nodes (default "#2c5aa0")
+            node_stroke_width: Stroke width for nodes (default 2)
+            edge_color: Color for edges (default "#666666")
+            edge_width: Width for edges (default 1.5)
+            show_labels: Whether to show node labels (default True)
+            label_color: Color for labels (default "#000000")
+            font_size: Font size for labels (default 12)
+            font_family: Font family for labels (default "sans-serif")
+            padding: Padding around the graph (default 40)
+            background: Background color (default None for transparent)
+            node_shape: Shape of nodes: "circle" or "rect" (default "circle")
+
+        Returns:
+            SVG string representation of the graph
+        """
+        from .export.svg import to_svg
+
+        return to_svg(self, **kwargs)
+
+    def to_dot(self, **kwargs: Any) -> str:
+        """
+        Export layout to DOT (Graphviz) format.
+
+        Args:
+            name: Name of the graph (default "G")
+            directed: Whether the graph is directed (default False)
+            include_positions: Include pos attributes for nodes (default True)
+            node_shape: Default node shape (default "ellipse")
+            node_color: Default node border color
+            node_fillcolor: Default node fill color
+            node_style: Default node style (e.g., "filled")
+            edge_color: Default edge color
+            graph_attrs: Additional graph-level attributes
+            node_attrs: Additional default node attributes
+            edge_attrs: Additional default edge attributes
+            get_node_label: Callable(node) -> str for custom node labels
+            get_node_attrs: Callable(node) -> dict for custom node attributes
+            get_edge_attrs: Callable(link) -> dict for custom edge attributes
+
+        Returns:
+            DOT format string representation of the graph
+        """
+        from .export.dot import to_dot
+
+        return to_dot(self, **kwargs)
+
+    def to_graphml(self, **kwargs: Any) -> str:
+        """
+        Export layout to GraphML format.
+
+        Args:
+            graph_id: ID for the graph element (default "G")
+            directed: Whether edges are directed (default False)
+            include_positions: Include x, y position data (default True)
+            include_size: Include width, height data (default True)
+            include_weights: Include edge weights (default True)
+            get_node_attrs: Callable(node) -> dict for custom node data
+            get_edge_attrs: Callable(link) -> dict for custom edge data
+            extra_node_keys: Additional node data keys: {key_id: attr_name}
+            extra_edge_keys: Additional edge data keys: {key_id: attr_name}
+
+        Returns:
+            GraphML XML string
+        """
+        from .export.graphml import to_graphml
+
+        return to_graphml(self, **kwargs)
+
 
 class IterativeLayout(BaseLayout):
     """

@@ -967,5 +967,76 @@ class KandinskyLayout(StaticLayout):
 
         return bends
 
+    # -------------------------------------------------------------------------
+    # Export Methods (Override base class for orthogonal output)
+    # -------------------------------------------------------------------------
+
+    def to_svg(self, **kwargs: Any) -> str:
+        """
+        Export orthogonal layout to SVG format.
+
+        Uses orthogonal-specific rendering with rectangular nodes and
+        polyline edges that include bend points.
+
+        Args:
+            node_color: Fill color for nodes (default "#4a90d9")
+            node_stroke: Stroke color for nodes (default "#2c5aa0")
+            node_stroke_width: Stroke width for nodes (default 2)
+            edge_color: Color for edges (default "#666666")
+            edge_width: Width for edges (default 1.5)
+            show_labels: Whether to show node labels (default True)
+            label_color: Color for labels (default "#000000")
+            font_size: Font size for labels (default 12)
+            font_family: Font family for labels (default "sans-serif")
+            padding: Padding around the graph (default 40)
+            background: Background color (default None for transparent)
+
+        Returns:
+            SVG string representation of the orthogonal graph
+        """
+        from ..export.svg import to_svg_orthogonal
+
+        return to_svg_orthogonal(self._node_boxes, self._orthogonal_edges, **kwargs)
+
+    def to_dot(self, **kwargs: Any) -> str:
+        """
+        Export orthogonal layout to DOT (Graphviz) format.
+
+        Uses orthogonal-specific settings with splines=ortho.
+
+        Args:
+            name: Name of the graph (default "G")
+            directed: Whether the graph is directed (default False)
+            include_positions: Include pos attributes (default True)
+            node_shape: Node shape (default "box")
+            node_color: Node border color
+            node_fillcolor: Node fill color
+            graph_attrs: Additional graph attributes
+
+        Returns:
+            DOT format string
+        """
+        from ..export.dot import to_dot_orthogonal
+
+        return to_dot_orthogonal(self._node_boxes, self._orthogonal_edges, **kwargs)
+
+    def to_graphml(self, **kwargs: Any) -> str:
+        """
+        Export orthogonal layout to GraphML format.
+
+        Includes bend point information for orthogonal edges.
+
+        Args:
+            graph_id: ID for the graph element (default "G")
+            directed: Whether edges are directed (default False)
+            include_bends: Include bend point data (default True)
+
+        Returns:
+            GraphML XML string
+        """
+        from ..export.graphml import to_graphml_orthogonal
+
+        return to_graphml_orthogonal(self._node_boxes, self._orthogonal_edges, **kwargs)
+
 
 __all__ = ["KandinskyLayout"]

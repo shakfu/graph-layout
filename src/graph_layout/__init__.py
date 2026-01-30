@@ -13,6 +13,7 @@ Available algorithms:
 - circular: Circular and shell layouts
 - spectral: Spectral/eigenvector-based layouts
 - orthogonal: Orthogonal layouts with horizontal/vertical edges (Kandinsky)
+- export: Export to SVG, DOT (Graphviz), and GraphML formats
 """
 
 __version__ = "0.1.7"
@@ -39,6 +40,16 @@ from .circular import (
 
 # Cola layout (constraint-based)
 from .cola import ColaLayoutAdapter, Layout, Layout3D
+
+# Export functions
+from .export import (
+    to_dot,
+    to_dot_orthogonal,
+    to_graphml,
+    to_graphml_orthogonal,
+    to_svg,
+    to_svg_orthogonal,
+)
 
 # Force-directed layouts
 from .force import (
@@ -187,4 +198,11 @@ __all__ = [
     "assign_layers_longest_path",
     "minimize_crossings_barycenter",
     "count_crossings",
+    # Export functions
+    "to_svg",
+    "to_svg_orthogonal",
+    "to_dot",
+    "to_dot_orthogonal",
+    "to_graphml",
+    "to_graphml_orthogonal",
 ]

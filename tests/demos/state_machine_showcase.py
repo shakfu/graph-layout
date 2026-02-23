@@ -17,19 +17,18 @@ Output:
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
 from typing import Any
-import math
 
 from graph_layout import (
     CircularLayout,
     ForceAtlas2Layout,
     FruchtermanReingoldLayout,
     RadialTreeLayout,
-    ShellLayout,
     SpectralLayout,
     SpringLayout,
     SugiyamaLayout,
@@ -45,6 +44,7 @@ SVG_HEIGHT = 450
 @dataclass
 class State:
     """Represents a state in the workflow."""
+
     id: int
     name: str
     state_type: str  # "start", "normal", "end", "decision"
@@ -53,6 +53,7 @@ class State:
 @dataclass
 class LayoutSpec:
     """Specification for a layout algorithm."""
+
     name: str
     cls: type | None
     params: dict[str, Any]
@@ -237,9 +238,12 @@ def run_layout(spec: LayoutSpec, states: list[State], links: list[dict]) -> Any:
 
     if spec.uses_cola_api:
         node_data = [
-            {"x": random.uniform(100, SVG_WIDTH - 100),
-             "y": random.uniform(100, SVG_HEIGHT - 100),
-             "width": 30, "height": 30}
+            {
+                "x": random.uniform(100, SVG_WIDTH - 100),
+                "y": random.uniform(100, SVG_HEIGHT - 100),
+                "width": 30,
+                "height": 30,
+            }
             for _ in states
         ]
         layout = ColaLayout()
@@ -387,7 +391,7 @@ def layout_to_svg(layout: Any, spec: LayoutSpec, states: list[State], workflow_n
         rx = 14 if state.state_type in ("start", "end") else 4
 
         svg_parts.append(
-            f'<rect x="{node.x - box_w/2:.1f}" y="{node.y - box_h/2:.1f}" '
+            f'<rect x="{node.x - box_w / 2:.1f}" y="{node.y - box_h / 2:.1f}" '
             f'width="{box_w}" height="{box_h}" rx="{rx}" '
             f'fill="{color}" stroke="#fff" stroke-width="2"/>'
         )
@@ -422,7 +426,7 @@ def layout_to_svg(layout: Any, spec: LayoutSpec, states: list[State], workflow_n
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="{SVG_HEIGHT - 8}" text-anchor="middle" '
         f'fill="#95a5a6" font-size="8" font-family="sans-serif">'
-        f'{escape(workflow_name)} ({len(states)} states)</text>'
+        f"{escape(workflow_name)} ({len(states)} states)</text>"
     )
 
     svg_parts.append("</svg>")
@@ -568,11 +572,12 @@ def generate_html(sections: list[tuple[str, str, list[str]]]) -> str:
     ]
 
     for title, desc, svgs in sections:
-        html_parts.append(f'        <section>\n            <h2>{escape(title)}</h2>')
-        html_parts.append(f'            <p>{escape(desc)}</p>')
+        html_parts.append(f"        <section>\n            <h2>{escape(title)}</h2>")
+        html_parts.append(f"            <p>{escape(desc)}</p>")
         html_parts.append('            <div class="graph-grid">')
         for svg in svgs:
-            html_parts.append(f'                <div class="graph-card">\n{svg}\n                </div>')
+            card = f'                <div class="graph-card">\n{svg}\n                </div>'
+            html_parts.append(card)
         html_parts.append("            </div>\n        </section>")
 
     html_parts.append(
@@ -591,7 +596,11 @@ def main() -> None:
     BUILD_DIR.mkdir(exist_ok=True)
 
     workflows = [
-        ("E-Commerce Order Flow", "Order processing from cart to delivery", generate_order_workflow()),
+        (
+            "E-Commerce Order Flow",
+            "Order processing from cart to delivery",
+            generate_order_workflow(),
+        ),
         ("Document Approval", "Review and approval workflow", generate_approval_workflow()),
         ("CI/CD Pipeline", "Build, test, and deploy pipeline", generate_ci_pipeline()),
         ("Support Ticket", "Ticket lifecycle from new to closed", generate_support_ticket()),

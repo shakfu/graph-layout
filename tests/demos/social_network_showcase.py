@@ -166,9 +166,9 @@ def generate_community_network() -> tuple[list[Person], list[dict]]:
 
     # Community names and sizes
     communities = [
-        ("Tech", 10),      # Tech enthusiasts
-        ("Sports", 8),     # Sports fans
-        ("Music", 9),      # Music lovers
+        ("Tech", 10),  # Tech enthusiasts
+        ("Sports", 8),  # Sports fans
+        ("Music", 9),  # Music lovers
     ]
 
     # Names for each community
@@ -204,11 +204,11 @@ def generate_community_network() -> tuple[list[Person], list[dict]]:
     # Create inter-community links (sparse bridges)
     # These are the "weak ties" that connect communities
     bridges = [
-        (0, 10),   # Alice (Tech) - Kyle (Sports)
-        (2, 18),   # Carol (Tech) - Sam (Music)
+        (0, 10),  # Alice (Tech) - Kyle (Sports)
+        (2, 18),  # Carol (Tech) - Sam (Music)
         (11, 20),  # Luna (Sports) - Tina (Music)
-        (5, 14),   # Frank (Tech) - Oscar (Sports)
-        (8, 22),   # Ivy (Tech) - Wendy (Music)
+        (5, 14),  # Frank (Tech) - Oscar (Sports)
+        (8, 22),  # Ivy (Tech) - Wendy (Music)
         (15, 25),  # Pam (Sports) - Zara (Music)
     ]
     for src, tgt in bridges:
@@ -243,7 +243,7 @@ def generate_influencer_network() -> tuple[list[Person], list[dict]]:
     # Create regular users
     num_regular = 25
     for i in range(num_regular):
-        people.append(Person(len(influencers) + i, f"User{i+1}", 1, 0))
+        people.append(Person(len(influencers) + i, f"User{i + 1}", 1, 0))
 
     # Connect users to influencers (preferential attachment style)
     regular_start = len(influencers)
@@ -281,10 +281,10 @@ def generate_small_world_network() -> tuple[list[Person], list[dict]]:
     """
     random.seed(456)
     n = 20  # Number of nodes
-    k = 4   # Each node connects to k nearest neighbors
+    k = 4  # Each node connects to k nearest neighbors
     p = 0.3  # Rewiring probability
 
-    people = [Person(i, f"P{i+1}", i % 3, 0) for i in range(n)]
+    people = [Person(i, f"P{i + 1}", i % 3, 0) for i in range(n)]
     links = []
     edge_set = set()
 
@@ -483,25 +483,24 @@ def layout_to_svg(
 
     badge_x = SVG_WIDTH // 2 + len(spec.name) * 4 + 20
     svg_parts.append(
-        f'<rect x="{badge_x - 20}" y="10" width="40" height="16" rx="8" '
-        f'fill="{rating_color}"/>'
+        f'<rect x="{badge_x - 20}" y="10" width="40" height="16" rx="8" fill="{rating_color}"/>'
     )
     svg_parts.append(
         f'<text x="{badge_x}" y="22" text-anchor="middle" fill="#fff" '
         f'font-size="8" font-weight="bold" font-family="sans-serif">'
-        f'{escape(spec.rating)}</text>'
+        f"{escape(spec.rating)}</text>"
     )
 
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="38" text-anchor="middle" '
         f'fill="#7f8c8d" font-size="9" font-family="sans-serif">'
-        f'{escape(spec.description)}</text>'
+        f"{escape(spec.description)}</text>"
     )
 
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="{SVG_HEIGHT - 8}" text-anchor="middle" '
         f'fill="#95a5a6" font-size="8" font-family="sans-serif">'
-        f'{escape(network_name)} ({len(people)} people, {len(links)} connections)</text>'
+        f"{escape(network_name)} ({len(people)} people, {len(links)} connections)</text>"
     )
 
     svg_parts.append("</svg>")
@@ -688,7 +687,7 @@ def generate_html(sections: list[tuple[str, str, list[str]]]) -> str:
             <h3>Recommendation</h3>
             <p>For social networks, use:</p>
             <ul>
-                <li><strong>ForceAtlas2</strong> - Best for community detection, widely used in network science</li>
+                <li><strong>ForceAtlas2</strong> - Best for community detection</li>
                 <li><strong>Fruchterman-Reingold</strong> - Classic choice, good clustering</li>
                 <li><strong>Yifan Hu</strong> - Best for large networks (1000+ nodes)</li>
                 <li><strong>Cola</strong> - When you need overlap avoidance</li>
@@ -698,11 +697,12 @@ def generate_html(sections: list[tuple[str, str, list[str]]]) -> str:
     ]
 
     for section_title, section_desc, svgs in sections:
-        html_parts.append(f'        <section>\n            <h2>{escape(section_title)}</h2>')
-        html_parts.append(f'            <p>{escape(section_desc)}</p>')
+        html_parts.append(f"        <section>\n            <h2>{escape(section_title)}</h2>")
+        html_parts.append(f"            <p>{escape(section_desc)}</p>")
         html_parts.append('            <div class="graph-grid">')
         for svg in svgs:
-            html_parts.append(f'                <div class="graph-card">\n{svg}\n                </div>')
+            card = f'                <div class="graph-card">\n{svg}\n                </div>'
+            html_parts.append(card)
         html_parts.append("            </div>\n        </section>")
 
     html_parts.append(
@@ -724,17 +724,17 @@ def main() -> None:
     networks = [
         (
             "Community Network (27 people)",
-            "Three distinct communities with sparse inter-community bridges - tests community detection",
+            "Three communities with sparse bridges - tests community detection",
             generate_community_network(),
         ),
         (
             "Influencer Network (28 people)",
-            "Hub-and-spoke structure with influencers (high degree) and followers - tests scale-free handling",
+            "Hub-and-spoke with influencers and followers - tests scale-free handling",
             generate_influencer_network(),
         ),
         (
             "Small World Network (20 people)",
-            "Watts-Strogatz model with local clustering and random shortcuts - tests 'six degrees' structure",
+            "Watts-Strogatz model with clustering and shortcuts - tests 'six degrees'",
             generate_small_world_network(),
         ),
     ]

@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     pass
 
 from ..base import StaticLayout
+from ..planarity import check_planarity
 from ..types import (
     Event,
     GroupLike,
@@ -262,61 +263,32 @@ class GIOTTOLayout(StaticLayout):
 
     def _validate_planar(self) -> bool:
         """
-        Quick planarity check using Euler's formula.
+        Definitive planarity check using LR-planarity algorithm.
 
-        For a planar graph: E <= 3V - 6 (for V >= 3)
-
-        This is a necessary but not sufficient condition. A more rigorous
-        check would require a full planarity testing algorithm.
+        Uses linear-time LR-planarity test to determine whether the graph
+        is planar. Replaces the previous heuristic (Euler formula + K5
+        brute-force) with a correct O(n+m) algorithm.
 
         Returns:
-            True if graph might be planar, False if definitely not planar
+            True if graph is planar, False otherwise.
         """
         n = len(self._nodes)
         m = len(self._links)
-        return is_planar_quick_check(n, m)
 
-    def _is_k5_subgraph(self) -> bool:
-        """
-        Check for K5 (complete graph on 5 vertices) as a minor.
-
-        K5 is non-planar. This is a simplified check that looks for
-        5 mutually connected vertices.
-
-        Returns:
-            True if K5 subgraph detected (definitely non-planar)
-        """
-        n = len(self._nodes)
-        if n < 5:
+        # Quick Euler formula pre-check (O(1))
+        if not is_planar_quick_check(n, m):
             return False
 
-        # Build adjacency set
-        adj: dict[int, set[int]] = {i: set() for i in range(n)}
+        # Build edge list
+        edges: list[tuple[int, int]] = []
         for link in self._links:
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
             if 0 <= src < n and 0 <= tgt < n and src != tgt:
-                adj[src].add(tgt)
-                adj[tgt].add(src)
+                edges.append((src, tgt))
 
-        # Check all 5-combinations for K5
-        # This is O(n^5) which is expensive but acceptable for small graphs
-        if n > 20:
-            # For larger graphs, skip this check and rely on Euler's formula
-            return False
-
-        from itertools import combinations
-
-        for vertices in combinations(range(n), 5):
-            is_complete = True
-            for i, j in combinations(vertices, 2):
-                if j not in adj[i]:
-                    is_complete = False
-                    break
-            if is_complete:
-                return True
-
-        return False
+        result = check_planarity(n, edges)
+        return result.is_planar
 
     # -------------------------------------------------------------------------
     # Layout Computation
@@ -343,25 +315,12 @@ class GIOTTOLayout(StaticLayout):
             self._compute_fallback()
             return
 
-        # Validate planarity
+        # Validate planarity (linear-time LR-planarity test)
         if not self._validate_planar():
             if self._strict:
                 raise ValueError(
-                    f"GIOTTO requires a planar graph. The graph has {n} nodes "
-                    f"and {len(self._links)} edges, which violates Euler's formula "
-                    f"(E <= 3V - 6 = {3 * n - 6} for V >= 3). "
-                    "Use strict=False to fall back to Kandinsky-like behavior."
-                )
-            self._is_valid_input = False
-            self._compute_fallback()
-            return
-
-        # Check for K5 subgraph (non-planar)
-        if self._is_k5_subgraph():
-            if self._strict:
-                raise ValueError(
-                    "GIOTTO requires a planar graph. The graph contains K5 "
-                    "(complete graph on 5 vertices) as a subgraph, which is non-planar. "
+                    f"GIOTTO requires a planar graph. The graph with {n} nodes "
+                    f"and {len(self._links)} edges is non-planar. "
                     "Use strict=False to fall back to Kandinsky-like behavior."
                 )
             self._is_valid_input = False

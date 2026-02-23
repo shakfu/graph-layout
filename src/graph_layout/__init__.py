@@ -80,6 +80,9 @@ from .metrics import (
 # Orthogonal layouts
 from .orthogonal import GIOTTOLayout, KandinskyLayout
 
+# Planarity testing
+from .planarity import PlanarityResult, check_planarity, is_planar
+
 # Preprocessing utilities
 from .preprocessing import (
     assign_layers_longest_path,
@@ -188,6 +191,10 @@ __all__ = [
     "validate_canvas_size",
     "validate_link_indices",
     "validate_group_indices",
+    # Planarity
+    "is_planar",
+    "check_planarity",
+    "PlanarityResult",
     # Preprocessing
     "detect_cycle",
     "has_cycle",

@@ -18,18 +18,18 @@ import random
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 # Import all layout algorithms
 from graph_layout import (
     BipartiteLayout,
     CircularLayout,
-    ColaLayoutAdapter,
     ForceAtlas2Layout,
     FruchtermanReingoldLayout,
     GIOTTOLayout,
     KamadaKawaiLayout,
     KandinskyLayout,
+    PlanarityResult,
     RadialTreeLayout,
     ReingoldTilfordLayout,
     ShellLayout,
@@ -37,12 +37,12 @@ from graph_layout import (
     SpringLayout,
     SugiyamaLayout,
     YifanHuLayout,
+    check_planarity,
 )
 from graph_layout.cola import Layout as ColaLayout
-from graph_layout.orthogonal import Side, is_scipy_available
 
 # Output directory
-BUILD_DIR = Path(__file__).parent.parent / "build"
+BUILD_DIR = Path(__file__).parent.parent.parent / "build"
 
 # SVG dimensions
 SVG_WIDTH = 400
@@ -218,8 +218,7 @@ def generate_erdos_renyi(n: int, p: float, seed: int = 42) -> tuple[list[dict], 
 
     # Remap links to use new indices
     remapped_links = [
-        {"source": old_to_new[l["source"]], "target": old_to_new[l["target"]]}
-        for l in links
+        {"source": old_to_new[l["source"]], "target": old_to_new[l["target"]]} for l in links
     ]
 
     # Create nodes only for connected nodes
@@ -388,6 +387,150 @@ def generate_ladder_graph() -> tuple[list[dict], list[dict]]:
     return nodes, links
 
 
+def generate_planarity_demos() -> list[tuple[str, int, list[tuple[int, int]], PlanarityResult]]:
+    """Generate a set of graphs with planarity test results for showcase."""
+    demos: list[tuple[str, int, list[tuple[int, int]], PlanarityResult]] = []
+
+    # Planar: K4 (complete graph on 4 vertices)
+    k4_edges = [(i, j) for i in range(4) for j in range(i + 1, 4)]
+    demos.append(("K4 (planar)", 4, k4_edges, check_planarity(4, k4_edges)))
+
+    # Planar: Wheel W5 (hub + 5-cycle)
+    w5_edges = [(0, i) for i in range(1, 6)] + [(i, i % 5 + 1) for i in range(1, 6)]
+    demos.append(("Wheel W5 (planar)", 6, w5_edges, check_planarity(6, w5_edges)))
+
+    # Planar: 3x3 grid
+    grid_edges: list[tuple[int, int]] = []
+    for r in range(3):
+        for c in range(3):
+            i = r * 3 + c
+            if c < 2:
+                grid_edges.append((i, i + 1))
+            if r < 2:
+                grid_edges.append((i, i + 3))
+    demos.append(("3x3 Grid (planar)", 9, grid_edges, check_planarity(9, grid_edges)))
+
+    # Non-planar: K5
+    k5_edges = [(i, j) for i in range(5) for j in range(i + 1, 5)]
+    demos.append(("K5 (non-planar)", 5, k5_edges, check_planarity(5, k5_edges)))
+
+    # Non-planar: K3,3
+    k33_edges = [(i, 3 + j) for i in range(3) for j in range(3)]
+    demos.append(("K3,3 (non-planar)", 6, k33_edges, check_planarity(6, k33_edges)))
+
+    # Non-planar: Petersen graph
+    pet_edges = [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 0),
+        (5, 7),
+        (7, 9),
+        (9, 6),
+        (6, 8),
+        (8, 5),
+        (0, 5),
+        (1, 6),
+        (2, 7),
+        (3, 8),
+        (4, 9),
+    ]
+    demos.append(("Petersen (non-planar)", 10, pet_edges, check_planarity(10, pet_edges)))
+
+    return demos
+
+
+def planarity_demo_to_svg(
+    name: str,
+    num_nodes: int,
+    edges: list[tuple[int, int]],
+    result: PlanarityResult,
+) -> str:
+    """Render a planarity test result as an SVG card.
+
+    Draws the graph using a simple circular layout and annotates with
+    planarity result and embedding stats (face count, Euler check).
+    """
+    import math
+
+    w, h = SVG_WIDTH, SVG_HEIGHT
+    cx, cy = w / 2, h / 2 + 10
+    radius = min(w, h) / 2 - 60
+
+    # Circular positions
+    positions: list[tuple[float, float]] = []
+    for i in range(num_nodes):
+        angle = 2 * math.pi * i / num_nodes - math.pi / 2
+        px = cx + radius * math.cos(angle)
+        py = cy + radius * math.sin(angle)
+        positions.append((px, py))
+
+    is_planar = result.is_planar
+    border_color = "#2ecc71" if is_planar else "#e74c3c"
+    status_text = "PLANAR" if is_planar else "NON-PLANAR"
+
+    svg = [
+        f'<svg width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">',
+        f'<rect width="100%" height="100%" fill="#fafafa"'
+        f' stroke="{border_color}" stroke-width="3"/>',
+    ]
+
+    # Draw edges
+    edge_color = "#888" if is_planar else "#e74c3c"
+    edge_opacity = "0.5" if is_planar else "0.35"
+    for u, v in edges:
+        x1, y1 = positions[u]
+        x2, y2 = positions[v]
+        svg.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'stroke="{edge_color}" stroke-width="1.5" opacity="{edge_opacity}"/>'
+        )
+
+    # Draw nodes
+    node_color = "#4a90d9" if is_planar else "#c0392b"
+    for i, (px, py) in enumerate(positions):
+        svg.append(
+            f'<circle cx="{px:.1f}" cy="{py:.1f}" r="8" '
+            f'fill="{node_color}" stroke="#fff" stroke-width="1.5"/>'
+        )
+        svg.append(
+            f'<text x="{px:.1f}" y="{py + 3:.1f}" text-anchor="middle" '
+            f'fill="#fff" font-size="8" font-family="sans-serif">{i}</text>'
+        )
+
+    # Title
+    svg.append(
+        f'<text x="{w // 2}" y="20" text-anchor="middle" '
+        f'fill="#333" font-size="12" font-weight="bold" font-family="sans-serif">'
+        f"{escape(name)}</text>"
+    )
+
+    # Status badge
+    svg.append(
+        f'<text x="{w // 2}" y="38" text-anchor="middle" '
+        f'fill="{border_color}" font-size="11" font-weight="bold" font-family="sans-serif">'
+        f"{status_text}</text>"
+    )
+
+    # Stats line
+    n_edges = len(edges)
+    euler_limit = max(3 * num_nodes - 6, 0) if num_nodes >= 3 else "n/a"
+    stats = f"V={num_nodes}  E={n_edges}  3V-6={euler_limit}"
+    if is_planar and result.embedding:
+        from graph_layout.planarity import PlanarEmbedding
+
+        emb = PlanarEmbedding(result.embedding)
+        stats += f"  F={emb.num_faces()}"
+    svg.append(
+        f'<text x="{w // 2}" y="{h - 10}" text-anchor="middle" '
+        f'fill="#999" font-size="9" font-family="sans-serif">{stats}</text>'
+    )
+
+    svg.append("</svg>")
+    return "\n".join(svg)
+
+
 def run_layout(spec: LayoutSpec, nodes: list[dict], links: list[dict]) -> Any:
     """Run a layout algorithm and return the layout object."""
     random.seed(42)  # Reproducible
@@ -409,7 +552,12 @@ def run_layout(spec: LayoutSpec, nodes: list[dict], links: list[dict]) -> Any:
     if spec.uses_cola_api:
         # Cola uses different API (no port constraints)
         node_data = [
-            {"x": random.uniform(100, SVG_WIDTH - 100), "y": random.uniform(100, SVG_HEIGHT - 100), "width": 15, "height": 15}
+            {
+                "x": random.uniform(100, SVG_WIDTH - 100),
+                "y": random.uniform(100, SVG_HEIGHT - 100),
+                "width": 15,
+                "height": 15,
+            }
             for _ in nodes
         ]
         # Strip port constraints for Cola
@@ -511,7 +659,8 @@ def layout_to_svg(
 
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="20" text-anchor="middle" '
-        f'fill="#333" font-size="12" font-weight="bold" font-family="sans-serif">{escape(title)}</text>'
+        f'fill="#333" font-size="12" font-weight="bold" '
+        f'font-family="sans-serif">{escape(title)}</text>'
     )
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="35" text-anchor="middle" '
@@ -645,6 +794,7 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
             </ul>
             <h3 style="margin-top: 1rem;">New Features</h3>
             <ul>
+                <li><strong>Planarity Testing:</strong> Linear-time LR-planarity</li>
                 <li><strong>Port Constraints:</strong> User-specified edge exit/entry sides</li>
                 <li><strong>ILP Compaction:</strong> Optimal area minimization (requires scipy)</li>
                 <li><strong>GIOTTO:</strong> Bend-optimal for degree-4 planar graphs</li>
@@ -654,10 +804,11 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
     ]
 
     for section_title, svgs in sections:
-        html_parts.append(f'        <section>\n            <h2>{escape(section_title)}</h2>')
+        html_parts.append(f"        <section>\n            <h2>{escape(section_title)}</h2>")
         html_parts.append('            <div class="graph-grid">')
         for svg in svgs:
-            html_parts.append(f'                <div class="graph-card">\n{svg}\n                </div>')
+            card = f'                <div class="graph-card">\n{svg}\n                </div>'
+            html_parts.append(card)
         html_parts.append("            </div>\n        </section>")
 
     html_parts.append(
@@ -701,6 +852,14 @@ def main() -> None:
     }
 
     sections = []
+
+    # Planarity testing section
+    print("\nProcessing: Planarity Testing")
+    planarity_svgs = []
+    for name, n, edges, result in generate_planarity_demos():
+        print(f"  {name}: is_planar={result.is_planar}")
+        planarity_svgs.append(planarity_demo_to_svg(name, n, edges, result))
+    sections.append(("Planarity Testing (LR-Planarity Algorithm)", planarity_svgs))
 
     for graph_name, (nodes, links) in graphs.items():
         print(f"\nProcessing: {graph_name}")

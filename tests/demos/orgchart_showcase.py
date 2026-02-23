@@ -23,12 +23,9 @@ from typing import Any
 
 # Import all layout algorithms
 from graph_layout import (
-    BipartiteLayout,
     CircularLayout,
-    ColaLayoutAdapter,
     ForceAtlas2Layout,
     FruchtermanReingoldLayout,
-    GIOTTOLayout,
     KamadaKawaiLayout,
     KandinskyLayout,
     RadialTreeLayout,
@@ -244,17 +241,19 @@ def generate_orgchart() -> tuple[list[OrgPerson], list[dict]]:
         OrgPerson(18, "Mark Johnson", "Sales Manager", 3),
     ]
     people.extend(managers)
-    links.extend([
-        {"source": 4, "target": 10},
-        {"source": 4, "target": 11},
-        {"source": 5, "target": 12},
-        {"source": 6, "target": 13},
-        {"source": 7, "target": 14},
-        {"source": 8, "target": 15},
-        {"source": 8, "target": 16},
-        {"source": 9, "target": 17},
-        {"source": 9, "target": 18},
-    ])
+    links.extend(
+        [
+            {"source": 4, "target": 10},
+            {"source": 4, "target": 11},
+            {"source": 5, "target": 12},
+            {"source": 6, "target": 13},
+            {"source": 7, "target": 14},
+            {"source": 8, "target": 15},
+            {"source": 8, "target": 16},
+            {"source": 9, "target": 17},
+            {"source": 9, "target": 18},
+        ]
+    )
 
     # Level 4: Individual Contributors (report to Managers)
     ics = [
@@ -281,20 +280,22 @@ def generate_orgchart() -> tuple[list[OrgPerson], list[dict]]:
         OrgPerson(30, "Jack Bell", "Sales Rep", 4),
     ]
     people.extend(ics)
-    links.extend([
-        {"source": 10, "target": 19},
-        {"source": 10, "target": 20},
-        {"source": 11, "target": 21},
-        {"source": 11, "target": 22},
-        {"source": 12, "target": 23},
-        {"source": 13, "target": 24},
-        {"source": 14, "target": 25},
-        {"source": 15, "target": 26},
-        {"source": 16, "target": 27},
-        {"source": 17, "target": 28},
-        {"source": 17, "target": 29},
-        {"source": 18, "target": 30},
-    ])
+    links.extend(
+        [
+            {"source": 10, "target": 19},
+            {"source": 10, "target": 20},
+            {"source": 11, "target": 21},
+            {"source": 11, "target": 22},
+            {"source": 12, "target": 23},
+            {"source": 13, "target": 24},
+            {"source": 14, "target": 25},
+            {"source": 15, "target": 26},
+            {"source": 16, "target": 27},
+            {"source": 17, "target": 28},
+            {"source": 17, "target": 29},
+            {"source": 18, "target": 30},
+        ]
+    )
 
     return people, links
 
@@ -346,9 +347,7 @@ def generate_startup_orgchart() -> tuple[list[OrgPerson], list[dict]]:
         OrgPerson(6, "Sales", "BD", 1),
         OrgPerson(7, "Support", "Customer Success", 1),
     ]
-    links = [
-        {"source": 0, "target": i} for i in range(1, 8)
-    ]
+    links = [{"source": 0, "target": i} for i in range(1, 8)]
     return people, links
 
 
@@ -502,8 +501,7 @@ def layout_to_svg(
             path_parts.append(f"L {tgt_node.x:.1f} {tgt_node.y:.1f}")
 
             svg_parts.append(
-                f'<path d="{" ".join(path_parts)}" stroke="#7f8c8d" '
-                f'stroke-width="2" fill="none"/>'
+                f'<path d="{" ".join(path_parts)}" stroke="#7f8c8d" stroke-width="2" fill="none"/>'
             )
     else:
         for link in links:
@@ -555,27 +553,26 @@ def layout_to_svg(
     # Rating badge
     badge_x = SVG_WIDTH // 2 + len(spec.name) * 4 + 20
     svg_parts.append(
-        f'<rect x="{badge_x - 20}" y="10" width="40" height="16" rx="8" '
-        f'fill="{rating_color}"/>'
+        f'<rect x="{badge_x - 20}" y="10" width="40" height="16" rx="8" fill="{rating_color}"/>'
     )
     svg_parts.append(
         f'<text x="{badge_x}" y="22" text-anchor="middle" fill="#fff" '
         f'font-size="8" font-weight="bold" font-family="sans-serif">'
-        f'{escape(spec.rating)}</text>'
+        f"{escape(spec.rating)}</text>"
     )
 
     # Description
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="38" text-anchor="middle" '
         f'fill="#7f8c8d" font-size="9" font-family="sans-serif">'
-        f'{escape(spec.description)}</text>'
+        f"{escape(spec.description)}</text>"
     )
 
     # Legend at bottom
     svg_parts.append(
         f'<text x="{SVG_WIDTH // 2}" y="{SVG_HEIGHT - 8}" text-anchor="middle" '
         f'fill="#95a5a6" font-size="8" font-family="sans-serif">'
-        f'{escape(org_name)} ({len(people)} people)</text>'
+        f"{escape(org_name)} ({len(people)} people)</text>"
     )
 
     svg_parts.append("</svg>")
@@ -771,21 +768,22 @@ def generate_html(sections: list[tuple[str, str, list[str]]]) -> str:
             <h3>Recommendation</h3>
             <p>For organizational charts, use:</p>
             <ul>
-                <li><strong>Sugiyama</strong> - Best overall for traditional top-down org charts</li>
-                <li><strong>Reingold-Tilford</strong> - Excellent for strict tree hierarchies</li>
-                <li><strong>Radial Tree</strong> - Great when you want CEO at center</li>
-                <li><strong>Kandinsky</strong> - For formal diagrams with clean orthogonal lines</li>
+                <li><strong>Sugiyama</strong> - Best for top-down org charts</li>
+                <li><strong>Reingold-Tilford</strong> - For strict tree hierarchies</li>
+                <li><strong>Radial Tree</strong> - CEO at center layout</li>
+                <li><strong>Kandinsky</strong> - Clean orthogonal lines</li>
             </ul>
         </div>
 """
     ]
 
     for section_title, section_desc, svgs in sections:
-        html_parts.append(f'        <section>\n            <h2>{escape(section_title)}</h2>')
-        html_parts.append(f'            <p>{escape(section_desc)}</p>')
+        html_parts.append(f"        <section>\n            <h2>{escape(section_title)}</h2>")
+        html_parts.append(f"            <p>{escape(section_desc)}</p>")
         html_parts.append('            <div class="graph-grid">')
         for svg in svgs:
-            html_parts.append(f'                <div class="graph-card">\n{svg}\n                </div>')
+            card = f'                <div class="graph-card">\n{svg}\n                </div>'
+            html_parts.append(card)
         html_parts.append("            </div>\n        </section>")
 
     html_parts.append(

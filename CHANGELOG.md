@@ -17,6 +17,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Added
+
+- **LR-Planarity Testing Module** (`planarity/`):
+  - Linear-time O(n+m) planarity testing using the Left-Right planarity algorithm (de Fraysseix & Rosenstiehl, Brandes 2009 implementation)
+  - Public API: `is_planar(num_nodes, edges)` and `check_planarity(num_nodes, edges)`
+  - `PlanarityResult` dataclass with `is_planar` flag and optional combinatorial embedding
+  - `PlanarEmbedding` class wrapping the rotation system with face enumeration, outer face detection, and Euler formula verification
+  - Preprocessing: self-loop removal, parallel edge handling (2 ok, 3+ non-planar), disconnected component splitting, biconnected component decomposition (Tarjan's algorithm)
+  - Correctly detects K5, K3,3, Petersen graph, subdivisions, and all non-planar minors
+  - New package exports: `is_planar`, `check_planarity`, `PlanarityResult`, `PlanarEmbedding`
+
+- **Test suite for planarity** (`tests/test_planarity.py`):
+  - 60 tests covering planar graphs (K4, W5, W6, grids, trees, cycles, maximal planar), non-planar graphs (K5, K3,3, Petersen, K6, K7, K4,4, subdivisions), embedding verification (bidirectional check, Euler formula), edge cases (self-loops, multi-edges, disconnected graphs, isolated vertices), GIOTTO integration, and performance
+
+- **Planarity showcase demos** (`tests/demos/showcase.py`):
+  - 6 planarity demo graphs (K4, W5, 3x3 grid, K5, K3,3, Petersen) rendered as SVG cards with planar/non-planar status and embedding statistics
+
+### Changed
+
+- **GIOTTO planarity validation** (`orthogonal/giotto.py`):
+  - Replaced Euler formula heuristic + O(n^5) K5 brute-force check with single call to `check_planarity()`
+  - K3,3-based non-planarity now correctly detected (was never detected before)
+  - Graphs with n>20 now tested correctly (K5 check was disabled above this threshold)
+  - Removed `_is_k5_subgraph()` method
+
+
 ## [0.1.7]
 
 ### Fixed
@@ -77,7 +103,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **GIOTTO Algorithm** (`orthogonal/giotto.py`):
   - Bend-optimal orthogonal layout for degree-4 planar graphs
   - Based on Tamassia's algorithm for minimum-bend orthogonal drawings
-  - Validates degree <= 4 and planarity (Euler's formula + K5 check)
+  - Validates degree <= 4 and planarity
   - `strict` mode (raise ValueError) or fallback mode (Kandinsky-like)
   - Properties: `is_valid_input`, `total_bends`, `orthogonal_rep`
   - Exported from package root: `from graph_layout import GIOTTOLayout`

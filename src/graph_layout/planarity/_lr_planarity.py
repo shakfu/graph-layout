@@ -507,6 +507,9 @@ def _find_kuratowski_subgraph(
             for w in wadj[v]:
                 if w in local_map:
                     local_adj[local_map[v]].append(local_map[w])
+        # Sort adjacency lists for deterministic DFS across platforms
+        for a in local_adj:
+            a.sort()
         m_sub = sum(len(a) for a in local_adj) // 2
         if n_sub >= 3 and m_sub > 3 * n_sub - 6:
             return False
@@ -563,7 +566,7 @@ def _find_kuratowski_subgraph(
 
     visited_deg2: set[int] = set()
     for bv in branch_verts:
-        for w in work_adj[bv]:
+        for w in sorted(work_adj[bv]):
             if w in visited_deg2:
                 continue
             # Follow the path from bv through degree-2 vertices
@@ -572,7 +575,7 @@ def _find_kuratowski_subgraph(
             prev = bv
             while cur in degrees and degrees[cur] == 2:
                 visited_deg2.add(cur)
-                nbs = [x for x in work_adj[cur] if x != prev]
+                nbs = sorted(x for x in work_adj[cur] if x != prev)
                 if not nbs:
                     break
                 nxt = nbs[0]

@@ -16,7 +16,7 @@ Available algorithms:
 - export: Export to SVG, DOT (Graphviz), and GraphML formats
 """
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 # Shared types for all algorithms
 # Base classes for building layouts
@@ -81,11 +81,21 @@ from .metrics import (
 from .orthogonal import GIOTTOLayout, KandinskyLayout
 
 # Planarity testing
-from .planarity import PlanarityResult, check_planarity, is_planar
+from .planarity import (
+    FixedEmbedder,
+    MaxFaceEmbedder,
+    MinDepthEmbedder,
+    OptimalFlexEmbedder,
+    PlanarEmbedder,
+    PlanarityResult,
+    check_planarity,
+    is_planar,
+)
 
 # Preprocessing utilities
 from .preprocessing import (
     assign_layers_longest_path,
+    assign_layers_width_bounded,
     connected_components,
     count_crossings,
     detect_cycle,
@@ -195,6 +205,11 @@ __all__ = [
     "is_planar",
     "check_planarity",
     "PlanarityResult",
+    "PlanarEmbedder",
+    "FixedEmbedder",
+    "MaxFaceEmbedder",
+    "MinDepthEmbedder",
+    "OptimalFlexEmbedder",
     # Preprocessing
     "detect_cycle",
     "has_cycle",
@@ -203,6 +218,7 @@ __all__ = [
     "connected_components",
     "is_connected",
     "assign_layers_longest_path",
+    "assign_layers_width_bounded",
     "minimize_crossings_barycenter",
     "count_crossings",
     # Export functions

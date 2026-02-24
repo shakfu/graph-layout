@@ -17,6 +17,13 @@ from typing import Sequence
 from ._embedding import PlanarEmbedding
 from ._lr_planarity import test_biconnected
 from ._types import PlanarityResult
+from .embedders import (
+    FixedEmbedder,
+    MaxFaceEmbedder,
+    MinDepthEmbedder,
+    OptimalFlexEmbedder,
+    PlanarEmbedder,
+)
 
 
 def is_planar(num_nodes: int, edges: Sequence[tuple[int, int]]) -> bool:
@@ -74,6 +81,21 @@ def check_planarity(
     # Quick edge-count check (Euler formula necessary condition)
     m = len(clean_edges)
     if num_nodes >= 3 and m > 3 * num_nodes - 6:
+        # Still try to extract Kuratowski witness
+        adj_quick: list[list[int]] = [[] for _ in range(num_nodes)]
+        for u, v in clean_edges:
+            adj_quick[u].append(v)
+            adj_quick[v].append(u)
+        from ._lr_planarity import _find_kuratowski_subgraph
+
+        witness = _find_kuratowski_subgraph(num_nodes, adj_quick)
+        if witness is not None:
+            k_type, k_edges = witness
+            return PlanarityResult(
+                is_planar=False,
+                kuratowski_edges=k_edges,
+                kuratowski_type=k_type,
+            )
         return PlanarityResult(is_planar=False)
 
     # Build undirected adjacency list
@@ -108,7 +130,16 @@ def check_planarity(
         result = test_biconnected(n_local, local_adj)
 
         if not result.is_planar:
-            return PlanarityResult(is_planar=False)
+            # Map Kuratowski witness edges back to global vertex IDs
+            comp_k_edges: list[tuple[int, int]] | None = None
+            comp_k_type = result.kuratowski_type
+            if result.kuratowski_edges is not None:
+                comp_k_edges = [(comp[a], comp[b]) for a, b in result.kuratowski_edges]
+            return PlanarityResult(
+                is_planar=False,
+                kuratowski_edges=comp_k_edges,
+                kuratowski_type=comp_k_type,
+            )
 
         # Map local embedding to global
         if result.embedding:
@@ -178,4 +209,9 @@ __all__ = [
     "check_planarity",
     "PlanarityResult",
     "PlanarEmbedding",
+    "PlanarEmbedder",
+    "FixedEmbedder",
+    "MaxFaceEmbedder",
+    "MinDepthEmbedder",
+    "OptimalFlexEmbedder",
 ]

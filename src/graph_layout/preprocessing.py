@@ -433,7 +433,10 @@ def assign_layers_longest_path(
     if not sources:
         sources = [0]  # Fallback for cyclic graphs
 
-    # Compute longest path from sources
+    # Compute longest path from sources.
+    # Cap at n-1 to guarantee termination on cyclic graphs (a DAG with
+    # n nodes has a longest path of at most n-1 edges).
+    max_layer = n - 1
     node_layer = [-1] * n
     queue: deque[int] = deque()
 
@@ -445,7 +448,7 @@ def assign_layers_longest_path(
         node = queue.popleft()
         for child in outgoing[node]:
             new_layer = node_layer[node] + 1
-            if new_layer > node_layer[child]:
+            if new_layer > node_layer[child] and new_layer <= max_layer:
                 node_layer[child] = new_layer
                 queue.append(child)
 
@@ -628,6 +631,169 @@ def count_crossings(
     return total
 
 
+def assign_layers_width_bounded(
+    n: int,
+    links: Sequence[LinkLike],
+    max_width: int = 0,
+    get_source: Optional[Callable[[Any], int]] = None,
+    get_target: Optional[Callable[[Any], int]] = None,
+) -> list[list[int]]:
+    """
+    Assign nodes to layers using BFS with width-bounded merging.
+
+    This algorithm is designed for undirected or loosely-directed graphs
+    (e.g., grids) where longest-path layering produces undesirable diagonal
+    layouts. It uses BFS to discover natural distance layers, then greedily
+    merges adjacent thin layers to reduce the total number of layers while
+    keeping each layer's width within a bound.
+
+    Args:
+        n: Number of nodes
+        links: List of edges
+        max_width: Maximum layer width. If 0 (default), uses
+            ceil(n / ceil(sqrt(n))).
+        get_source: Function to extract source index from link
+        get_target: Function to extract target index from link
+
+    Returns:
+        List of layers, where each layer is a list of node indices.
+    """
+    if get_source is None:
+        get_source = _default_get_source
+    if get_target is None:
+        get_target = _default_get_target
+
+    if n == 0:
+        return []
+    if n == 1:
+        return [[0]]
+
+    # Build undirected adjacency
+    adj: list[list[int]] = [[] for _ in range(n)]
+    for link in links:
+        src = get_source(link)
+        tgt = get_target(link)
+        if 0 <= src < n and 0 <= tgt < n and src != tgt:
+            adj[src].append(tgt)
+            adj[tgt].append(src)
+
+    # Auto max_width: ceil(n / ceil(sqrt(n)))
+    if max_width <= 0:
+        import math
+
+        target_layers = math.ceil(math.sqrt(n))
+        max_width = math.ceil(n / target_layers)
+
+    # Try a few candidate roots, pick the one giving the best (fewest) layers
+    # after merging.
+    candidates = _pick_bfs_candidates(n, adj)
+
+    best_layers: list[list[int]] | None = None
+    best_count = n + 1  # worst case: each node in its own layer
+
+    for root in candidates:
+        bfs_layers = _bfs_layers(n, adj, root)
+        merged = _merge_layers(bfs_layers, max_width)
+        if len(merged) < best_count:
+            best_count = len(merged)
+            best_layers = merged
+
+    assert best_layers is not None
+    return best_layers
+
+
+def _pick_bfs_candidates(n: int, adj: list[list[int]]) -> list[int]:
+    """Pick a small set of candidate BFS roots to try."""
+    candidates: list[int] = [0]
+
+    # Highest-degree node
+    best_deg = len(adj[0])
+    best_node = 0
+    for i in range(1, n):
+        if len(adj[i]) > best_deg:
+            best_deg = len(adj[i])
+            best_node = i
+    if best_node != 0:
+        candidates.append(best_node)
+
+    # Degree-1 nodes (periphery heuristic): pick up to 2
+    for i in range(n):
+        if len(adj[i]) == 1 and i not in candidates:
+            candidates.append(i)
+            if len(candidates) >= 4:
+                break
+
+    # BFS-diameter endpoint heuristic: BFS from node 0, take the farthest
+    # node, then BFS from that node, take the farthest again.
+    farthest = _bfs_farthest(n, adj, 0)
+    if farthest not in candidates:
+        candidates.append(farthest)
+    farthest2 = _bfs_farthest(n, adj, farthest)
+    if farthest2 not in candidates:
+        candidates.append(farthest2)
+
+    return candidates
+
+
+def _bfs_farthest(n: int, adj: list[list[int]], start: int) -> int:
+    """Return the node farthest from start via BFS."""
+    dist = [-1] * n
+    dist[start] = 0
+    queue: deque[int] = deque([start])
+    farthest = start
+    while queue:
+        node = queue.popleft()
+        for nb in adj[node]:
+            if dist[nb] < 0:
+                dist[nb] = dist[node] + 1
+                queue.append(nb)
+                farthest = nb
+    return farthest
+
+
+def _bfs_layers(n: int, adj: list[list[int]], root: int) -> list[list[int]]:
+    """Compute BFS distance layers from root."""
+    dist = [-1] * n
+    dist[root] = 0
+    queue: deque[int] = deque([root])
+    max_dist = 0
+
+    while queue:
+        node = queue.popleft()
+        for nb in adj[node]:
+            if dist[nb] < 0:
+                dist[nb] = dist[node] + 1
+                if dist[nb] > max_dist:
+                    max_dist = dist[nb]
+                queue.append(nb)
+
+    # Handle disconnected nodes: assign to layer 0
+    for i in range(n):
+        if dist[i] < 0:
+            dist[i] = 0
+
+    layers: list[list[int]] = [[] for _ in range(max_dist + 1)]
+    for i in range(n):
+        layers[dist[i]].append(i)
+
+    return layers
+
+
+def _merge_layers(layers: list[list[int]], max_width: int) -> list[list[int]]:
+    """Greedily merge adjacent layers while respecting max_width."""
+    if not layers:
+        return []
+
+    merged: list[list[int]] = [list(layers[0])]
+    for layer in layers[1:]:
+        if len(merged[-1]) + len(layer) <= max_width:
+            merged[-1].extend(layer)
+        else:
+            merged.append(list(layer))
+
+    return merged
+
+
 __all__ = [
     "detect_cycle",
     "has_cycle",
@@ -636,6 +802,7 @@ __all__ = [
     "connected_components",
     "is_connected",
     "assign_layers_longest_path",
+    "assign_layers_width_bounded",
     "minimize_crossings_barycenter",
     "count_crossings",
 ]

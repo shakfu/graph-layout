@@ -17,7 +17,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+## [0.1.8]
+
 ### Added
+
+- **Within-layer node ordering for Kandinsky** (`orthogonal/kandinsky.py`):
+  - Calls `minimize_crossings_barycenter()` between layer assignment and node positioning
+  - Tree and DAG layouts now have logical left-to-right ordering within layers instead of arbitrary insertion order
+
+- **Parent-centering in ILP compaction** (`orthogonal/compaction_ilp.py`):
+  - Added auxiliary variables for `|x_parent - x_child|` per cross-layer edge to the LP objective (alpha=0.5)
+  - Parents are now centered over their children instead of pushed to the far left
+
+- **Edge-based vertical separation constraints** (`orthogonal/compaction.py`, `orthogonal/compaction_ilp.py`):
+  - Both greedy and ILP compaction now enforce minimum vertical separation between connected nodes in different layers
+  - Prevents compaction from collapsing distinct layers into the same y-level
+
+- **Orthogonal edge repair and simplification** (`orthogonal/edge_routing.py`):
+  - `_ensure_orthogonal()`: post-processing function that fixes diagonal segments, removes zero-length micro-segments (duplicate consecutive points), and removes redundant collinear bends (three consecutive points on same axis)
+  - Applied in `route_edge()`, `_route_planarized_edges()`, `_route_single_edge()`, and after segment nudging
+
+- **Fit-to-canvas scaling in showcase** (`tests/demos/showcase.py`):
+  - `_fit_transform()`: computes SVG scale+translate to fit layout content within the card area with padding
+  - Prevents nodes and edges from being clipped at SVG boundaries
+  - Applied to both general and orthogonal layout rendering
+
+- **Makefile `showcase` target**:
+  - `make showcase` generates the showcase HTML and opens it on macOS
+
+- **Kandinsky node ordering tests** (`tests/test_kandinsky.py`):
+  - `test_tree_parent_between_children`: verifies parent x-position is between children
+  - `test_tree_layers_separated`: verifies distinct layers have strictly increasing y
+
+- **Constraint-Aware Edge Routing** (`orthogonal/edge_routing.py`):
+  - New module providing global edge routing shared by KandinskyLayout and GIOTTOLayout
+  - `assign_ports()`: Even port distribution along node sides using `(i+1)/(k+1)` formula for k edges on the same side
+  - `route_self_loop()`: Self-loop routing with 3-bend path around a node corner
+  - `route_edge()`: 5-case orthogonal bend logic with basic obstacle-aware segment detouring
+  - `route_all_edges()`: Global routing pipeline -- classifies edges (normal/self-loop/parallel), determines sides, distributes ports, routes with obstacle awareness
+  - Supports port constraints and custom side-determination functions
+  - Self-loops now rendered (previously silently dropped)
+  - Parallel edges get distinct port positions (previously overlapped)
+  - New package exports: `assign_ports`, `determine_port_sides`, `route_all_edges`, `route_edge`, `route_self_loop`
+
+- **Test suite for edge routing** (`tests/test_edge_routing.py`):
+  - 16 tests covering port distribution, self-loop routing, parallel edge separation, obstacle avoidance, port constraints, and layout integration (Kandinsky with self-loops, parallel edges; GIOTTO fallback with self-loops)
+
+- **Test suite for face computation** (`tests/test_face_computation.py`):
+  - 15 tests covering edge sanitization, self-loop filtering, multi-edge deduplication, disconnected graphs, embedding verification fallback, Euler formula validation, and orthogonal representation edge cases
+
+- **Flow-Based and Longest-Path Compaction** (`orthogonal/compaction_flow.py`):
+  - Two new compaction strategies based on constraint DAGs (ref: Eiglsperger et al. 2001)
+  - `compact_layout_longest_path()`: Assigns coordinates via longest-path distances in the constraint DAG. O(n^2) for DAG construction, O(n+m) for longest path. Guaranteed correct in one pass (unlike greedy which can miss constraints between non-consecutive pairs)
+  - `compact_layout_flow()`: Min-cost flow compaction that redistributes slack for tighter layouts. Reuses the existing `_min_cost_flow` solver
+  - `_build_constraint_dag()`: Checks all pairs for perpendicular overlap, fixing a correctness gap in the greedy approach which only checks consecutive sorted pairs
+  - New `compaction_method` options for `KandinskyLayout`: `"flow"`, `"longest_path"` (in addition to existing `"greedy"`, `"ilp"`, `"auto"`)
+  - New `compaction_method` parameter for `GIOTTOLayout`: `"greedy"` (default), `"flow"`, `"longest_path"`
+  - New package exports: `compact_layout_flow`, `compact_layout_longest_path`
+
+- **Test suite for flow/longest-path compaction** (`tests/test_compaction_flow.py`):
+  - 25 tests covering constraint DAG construction, longest-path compaction, flow compaction, Kandinsky/GIOTTO integration, and performance benchmarks (100-node, 500-node)
 
 - **LR-Planarity Testing Module** (`planarity/`):
   - Linear-time O(n+m) planarity testing using the Left-Right planarity algorithm (de Fraysseix & Rosenstiehl, Brandes 2009 implementation)
@@ -36,12 +95,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 
+- **Showcase renders orthogonal nodes as rectangles** (`tests/demos/showcase.py`):
+  - Both `layout_to_svg` and `orthogonal_layout_to_svg` now draw rounded rectangles matching the layout's configured `node_width`/`node_height` for Kandinsky/GIOTTO, instead of small circles that left visual gaps between edges and nodes
+
+- **Showcase layout area excludes title/stats** (`tests/demos/showcase.py`):
+  - Layout algorithms receive a reduced canvas height (minus 50px top margin, 25px bottom margin) so nodes don't overlap title text
+  - Rendered content shifted down via SVG `<g transform>` group
+
+- **`_center_graph()` now shifts orthogonal data** (`base.py`):
+  - Centering also shifts `_node_boxes` and `_orthogonal_edges` bend points, fixing edge disconnection in SVG rendering for both KandinskyLayout and GIOTTOLayout
+
+- **Showcase planarity section moved to bottom** (`tests/demos/showcase.py`)
+
+- **Segment nudging showcase cards removed** (`tests/demos/showcase.py`):
+  - Both Kandinsky and GIOTTO segment nudging cards disabled until obstacle-aware nudging is implemented (see TODO.md)
+
+- **KandinskyLayout edge routing** (`orthogonal/kandinsky.py`):
+  - `_route_original_edges()` now delegates to `route_all_edges()` from the new edge routing module
+  - Self-loops and parallel edges now handled correctly with proper port distribution
+  - Port constraints still respected via the `port_constraints` parameter
+
+- **GIOTTOLayout edge routing** (`orthogonal/giotto.py`):
+  - `_route_edges()` now delegates to `route_all_edges()` from the new edge routing module
+  - Same self-loop, parallel edge, and port distribution improvements as Kandinsky
+
 - **GIOTTO planarity validation** (`orthogonal/giotto.py`):
   - Replaced Euler formula heuristic + O(n^5) K5 brute-force check with single call to `check_planarity()`
   - K3,3-based non-planarity now correctly detected (was never detected before)
   - Graphs with n>20 now tested correctly (K5 check was disabled above this threshold)
   - Removed `_is_k5_subgraph()` method
 
+### Fixed
+
+- **Edges disconnected from nodes after centering**: `_center_graph()` shifted node positions but not `node_boxes` or edge bend coordinates, causing SVG edges to render at pre-centering positions while nodes were at post-centering positions
+
+- **Empty leading layers for cyclic graphs**: `longest_path` layering on graphs with cycles (e.g., Petersen) produced empty layers; now filtered with `layers = [layer for layer in layers if layer]`
+
+- **Diagonal edge segments**: Visibility-graph routing and planarized edge routing could produce non-orthogonal paths; `_ensure_orthogonal()` post-processing now guarantees all segments are axis-aligned
+
+- **Segment nudging creating diagonal paths** (`orthogonal/edge_routing.py`):
+  - `nudge_overlapping_segments()` moved bend points without updating port positions, creating diagonal segments from port to first/last bend
+  - Now applies `_ensure_orthogonal()` after nudging to reconnect with L-shaped bends
+
+- **Redundant edge bend points** (`orthogonal/edge_routing.py`):
+  - Edge routing produced zero-length micro-segments (duplicate consecutive points) and redundant collinear bends (unnecessary direction changes in empty space)
+  - `_ensure_orthogonal()` now includes path simplification: deduplicates consecutive points and removes collinear middle points
+
+- **Robust face computation** (`orthogonal/orthogonalization.py`):
+  - Self-loops no longer corrupt vertex degrees in flow network (were inflating supply values)
+  - Multi-edges no longer produce duplicate face entries (deduplicated before face tracing)
+  - `compute_faces()` now validates `PlanarEmbedding.verify()` before using embedding path; falls back to legacy path with warning on failure
+  - Legacy face tracing has safety bound to prevent infinite loops on malformed input
+  - Legacy `.index()` lookup uses `try/except` instead of bare call (handles missing neighbors gracefully)
+  - Neighbor lists deduplicated before angular sorting in legacy path
+
+- **Embedder edge-case handling** (`planarity/embedders.py`):
+  - All three embedders (`FixedEmbedder`, `MaxFaceEmbedder`, `MinDepthEmbedder`) now filter self-loops from edges before processing
+  - Disconnected planar graphs handled correctly through existing `check_planarity` component decomposition
+  - Isolated vertices no longer cause failures in block-cut tree traversal
+
+- **Embedder edge-case tests** (`tests/test_embedders.py`):
+  - 11 new tests for disconnected graphs (two disjoint triangles), isolated vertices, self-loops across all three embedders
 
 ## [0.1.7]
 

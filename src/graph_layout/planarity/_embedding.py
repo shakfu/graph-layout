@@ -16,10 +16,25 @@ class PlanarEmbedding:
         rotation: Mapping from vertex to its clockwise neighbor order.
     """
 
-    __slots__ = ("rotation",)
+    __slots__ = ("rotation", "outer_face_index")
 
     def __init__(self, rotation: dict[int, list[int]]) -> None:
         self.rotation = rotation
+        self.outer_face_index: Optional[int] = None
+
+    def set_outer_face(self, face_index: int) -> None:
+        """Designate a face as the outer face by index into faces() result.
+
+        Args:
+            face_index: Index into the list returned by faces().
+
+        Raises:
+            IndexError: If face_index is out of range.
+        """
+        num = len(self.faces())
+        if face_index < 0 or face_index >= num:
+            raise IndexError(f"face_index {face_index} out of range for {num} faces")
+        self.outer_face_index = face_index
 
     def faces(self) -> list[list[tuple[int, int]]]:
         """Enumerate all faces as lists of directed edges.

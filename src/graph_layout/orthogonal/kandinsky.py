@@ -18,6 +18,12 @@ if TYPE_CHECKING:
     pass
 
 from ..base import StaticLayout
+from ..planarity.embedders import MaxFaceEmbedder, PlanarEmbedder
+from ..preprocessing import (
+    assign_layers_longest_path,
+    assign_layers_width_bounded,
+    minimize_crossings_barycenter,
+)
 from ..types import (
     Event,
     GroupLike,
@@ -29,10 +35,15 @@ from .compaction import (
     CompactionResult,
     compact_layout,
 )
+from .compaction_flow import (
+    compact_layout_flow,
+    compact_layout_longest_path,
+)
 from .compaction_ilp import (
     compact_layout_ilp,
     is_scipy_available,
 )
+from .edge_routing import _ensure_orthogonal, route_all_edges
 from .orthogonalization import (
     OrthogonalRepresentation,
     compute_orthogonal_representation,
@@ -114,6 +125,8 @@ class KandinskyLayout(StaticLayout):
         optimize_bends: bool = True,
         compact: bool = True,
         compaction_method: str = "auto",
+        embedder: Optional[PlanarEmbedder] = None,
+        layering_method: str = "auto",
     ) -> None:
         """
         Initialize Kandinsky layout.
@@ -144,6 +157,14 @@ class KandinskyLayout(StaticLayout):
                 - "auto": Use ILP if scipy is available, otherwise greedy
                 - "greedy": Always use greedy constraint-based compaction
                 - "ilp": Use ILP-based optimal compaction (requires scipy)
+                - "flow": Flow-based compaction using min-cost flow
+                - "longest_path": Longest-path compaction on constraint DAG
+            layering_method: Method for assigning nodes to layers. Options:
+                - "auto" (default): detect undirected graphs (all src < tgt)
+                  and use "width_bounded"; otherwise use "longest_path"
+                - "longest_path": directed longest-path layering (good for DAGs)
+                - "width_bounded": BFS with width-bounded merging (good for
+                  undirected/grid-like graphs)
         """
         super().__init__(
             nodes=nodes,
@@ -166,6 +187,8 @@ class KandinskyLayout(StaticLayout):
         self._optimize_bends = bool(optimize_bends)
         self._compact = bool(compact)
         self._compaction_method = compaction_method
+        self._embedder: PlanarEmbedder = embedder or MaxFaceEmbedder()
+        self._layering_method = layering_method
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
@@ -402,6 +425,17 @@ class KandinskyLayout(StaticLayout):
         # Phase 1: Assign layers (simple topological ordering)
         layers = self._assign_layers()
 
+        # Strip empty leading/trailing layers (can occur with cyclic graphs)
+        layers = [layer for layer in layers if layer]
+
+        # Phase 1.5: Reorder nodes within layers to minimize edge crossings
+        layers = minimize_crossings_barycenter(
+            layers,
+            self._links,
+            get_source=self._get_source_index,
+            get_target=self._get_target_index,
+        )
+
         # Phase 2: Position nodes on grid
         self._position_nodes(layers)
 
@@ -430,15 +464,13 @@ class KandinskyLayout(StaticLayout):
         """
         Compute optimal orthogonal representation using min-cost flow.
 
-        This determines the optimal assignment of angles at vertices
-        and bends along edges to minimize total bends.
+        When the graph is planar, uses the configured embedder to obtain
+        a combinatorial embedding before running bend minimization.
+        Falls back to position-based face computation otherwise.
         """
         n = len(self._nodes)
         if n == 0 or not self._node_boxes:
             return
-
-        # Get positions
-        positions = [(box.x, box.y) for box in self._node_boxes[:n]]
 
         # Build edge list
         edges: list[tuple[int, int]] = []
@@ -448,8 +480,19 @@ class KandinskyLayout(StaticLayout):
             if 0 <= src < n and 0 <= tgt < n:
                 edges.append((src, tgt))
 
-        # Compute orthogonal representation
-        self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
+        # Try to get a combinatorial embedding
+        embedding = None
+        try:
+            embedding = self._embedder.embed(n, edges)
+        except (ValueError, AttributeError):
+            pass
+
+        if embedding is not None:
+            self._orthogonal_rep = compute_orthogonal_representation(n, edges, embedding=embedding)
+        else:
+            # Fallback: use position-based face computation
+            positions = [(box.x, box.y) for box in self._node_boxes[:n]]
+            self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
 
     def _apply_compaction(self) -> None:
         """
@@ -481,7 +524,23 @@ class KandinskyLayout(StaticLayout):
         # else: "greedy" - use_ilp stays False
 
         # Run compaction with appropriate method
-        if use_ilp:
+        if self._compaction_method == "flow":
+            self._compaction_result = compact_layout_flow(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
+        elif self._compaction_method == "longest_path":
+            self._compaction_result = compact_layout_longest_path(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
+        elif use_ilp:
             ilp_result = compact_layout_ilp(
                 boxes=original_boxes,
                 edges=self._orthogonal_edges,
@@ -560,7 +619,7 @@ class KandinskyLayout(StaticLayout):
 
     def _assign_layers(self) -> list[list[int]]:
         """
-        Assign nodes to layers using longest path layering.
+        Assign nodes to layers using the configured layering method.
 
         Returns:
             List of layers, each containing node indices
@@ -569,50 +628,68 @@ class KandinskyLayout(StaticLayout):
         if n == 0:
             return []
 
-        # Build adjacency list
-        adj: list[list[int]] = [[] for _ in range(n)]
+        method = self._layering_method
+
+        if method == "auto":
+            method = self._detect_layering_method()
+
+        if method == "width_bounded":
+            return assign_layers_width_bounded(
+                n,
+                self._links,
+                get_source=self._get_source_index,
+                get_target=self._get_target_index,
+            )
+        else:
+            return assign_layers_longest_path(
+                n,
+                self._links,
+                get_source=self._get_source_index,
+                get_target=self._get_target_index,
+            )
+
+    def _detect_layering_method(self) -> str:
+        """
+        Auto-detect whether to use width_bounded or longest_path.
+
+        Heuristic: use width_bounded only for undirected-looking graphs
+        that are NOT trees/forests. A tree (or forest) with BFS-ordered
+        node indices also has all src < tgt, but should use longest_path
+        for proper hierarchical layering.
+
+        Detection:
+        1. If any edge has src >= tgt, the graph has explicit direction
+           -> longest_path.
+        2. If every non-root node has in-degree exactly 1 (tree/forest
+           structure) -> longest_path.
+        3. Otherwise (grid-like, with nodes having multiple incoming
+           edges) -> width_bounded.
+        """
+        n = len(self._nodes)
+        if n == 0:
+            return "longest_path"
+
         in_degree = [0] * n
+        edge_count = 0
 
         for link in self._links:
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
             if 0 <= src < n and 0 <= tgt < n and src != tgt:
-                adj[src].append(tgt)
+                edge_count += 1
+                if src >= tgt:
+                    return "longest_path"
                 in_degree[tgt] += 1
 
-        # Find nodes with no incoming edges (roots)
-        roots = [i for i in range(n) if in_degree[i] == 0]
-        if not roots:
-            # Graph has cycles, just use node 0 as root
-            roots = [0]
+        if edge_count == 0:
+            return "longest_path"
 
-        # Compute longest path from any root to each node
-        layer_assignment = [-1] * n
-        visited = [False] * n
+        # Tree/forest check: every node has in-degree <= 1
+        # (roots have 0, all others have exactly 1).
+        if all(d <= 1 for d in in_degree):
+            return "longest_path"
 
-        def dfs(node: int, depth: int) -> None:
-            if visited[node] and layer_assignment[node] >= depth:
-                return
-            visited[node] = True
-            layer_assignment[node] = max(layer_assignment[node], depth)
-            for neighbor in adj[node]:
-                dfs(neighbor, depth + 1)
-
-        for root in roots:
-            dfs(root, 0)
-
-        # Assign unvisited nodes to layer 0
-        for i in range(n):
-            if layer_assignment[i] < 0:
-                layer_assignment[i] = 0
-
-        # Group nodes by layer
-        max_layer = max(layer_assignment) if layer_assignment else 0
-        layers: list[list[int]] = [[] for _ in range(max_layer + 1)]
-        for node, layer in enumerate(layer_assignment):
-            layers[layer].append(node)
-
-        return layers
+        return "width_bounded"
 
     def _position_nodes(self, layers: list[list[int]]) -> None:
         """
@@ -688,42 +765,26 @@ class KandinskyLayout(StaticLayout):
             self._route_original_edges()
 
     def _route_original_edges(self) -> None:
-        """Route original edges without planarization."""
+        """Route original edges using global constraint-aware routing."""
         n = len(self._nodes)
 
+        edges: list[tuple[int, int]] = []
+        edge_indices: list[int] = []
         for edge_idx, link in enumerate(self._links):
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
+            if 0 <= src < n and 0 <= tgt < n:
+                edges.append((src, tgt))
+                edge_indices.append(edge_idx)
 
-            if not (0 <= src < n and 0 <= tgt < n):
-                continue
-
-            src_box = self._node_boxes[src]
-            tgt_box = self._node_boxes[tgt]
-
-            # Determine best sides based on relative positions (with port constraints)
-            src_side, tgt_side = self._determine_port_sides(src_box, tgt_box, edge_key=(src, tgt))
-
-            # Calculate port positions
-            src_port = Port(node=src, side=src_side, edge=edge_idx)
-            tgt_port = Port(node=tgt, side=tgt_side, edge=edge_idx)
-
-            # Get port coordinates
-            src_pos = src_box.get_port_position(src_side)
-            tgt_pos = tgt_box.get_port_position(tgt_side)
-
-            # Route the edge with orthogonal segments
-            bends = self._compute_edge_route(src_pos, tgt_pos, src_side, tgt_side)
-
-            ortho_edge = OrthogonalEdge(
-                source=src,
-                target=tgt,
-                source_port=src_port,
-                target_port=tgt_port,
-                bends=bends,
-            )
-
-            self._orthogonal_edges.append(ortho_edge)
+        self._orthogonal_edges = route_all_edges(
+            boxes=self._node_boxes[:n],
+            edges=edges,
+            edge_indices=edge_indices,
+            edge_separation=self._edge_separation,
+            port_constraints=self._port_constraints if self._port_constraints else None,
+            side_fn=lambda sb, tb: self._compute_heuristic_sides(sb, tb),
+        )
 
     def _route_planarized_edges(self) -> None:
         """Route edges through crossing vertices."""
@@ -789,6 +850,7 @@ class KandinskyLayout(StaticLayout):
             # Merge crossing bends with route bends
             # For now, just use crossing points as the main bends
             final_bends = all_bends if all_bends else route_bends
+            final_bends = _ensure_orthogonal(src_pos, tgt_pos, final_bends)
 
             ortho_edge = OrthogonalEdge(
                 source=orig_src,
@@ -816,6 +878,7 @@ class KandinskyLayout(StaticLayout):
         tgt_pos = tgt_box.get_port_position(tgt_side)
 
         bends = self._compute_edge_route(src_pos, tgt_pos, src_side, tgt_side)
+        bends = _ensure_orthogonal(src_pos, tgt_pos, bends)
 
         ortho_edge = OrthogonalEdge(
             source=src,

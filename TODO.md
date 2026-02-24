@@ -1,64 +1,28 @@
 # TODO
 
+ref: Open Graph Drawing Framework <https://github.com/ogdf/ogdf>
+
 ## High Priority
 
 ### Orthogonal Layout Improvements
 
-Improve existing Kandinsky/GIOTTO orthogonal layout algorithms to close the gap with [OGDF](https://github.com/ogdf/ogdf)'s orthogonal drawing capabilities.
+Remaining items for closing the gap with [OGDF](https://github.com/ogdf/ogdf)'s orthogonal drawing capabilities.
 
-#### Efficient Min-Cost Flow Solver
+#### ~~Planarity: Kuratowski Subgraph Extraction~~ (Done)
 
-Current successive shortest path solver is O(n^3) and only suitable for small graphs. Implement a production-grade solver.
+~~Extract Kuratowski subgraph (K5 or K3,3 minor) as proof of non-planarity.~~ Implemented: `check_planarity()` now returns `kuratowski_edges` and `kuratowski_type` ("K5" or "K3,3") for non-planar graphs (up to 50 vertices). Uses edge-deletion to find minimal non-planar subgraph, then identifies the K5/K3,3 subdivision structure.
 
-- Replace simple Bellman-Ford-based solver with Cost Scaling or Cycle Canceling algorithm
-- Target: handle graphs with 1000+ nodes efficiently
-- Reference: [Goldberg 1997](https://doi.org/10.1007/BF02592101) (cost scaling)
+#### ~~EmbedderOptimalFlexDraw~~ (Done)
 
-#### Flow-Based Compaction
+~~Optimal flexibility embedding for orthogonal drawing.~~ Implemented as `OptimalFlexEmbedder`: LP-based bend minimization over candidate outer faces using `scipy.optimize.linprog`. Falls back to `MaxFaceEmbedder` when scipy is unavailable.
 
-Replace greedy/ILP compaction with min-cost flow compaction (OGDF's `FlowCompaction`).
+#### Advanced Edge Routing (Partial)
 
-- Model horizontal/vertical compaction as flow problem on constraint graph
-- Produces optimal or near-optimal area minimization
-- Also implement `LongestPathCompaction` as lightweight alternative
-- Reference: [Eiglsperger et al. 2001](https://doi.org/10.1007/3-540-44541-2_8)
+Visibility graph routing is implemented. Segment nudging needs rework.
 
-#### ~~Proper Planarity Testing~~ (DONE)
-
-~~Replace Euler formula heuristic with a real linear-time planarity test.~~
-
-Implemented LR-planarity algorithm (de Fraysseix & Rosenstiehl) in `planarity/` module. Linear-time O(n+m) planarity testing with combinatorial embedding extraction. GIOTTO now uses real planarity test instead of Euler heuristic + O(n^5) K5 brute-force. Detects both K5 and K3,3 minors correctly.
-
-- ~~Implement Boyer-Myrvold or Booth-Lueker planarity test (O(n))~~
-- Extract Kuratowski subgraph as proof of non-planarity (deferred to Phase 2)
-- ~~Remove the O(n^5) K5 brute-force check~~
-
-#### Planar Embedding Strategies
-
-Current code assumes a fixed embedding. OGDF provides 8+ embedding strategies that optimize for different criteria.
-
-- `EmbedderMaxFace`: Maximize external face size (better for readability)
-- `EmbedderMinDepth`: Minimize tree depth of block-cut tree (more balanced)
-- `EmbedderOptimalFlexDraw`: Optimal flexibility for orthogonal drawing
-- Start with MaxFace as default, add others incrementally
-
-#### Global Edge Routing
-
-Current edge routing uses local heuristics (relative position of endpoints). Replace with global optimization.
-
-- Implement constraint-based edge routing using visibility graphs or channel routing
-- Handle multi-edge routing (parallel edges between same node pair)
-- Self-loop routing
-- Edge bundling for dense orthogonal drawings
-- Reference: OGDF's `EdgeRouter` module
-
-#### Robust Face Computation
-
-Current face extraction assumes well-formed planar embedding and fails on edge cases.
-
-- Handle self-loops, multi-edges, disconnected components
-- Validate planar embedding before face extraction
-- Robust signed-area computation for outer face detection
+- [x] Visibility graph routing: builds orthogonal visibility graph from obstacle corners, finds shortest path via BFS
+- [x] Segment nudging: `nudge_overlapping_segments()` post-processing separates coincident parallel edge segments
+- [ ] **Obstacle-aware segment nudging**: Current nudging blindly offsets segments without checking node-box collisions, causing edges to route through nodes. Fix requires: (1) checking nudged positions against node boxes, (2) re-routing segments that collide with obstacles after nudging, or (3) integrating nudging into the routing phase so obstacle avoidance is preserved. See `edge_routing.py:nudge_overlapping_segments()`.
 
 ---
 
@@ -74,7 +38,7 @@ Iterative stress minimization that converges faster than Kamada-Kawai with simil
 
 ### Pivot MDS
 
-Fast MDS approximation using pivot nodes. O(k*n) where k << n. Very fast initial layout for large graphs, useful when spectral layout is too slow.
+Fast MDS approximation using pivot nodes. `O(k*n) where k << n`. Very fast initial layout for large graphs, useful when spectral layout is too slow.
 
 ### Planar Straight-Line Drawing Algorithms (New Category)
 

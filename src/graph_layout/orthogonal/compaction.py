@@ -232,6 +232,27 @@ def compact_vertical(
                 )
             )
 
+    # Edge-based constraints: connected nodes in different layers must maintain
+    # vertical separation even if they don't overlap horizontally.
+    for edge in edges:
+        src, tgt = edge.source, edge.target
+        if src >= n or tgt >= n:
+            continue
+        if box_y[src] < box_y[tgt]:
+            top_idx, bottom_idx = src, tgt
+        elif box_y[tgt] < box_y[src]:
+            top_idx, bottom_idx = tgt, src
+        else:
+            continue  # Same layer -- no vertical constraint
+        gap = box_height[top_idx] / 2 + layer_separation + box_height[bottom_idx] / 2
+        constraints.append(
+            CompactionConstraint(
+                left=top_idx,
+                right=bottom_idx,
+                gap=gap,
+            )
+        )
+
     # Initial positions
     initial_y = box_y[:]
 

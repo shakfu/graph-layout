@@ -199,6 +199,192 @@ class TestKandinskyLayering:
         assert abs(layout.nodes[1].y - layout.nodes[2].y) < 1
 
 
+class TestKandinskyLayeringMethod:
+    """Tests for the layering_method parameter."""
+
+    @staticmethod
+    def _make_grid(rows, cols):
+        """Build a rows x cols grid graph."""
+        n = rows * cols
+        nodes = [{} for _ in range(n)]
+        links = []
+        for r in range(rows):
+            for c in range(cols):
+                node = r * cols + c
+                if c < cols - 1:
+                    links.append({"source": node, "target": node + 1})
+                if r < rows - 1:
+                    links.append({"source": node, "target": node + cols})
+        return n, nodes, links
+
+    def test_auto_detects_undirected_grid(self):
+        """Auto mode should use width_bounded for a grid (all src < tgt)."""
+        _, nodes, links = self._make_grid(4, 4)
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600), layering_method="auto")
+        # Auto should detect src < tgt pattern
+        method = layout._detect_layering_method()
+        assert method == "width_bounded"
+
+    def test_auto_detects_directed_dag(self):
+        """Auto mode should use longest_path for a DAG with mixed directions."""
+        nodes = [{} for _ in range(4)]
+        # Edge 2->1 has src > tgt, so not all src < tgt
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 2, "target": 1},
+            {"source": 1, "target": 3},
+        ]
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600), layering_method="auto")
+        method = layout._detect_layering_method()
+        assert method == "longest_path"
+
+    def test_grid_fewer_layers_with_width_bounded(self):
+        """4x4 grid should get fewer y-levels with width_bounded vs longest_path."""
+        _, nodes, links = self._make_grid(4, 4)
+
+        layout_wb = KandinskyLayout(
+            nodes=nodes, links=links, size=(800, 600), layering_method="width_bounded"
+        )
+        layout_wb.run()
+        y_wb = set(round(n.y, 1) for n in layout_wb.nodes)
+
+        layout_lp = KandinskyLayout(
+            nodes=nodes, links=links, size=(800, 600), layering_method="longest_path"
+        )
+        layout_lp.run()
+        y_lp = set(round(n.y, 1) for n in layout_lp.nodes)
+
+        # longest_path produces 7 layers for the grid; width_bounded should be <= 5
+        assert len(y_wb) < len(y_lp)
+        assert len(y_wb) <= 5
+
+    def test_explicit_longest_path(self):
+        """Explicit longest_path should work as before."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+        ]
+        layout = KandinskyLayout(
+            nodes=nodes, links=links, size=(800, 600), layering_method="longest_path"
+        )
+        layout.run()
+        # Chain should still produce sequential layers
+        y_positions = sorted(set(round(n.y, 1) for n in layout.nodes))
+        assert len(y_positions) >= 2
+
+    def test_auto_detects_tree_as_longest_path(self):
+        """Auto mode should use longest_path for trees (in-degree <= 1)."""
+        nodes = [{} for _ in range(7)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+            {"source": 1, "target": 4},
+            {"source": 2, "target": 5},
+            {"source": 2, "target": 6},
+        ]
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600), layering_method="auto")
+        # Tree: all src < tgt BUT every non-root has in-degree 1
+        method = layout._detect_layering_method()
+        assert method == "longest_path"
+
+    def test_tree_auto_produces_hierarchical_layers(self):
+        """Tree with auto layering should produce proper hierarchical layout."""
+        nodes = [{} for _ in range(7)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+            {"source": 1, "target": 4},
+            {"source": 2, "target": 5},
+            {"source": 2, "target": 6},
+        ]
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600), layering_method="auto")
+        layout.run()
+        y_positions = sorted(set(round(n.y, 1) for n in layout.nodes))
+        # Binary tree: 3 levels
+        assert len(y_positions) == 3
+
+    def test_tree_unaffected_by_longest_path(self):
+        """Tree graph with longest_path should produce hierarchical layers."""
+        nodes = [{} for _ in range(7)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+            {"source": 1, "target": 4},
+            {"source": 2, "target": 5},
+            {"source": 2, "target": 6},
+        ]
+        layout = KandinskyLayout(
+            nodes=nodes, links=links, size=(800, 600), layering_method="longest_path"
+        )
+        layout.run()
+        y_positions = sorted(set(round(n.y, 1) for n in layout.nodes))
+        # Binary tree: 3 levels
+        assert len(y_positions) == 3
+
+
+class TestKandinskyNodeOrdering:
+    """Tests for within-layer node ordering via barycenter crossing minimization."""
+
+    def test_tree_parent_between_children(self):
+        """For a binary tree, each parent's x should lie between its children's x."""
+        # Binary tree: 0->{1,2}, 1->{3,4}, 2->{5,6}
+        nodes = [{} for _ in range(7)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+            {"source": 1, "target": 4},
+            {"source": 2, "target": 5},
+            {"source": 2, "target": 6},
+        ]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        # Node 0 should be horizontally between nodes 1 and 2
+        x0 = layout.nodes[0].x
+        x1 = layout.nodes[1].x
+        x2 = layout.nodes[2].x
+        assert min(x1, x2) <= x0 <= max(x1, x2), (
+            f"Root node x={x0} not between children x={x1}, x={x2}"
+        )
+
+        # Node 1 should be horizontally between nodes 3 and 4
+        x1 = layout.nodes[1].x
+        x3 = layout.nodes[3].x
+        x4 = layout.nodes[4].x
+        assert min(x3, x4) <= x1 <= max(x3, x4), (
+            f"Node 1 x={x1} not between children x={x3}, x={x4}"
+        )
+
+    def test_tree_layers_separated(self):
+        """Nodes in different layers must have distinct y-positions after compaction."""
+        nodes = [{} for _ in range(7)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+            {"source": 1, "target": 4},
+            {"source": 2, "target": 5},
+            {"source": 2, "target": 6},
+        ]
+
+        layout = KandinskyLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+
+        # Layer 0: node 0; Layer 1: nodes 1,2; Layer 2: nodes 3,4,5,6
+        y0 = layout.nodes[0].y
+        y1 = layout.nodes[1].y
+        y3 = layout.nodes[3].y
+        # Each layer should be strictly below the previous
+        assert y0 < y1 < y3, f"Layers not separated: y0={y0}, y1={y1}, y3={y3}"
+
+
 class TestKandinskyEdgeRouting:
     """Tests for edge routing."""
 

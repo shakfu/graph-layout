@@ -29,6 +29,7 @@ from graph_layout import (
     GIOTTOLayout,
     KamadaKawaiLayout,
     KandinskyLayout,
+    OptimalFlexEmbedder,
     PlanarityResult,
     RadialTreeLayout,
     ReingoldTilfordLayout,
@@ -40,6 +41,7 @@ from graph_layout import (
     check_planarity,
 )
 from graph_layout.cola import Layout as ColaLayout
+from graph_layout.orthogonal.edge_routing import nudge_overlapping_segments
 
 # Output directory
 BUILD_DIR = Path(__file__).parent.parent.parent / "build"
@@ -47,6 +49,11 @@ BUILD_DIR = Path(__file__).parent.parent.parent / "build"
 # SVG dimensions
 SVG_WIDTH = 400
 SVG_HEIGHT = 350
+# Vertical margin reserved for title/subtitle at top and stats at bottom.
+# Layout algorithms receive a reduced height so nodes stay within the
+# visible content area.
+SVG_MARGIN_TOP = 50
+SVG_MARGIN_BOTTOM = 25
 
 
 @dataclass
@@ -549,12 +556,16 @@ def run_layout(spec: LayoutSpec, nodes: list[dict], links: list[dict]) -> Any:
             link_copy["target_side"] = l["target_side"]
         link_data.append(link_copy)
 
+    # Use reduced canvas height so nodes don't overlap title/stats
+    layout_w = SVG_WIDTH
+    layout_h = SVG_HEIGHT - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM
+
     if spec.uses_cola_api:
         # Cola uses different API (no port constraints)
         node_data = [
             {
-                "x": random.uniform(100, SVG_WIDTH - 100),
-                "y": random.uniform(100, SVG_HEIGHT - 100),
+                "x": random.uniform(100, layout_w - 100),
+                "y": random.uniform(100, layout_h - 100),
                 "width": 15,
                 "height": 15,
             }
@@ -563,7 +574,7 @@ def run_layout(spec: LayoutSpec, nodes: list[dict], links: list[dict]) -> Any:
         # Strip port constraints for Cola
         cola_links = [{"source": l["source"], "target": l["target"]} for l in link_data]
         layout = ColaLayout()
-        layout.nodes(node_data).links(cola_links).size([SVG_WIDTH, SVG_HEIGHT])
+        layout.nodes(node_data).links(cola_links).size([layout_w, layout_h])
         layout.link_distance(spec.params.get("link_distance", 80))
         layout.start(20, 0, 20, 0, False)
         return layout
@@ -572,7 +583,7 @@ def run_layout(spec: LayoutSpec, nodes: list[dict], links: list[dict]) -> Any:
     layout = spec.cls(
         nodes=node_data,
         links=link_data,
-        size=(SVG_WIDTH, SVG_HEIGHT),
+        size=(layout_w, layout_h),
         **spec.params,
     )
     layout.run()
@@ -594,34 +605,55 @@ def layout_to_svg(
         nodes = layout.nodes
         links = layout.links
 
+    # Compute bounding box for fit-to-canvas scaling
+    all_x: list[float] = []
+    all_y: list[float] = []
+    if show_orthogonal and hasattr(layout, "_node_width") and hasattr(layout, "node_boxes"):
+        nw = layout._node_width
+        nh = layout._node_height
+        for n in nodes:
+            all_x.extend([n.x - nw / 2, n.x + nw / 2])
+            all_y.extend([n.y - nh / 2, n.y + nh / 2])
+        boxes = layout.node_boxes
+        for edge in layout.orthogonal_edges:
+            if edge.source < len(boxes) and edge.target < len(boxes):
+                sp = boxes[edge.source].get_port_position(
+                    edge.source_port.side, edge.source_port.position
+                )
+                tp = boxes[edge.target].get_port_position(
+                    edge.target_port.side, edge.target_port.position
+                )
+                all_x.extend([sp[0], tp[0]])
+                all_y.extend([sp[1], tp[1]])
+                for bx, by in edge.bends:
+                    all_x.append(bx)
+                    all_y.append(by)
+    else:
+        all_x = [n.x for n in nodes]
+        all_y = [n.y for n in nodes]
+    content_h = SVG_HEIGHT - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM
+    fit = _fit_transform(all_x, all_y, float(SVG_WIDTH), content_h)
+    inner_transform = f"translate(0,{SVG_MARGIN_TOP})"
+    if fit:
+        inner_transform += f" {fit}"
+
     # Build SVG
     svg_parts = [
         f'<svg width="{SVG_WIDTH}" height="{SVG_HEIGHT}" xmlns="http://www.w3.org/2000/svg">',
         '<rect width="100%" height="100%" fill="#fafafa"/>',
     ]
 
+    svg_parts.append(f'<g transform="{inner_transform}">')
+
     # Draw edges
-    if show_orthogonal and hasattr(layout, "orthogonal_edges"):
-        # Draw orthogonal edges with bends
+    if show_orthogonal and hasattr(layout, "orthogonal_edges") and hasattr(layout, "node_boxes"):
+        # Draw orthogonal edges using port positions on box boundary
+        boxes = layout.node_boxes
         for edge in layout.orthogonal_edges:
-            src_idx = edge.source
-            tgt_idx = edge.target
-
-            if src_idx >= len(nodes) or tgt_idx >= len(nodes):
+            path_d = _ortho_edge_path(edge, boxes)
+            if path_d is None:
                 continue
-
-            src_node = nodes[src_idx]
-            tgt_node = nodes[tgt_idx]
-
-            # Build path through bends
-            path_parts = [f"M {src_node.x:.1f} {src_node.y:.1f}"]
-            for bx, by in edge.bends:
-                path_parts.append(f"L {bx:.1f} {by:.1f}")
-            path_parts.append(f"L {tgt_node.x:.1f} {tgt_node.y:.1f}")
-
-            svg_parts.append(
-                f'<path d="{" ".join(path_parts)}" stroke="#888" stroke-width="1.5" fill="none"/>'
-            )
+            svg_parts.append(f'<path d="{path_d}" stroke="#888" stroke-width="1.5" fill="none"/>')
     else:
         # Draw straight edges
         for link in links:
@@ -639,17 +671,35 @@ def layout_to_svg(
                 f'stroke="#888" stroke-width="1.5" opacity="0.6"/>'
             )
 
-    # Draw nodes
-    for i, node in enumerate(nodes):
-        svg_parts.append(
-            f'<circle cx="{node.x:.1f}" cy="{node.y:.1f}" r="8" '
-            f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
-        )
-        # Node label
-        svg_parts.append(
-            f'<text x="{node.x:.1f}" y="{node.y + 3:.1f}" '
-            f'text-anchor="middle" fill="#fff" font-size="8" font-family="sans-serif">{i}</text>'
-        )
+    # Draw nodes -- use rectangles for orthogonal layouts, circles otherwise
+    if show_orthogonal and hasattr(layout, "_node_width"):
+        nw = layout._node_width
+        nh = layout._node_height
+        rx = min(nw, nh) * 0.3
+        for i, node in enumerate(nodes):
+            svg_parts.append(
+                f'<rect x="{node.x - nw / 2:.1f}" y="{node.y - nh / 2:.1f}" '
+                f'width="{nw}" height="{nh}" rx="{rx:.1f}" '
+                f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
+            )
+            svg_parts.append(
+                f'<text x="{node.x:.1f}" y="{node.y + 3:.1f}" '
+                f'text-anchor="middle" fill="#fff" font-size="8"'
+                f' font-family="sans-serif">{i}</text>'
+            )
+    else:
+        for i, node in enumerate(nodes):
+            svg_parts.append(
+                f'<circle cx="{node.x:.1f}" cy="{node.y:.1f}" r="8" '
+                f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
+            )
+            svg_parts.append(
+                f'<text x="{node.x:.1f}" y="{node.y + 3:.1f}" '
+                f'text-anchor="middle" fill="#fff" font-size="8"'
+                f' font-family="sans-serif">{i}</text>'
+            )
+
+    svg_parts.append("</g>")
 
     # Title with algorithm name and parameters
     params_str = ", ".join(f"{k}={v}" for k, v in spec.params.items()) if spec.params else ""
@@ -795,6 +845,10 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
             <h3 style="margin-top: 1rem;">New Features</h3>
             <ul>
                 <li><strong>Planarity Testing:</strong> Linear-time LR-planarity</li>
+                <li><strong>Kuratowski Witness:</strong> K5/K3,3 subgraph extraction</li>
+                <li><strong>OptimalFlexEmbedder:</strong> LP-based bend minimization</li>
+                <li><strong>Visibility Routing:</strong> Obstacle-aware edge routing</li>
+                <li><strong>Segment Nudging:</strong> Overlap separation</li>
                 <li><strong>Port Constraints:</strong> User-specified edge exit/entry sides</li>
                 <li><strong>ILP Compaction:</strong> Optimal area minimization (requires scipy)</li>
                 <li><strong>GIOTTO:</strong> Bend-optimal for degree-4 planar graphs</li>
@@ -821,6 +875,328 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
     )
 
     return "\n".join(html_parts)
+
+
+def kuratowski_demo_to_svg(
+    name: str,
+    num_nodes: int,
+    edges: list[tuple[int, int]],
+    result: PlanarityResult,
+) -> str:
+    """Render a Kuratowski witness subgraph with highlighted edges.
+
+    Non-planar graphs get witness edges drawn in bold red on top of the
+    full graph drawn in light gray.
+    """
+    import math
+
+    w, h = SVG_WIDTH, SVG_HEIGHT
+    cx, cy = w / 2, h / 2 + 10
+    radius = min(w, h) / 2 - 60
+
+    positions: list[tuple[float, float]] = []
+    for i in range(num_nodes):
+        angle = 2 * math.pi * i / num_nodes - math.pi / 2
+        px = cx + radius * math.cos(angle)
+        py = cy + radius * math.sin(angle)
+        positions.append((px, py))
+
+    witness_set: set[tuple[int, int]] = set()
+    if result.kuratowski_edges:
+        for u, v in result.kuratowski_edges:
+            witness_set.add((min(u, v), max(u, v)))
+
+    svg = [
+        f'<svg width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">',
+        '<rect width="100%" height="100%" fill="#fafafa" stroke="#e74c3c" stroke-width="3"/>',
+    ]
+
+    # Draw all edges in light gray
+    for u, v in edges:
+        x1, y1 = positions[u]
+        x2, y2 = positions[v]
+        svg.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'stroke="#ddd" stroke-width="1.5"/>'
+        )
+
+    # Draw witness edges in bold red on top
+    for u, v in edges:
+        canon = (min(u, v), max(u, v))
+        if canon in witness_set:
+            x1, y1 = positions[u]
+            x2, y2 = positions[v]
+            svg.append(
+                f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'stroke="#e74c3c" stroke-width="3" opacity="0.8"/>'
+            )
+
+    # Draw nodes -- highlight branch vertices of the witness
+    witness_verts: set[int] = set()
+    if result.kuratowski_edges:
+        for u, v in result.kuratowski_edges:
+            witness_verts.add(u)
+            witness_verts.add(v)
+
+    for i, (px, py) in enumerate(positions):
+        color = "#c0392b" if i in witness_verts else "#aaa"
+        svg.append(
+            f'<circle cx="{px:.1f}" cy="{py:.1f}" r="8" '
+            f'fill="{color}" stroke="#fff" stroke-width="1.5"/>'
+        )
+        svg.append(
+            f'<text x="{px:.1f}" y="{py + 3:.1f}" text-anchor="middle" '
+            f'fill="#fff" font-size="8" font-family="sans-serif">{i}</text>'
+        )
+
+    # Title
+    svg.append(
+        f'<text x="{w // 2}" y="20" text-anchor="middle" '
+        f'fill="#333" font-size="12" font-weight="bold" font-family="sans-serif">'
+        f"{escape(name)}</text>"
+    )
+
+    # Witness info
+    k_type = result.kuratowski_type or "unknown"
+    n_witness = len(result.kuratowski_edges) if result.kuratowski_edges else 0
+    info = f"Witness: {k_type} ({n_witness} edges)"
+    svg.append(
+        f'<text x="{w // 2}" y="38" text-anchor="middle" '
+        f'fill="#e74c3c" font-size="11" font-weight="bold" font-family="sans-serif">'
+        f"{escape(info)}</text>"
+    )
+
+    svg.append(
+        f'<text x="{w // 2}" y="{h - 10}" text-anchor="middle" '
+        f'fill="#999" font-size="9" font-family="sans-serif">'
+        f"V={num_nodes}  E={len(edges)}  Witness edges in red</text>"
+    )
+
+    svg.append("</svg>")
+    return "\n".join(svg)
+
+
+def _fit_transform(
+    all_x: list[float],
+    all_y: list[float],
+    target_w: float,
+    target_h: float,
+    padding: float = 15.0,
+) -> str:
+    """Compute an SVG transform that scales and translates content to fit.
+
+    Returns a transform string like ``"translate(dx,dy) scale(s)"`` that maps
+    the bounding box of *all_x*/*all_y* into a *target_w* x *target_h* area
+    with *padding* on all sides.  Returns an empty string when no scaling is
+    needed (content already fits).
+    """
+    if not all_x or not all_y:
+        return ""
+    min_x, max_x = min(all_x), max(all_x)
+    min_y, max_y = min(all_y), max(all_y)
+    content_w = max_x - min_x
+    content_h = max_y - min_y
+
+    usable_w = target_w - 2 * padding
+    usable_h = target_h - 2 * padding
+    if usable_w <= 0 or usable_h <= 0:
+        return ""
+
+    # Only scale down, never up
+    sx = usable_w / content_w if content_w > 1e-6 else 1.0
+    sy = usable_h / content_h if content_h > 1e-6 else 1.0
+    scale = min(sx, sy, 1.0)
+
+    # Center in the target area after scaling
+    scaled_w = content_w * scale
+    scaled_h = content_h * scale
+    tx = padding + (usable_w - scaled_w) / 2 - min_x * scale
+    ty = padding + (usable_h - scaled_h) / 2 - min_y * scale
+
+    if abs(scale - 1.0) < 1e-6 and abs(tx) < 1e-6 and abs(ty) < 1e-6:
+        return ""
+    return f"translate({tx:.2f},{ty:.2f}) scale({scale:.4f})"
+
+
+def _ortho_edge_path(
+    edge: Any,
+    boxes: list[Any],
+) -> str | None:
+    """Build an SVG path string for an orthogonal edge using port positions."""
+    src_idx = edge.source
+    tgt_idx = edge.target
+    if src_idx >= len(boxes) or tgt_idx >= len(boxes):
+        return None
+    sp = boxes[src_idx].get_port_position(edge.source_port.side, edge.source_port.position)
+    tp = boxes[tgt_idx].get_port_position(edge.target_port.side, edge.target_port.position)
+    parts = [f"M {sp[0]:.1f} {sp[1]:.1f}"]
+    for bx, by in edge.bends:
+        parts.append(f"L {bx:.1f} {by:.1f}")
+    parts.append(f"L {tp[0]:.1f} {tp[1]:.1f}")
+    return " ".join(parts)
+
+
+def orthogonal_layout_to_svg(
+    layout: Any,
+    title: str,
+    subtitle: str,
+    graph_name: str,
+    border_color: str = "#888",
+) -> str:
+    """Render an orthogonal layout (Kandinsky/GIOTTO) to SVG.
+
+    Shows node boxes and routed orthogonal edges with bend count stats.
+    """
+    nodes = layout.nodes
+    boxes = layout.node_boxes
+    w, h = SVG_WIDTH, SVG_HEIGHT
+
+    svg = [
+        f'<svg width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">',
+        f'<rect width="100%" height="100%" fill="#fafafa"'
+        f' stroke="{border_color}" stroke-width="2"/>',
+    ]
+
+    # Use configured node dimensions (uniform for all nodes)
+    nw = getattr(layout, "_node_width", 30)
+    nh = getattr(layout, "_node_height", 20)
+    rx = min(nw, nh) * 0.3  # rounded corners
+
+    # Collect bounding box of all rendered geometry (nodes + edges)
+    all_x: list[float] = []
+    all_y: list[float] = []
+    for node in nodes:
+        all_x.extend([node.x - nw / 2, node.x + nw / 2])
+        all_y.extend([node.y - nh / 2, node.y + nh / 2])
+    for edge in layout.orthogonal_edges:
+        if edge.source < len(boxes) and edge.target < len(boxes):
+            sp = boxes[edge.source].get_port_position(
+                edge.source_port.side, edge.source_port.position
+            )
+            tp = boxes[edge.target].get_port_position(
+                edge.target_port.side, edge.target_port.position
+            )
+            all_x.extend([sp[0], tp[0]])
+            all_y.extend([sp[1], tp[1]])
+            for bx, by in edge.bends:
+                all_x.append(bx)
+                all_y.append(by)
+
+    content_h = float(h) - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM
+    fit = _fit_transform(all_x, all_y, float(w), content_h)
+    inner_transform = f"translate(0,{SVG_MARGIN_TOP})"
+    if fit:
+        inner_transform += f" {fit}"
+
+    svg.append(f'<g transform="{inner_transform}">')
+
+    # Draw orthogonal edges using port positions
+    for edge in layout.orthogonal_edges:
+        path_d = _ortho_edge_path(edge, boxes)
+        if path_d is None:
+            continue
+        svg.append(f'<path d="{path_d}" stroke="#888" stroke-width="1.5" fill="none"/>')
+
+    # Draw nodes as uniform rounded rectangles matching configured dimensions
+    for i, node in enumerate(nodes):
+        svg.append(
+            f'<rect x="{node.x - nw / 2:.1f}" y="{node.y - nh / 2:.1f}" '
+            f'width="{nw}" height="{nh}" rx="{rx:.1f}" '
+            f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
+        )
+        svg.append(
+            f'<text x="{node.x:.1f}" y="{node.y + 3:.1f}" '
+            f'text-anchor="middle" fill="#fff" font-size="8"'
+            f' font-family="sans-serif">{i}</text>'
+        )
+
+    svg.append("</g>")
+
+    # Title
+    svg.append(
+        f'<text x="{w // 2}" y="20" text-anchor="middle" '
+        f'fill="#333" font-size="12" font-weight="bold"'
+        f' font-family="sans-serif">{escape(title)}</text>'
+    )
+    svg.append(
+        f'<text x="{w // 2}" y="35" text-anchor="middle" '
+        f'fill="{border_color}" font-size="10"'
+        f' font-family="sans-serif">{escape(subtitle)}</text>'
+    )
+
+    # Stats
+    n_bends = sum(len(e.bends) for e in layout.orthogonal_edges)
+    n_edges = len(layout.orthogonal_edges)
+    svg.append(
+        f'<text x="{w // 2}" y="{h - 10}" text-anchor="middle" '
+        f'fill="#999" font-size="9" font-family="sans-serif">'
+        f"{escape(graph_name)}  |  {n_edges} edges, {n_bends} bends</text>"
+    )
+
+    svg.append("</svg>")
+    return "\n".join(svg)
+
+
+def nudged_layout_to_svg(
+    layout: Any,
+    title: str,
+    graph_name: str,
+) -> str:
+    """Render a Kandinsky/GIOTTO layout after applying segment nudging.
+
+    Draws the nudged orthogonal edges using the layout's node boxes.
+    """
+    nodes = layout.nodes
+    boxes = layout.node_boxes
+    nudged = nudge_overlapping_segments(layout.orthogonal_edges, boxes, edge_separation=15.0)
+
+    w, h = SVG_WIDTH, SVG_HEIGHT
+    svg = [
+        f'<svg width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">',
+        '<rect width="100%" height="100%" fill="#fafafa" stroke="#27ae60" stroke-width="2"/>',
+    ]
+
+    # Draw nudged edges using port positions
+    for edge in nudged:
+        path_d = _ortho_edge_path(edge, boxes)
+        if path_d is None:
+            continue
+        svg.append(f'<path d="{path_d}" stroke="#27ae60" stroke-width="1.5" fill="none"/>')
+
+    # Draw nodes
+    for i, node in enumerate(nodes):
+        svg.append(
+            f'<circle cx="{node.x:.1f}" cy="{node.y:.1f}" r="8" '
+            f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
+        )
+        svg.append(
+            f'<text x="{node.x:.1f}" y="{node.y + 3:.1f}" '
+            f'text-anchor="middle" fill="#fff" font-size="8"'
+            f' font-family="sans-serif">{i}</text>'
+        )
+
+    # Title
+    svg.append(
+        f'<text x="{w // 2}" y="20" text-anchor="middle" '
+        f'fill="#333" font-size="12" font-weight="bold"'
+        f' font-family="sans-serif">{escape(title)}</text>'
+    )
+    svg.append(
+        f'<text x="{w // 2}" y="35" text-anchor="middle" '
+        f'fill="#27ae60" font-size="10"'
+        f' font-family="sans-serif">After segment nudging</text>'
+    )
+
+    n_bends = sum(len(e.bends) for e in nudged)
+    n_edges = len(nudged)
+    svg.append(
+        f'<text x="{w // 2}" y="{h - 10}" text-anchor="middle" '
+        f'fill="#999" font-size="9" font-family="sans-serif">'
+        f"{escape(graph_name)}  |  {n_edges} edges, {n_bends} bends</text>"
+    )
+
+    svg.append("</svg>")
+    return "\n".join(svg)
 
 
 def main() -> None:
@@ -853,14 +1229,6 @@ def main() -> None:
 
     sections = []
 
-    # Planarity testing section
-    print("\nProcessing: Planarity Testing")
-    planarity_svgs = []
-    for name, n, edges, result in generate_planarity_demos():
-        print(f"  {name}: is_planar={result.is_planar}")
-        planarity_svgs.append(planarity_demo_to_svg(name, n, edges, result))
-    sections.append(("Planarity Testing (LR-Planarity Algorithm)", planarity_svgs))
-
     for graph_name, (nodes, links) in graphs.items():
         print(f"\nProcessing: {graph_name}")
         print(f"  Nodes: {len(nodes)}, Edges: {len(links)}")
@@ -879,10 +1247,65 @@ def main() -> None:
                 show_ortho = isinstance(layout, (KandinskyLayout, GIOTTOLayout))
                 svg = layout_to_svg(layout, spec, graph_name, show_orthogonal=show_ortho)
                 svgs.append(svg)
+
+                # Cross-cutting: for Kandinsky layouts, also show OptimalFlex
+                # variant and nudged variant on the SAME graph
+                if isinstance(layout, KandinskyLayout) and spec.name == "Kandinsky":
+                    n_bends_default = sum(len(e.bends) for e in layout.orthogonal_edges)
+
+                    # OptimalFlexEmbedder variant
+                    try:
+                        print("    + Kandinsky (OptimalFlexEmbedder)...")
+                        opt_layout = KandinskyLayout(
+                            nodes=[{} for _ in nodes],
+                            links=[{"source": l["source"], "target": l["target"]} for l in links],
+                            size=(SVG_WIDTH, SVG_HEIGHT - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM),
+                            embedder=OptimalFlexEmbedder(),
+                            **spec.params,
+                        )
+                        opt_layout.run()
+                        n_bends_opt = sum(len(e.bends) for e in opt_layout.orthogonal_edges)
+                        svgs.append(
+                            orthogonal_layout_to_svg(
+                                opt_layout,
+                                "Kandinsky (OptimalFlexEmbedder)",
+                                f"Default: {n_bends_default} bends"
+                                f"  |  OptimalFlex: {n_bends_opt} bends",
+                                graph_name,
+                                border_color="#667eea",
+                            )
+                        )
+                    except Exception as e:
+                        print(f"      Error: {e}")
+
+                    # Segment nudging disabled -- current implementation moves
+                    # segments without obstacle-aware re-routing, causing edges
+                    # to pass through node boxes.  See TODO.md.
+
             except Exception as e:
                 print(f"    Error: {e}")
 
         sections.append((graph_name, svgs))
+
+    # Planarity testing section -- includes Kuratowski witnesses on non-planar
+    print("\nProcessing: Planarity Testing")
+    planarity_svgs = []
+    for name, n, edges, result in generate_planarity_demos():
+        print(f"  {name}: is_planar={result.is_planar}")
+        planarity_svgs.append(planarity_demo_to_svg(name, n, edges, result))
+        # For non-planar graphs, also show the Kuratowski witness overlay
+        if not result.is_planar and result.kuratowski_edges:
+            k_type = result.kuratowski_type or "?"
+            print(f"    + Kuratowski witness: {k_type} ({len(result.kuratowski_edges)} edges)")
+            planarity_svgs.append(
+                kuratowski_demo_to_svg(
+                    f"{name} -- {k_type} witness",
+                    n,
+                    edges,
+                    result,
+                )
+            )
+    sections.append(("Planarity Testing (with Kuratowski witnesses)", planarity_svgs))
 
     # Generate HTML
     html = generate_html(sections)

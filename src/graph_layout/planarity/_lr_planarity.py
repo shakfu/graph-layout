@@ -29,12 +29,28 @@ def lr_planarity_test(
 
     m = sum(len(adj[v]) for v in range(num_nodes)) // 2
     if m > 3 * num_nodes - 6:
+        witness = _find_kuratowski_subgraph(num_nodes, adj)
+        if witness is not None:
+            k_type, k_edges = witness
+            return PlanarityResult(
+                is_planar=False,
+                kuratowski_edges=k_edges,
+                kuratowski_type=k_type,
+            )
         return PlanarityResult(is_planar=False)
 
     state = _LRState(num_nodes, adj)
     state.phase1_orientation()
 
     if not state.phase2_testing():
+        witness = _find_kuratowski_subgraph(num_nodes, adj)
+        if witness is not None:
+            k_type, k_edges = witness
+            return PlanarityResult(
+                is_planar=False,
+                kuratowski_edges=k_edges,
+                kuratowski_type=k_type,
+            )
         return PlanarityResult(is_planar=False)
 
     embedding = state.phase3_embedding()
@@ -445,6 +461,187 @@ class _LRState:
 
 
 # ---------------------------------------------------------------------------
+# Kuratowski subgraph extraction
+# ---------------------------------------------------------------------------
+
+
+def _find_kuratowski_subgraph(
+    n: int,
+    adj: list[list[int]],
+) -> Optional[tuple[str, list[tuple[int, int]]]]:
+    """Find a K5 or K3,3 subdivision in a non-planar graph.
+
+    Two-phase approach:
+    1. Edge deletion: remove edges while maintaining non-planarity to get a
+       minimal non-planar subgraph (a subdivision of K5 or K3,3).
+    2. Identification: degree-2 vertices are subdivision vertices; smooth them
+       to identify the K5 or K3,3 structure.
+
+    Returns:
+        ("K5", edges) or ("K3,3", edges), or None if extraction fails.
+    """
+    # Skip extraction for large graphs (too expensive for O(m^2) edge deletion)
+    m = sum(len(adj[v]) for v in range(n)) // 2
+    if n > 50 or m > 200:
+        return None
+
+    # Build working adjacency
+    work_adj: list[set[int]] = [set() for _ in range(n)]
+    for v in range(n):
+        for w in adj[v]:
+            if w > v:
+                work_adj[v].add(w)
+                work_adj[w].add(v)
+
+    def _is_planar_sub(wadj: list[set[int]], n_total: int) -> bool:
+        """Planarity check on the subgraph induced by non-empty adjacencies."""
+        verts = [v for v in range(n_total) if wadj[v]]
+        if not verts:
+            return True
+        n_sub = len(verts)
+        if n_sub <= 4:
+            return True
+        local_map = {v: i for i, v in enumerate(verts)}
+        local_adj: list[list[int]] = [[] for _ in range(n_sub)]
+        for v in verts:
+            for w in wadj[v]:
+                if w in local_map:
+                    local_adj[local_map[v]].append(local_map[w])
+        m_sub = sum(len(a) for a in local_adj) // 2
+        if n_sub >= 3 and m_sub > 3 * n_sub - 6:
+            return False
+        st = _LRState(n_sub, local_adj)
+        st.phase1_orientation()
+        return st.phase2_testing()
+
+    # Phase 1: Delete edges to reach a minimal non-planar subgraph.
+    # A minimal non-planar subgraph is a subdivision of K5 or K3,3.
+    changed = True
+    while changed:
+        changed = False
+        for v in range(n):
+            for w in sorted(work_adj[v]):
+                if w <= v:
+                    continue
+                # Try removing edge (v, w)
+                work_adj[v].discard(w)
+                work_adj[w].discard(v)
+                if _is_planar_sub(work_adj, n):
+                    # Edge is essential; put it back
+                    work_adj[v].add(w)
+                    work_adj[w].add(v)
+                else:
+                    # Edge removed successfully
+                    changed = True
+
+    # Phase 2: Identify the K5 or K3,3 structure.
+    # Collect edges and vertices of the minimal subgraph.
+    sub_edges: list[tuple[int, int]] = []
+    degrees: dict[int, int] = {}
+    for v in range(n):
+        for w in work_adj[v]:
+            if w > v:
+                sub_edges.append((v, w))
+        if work_adj[v]:
+            degrees[v] = len(work_adj[v])
+
+    if not sub_edges:
+        return None
+
+    # Remove isolated vertices (degree 0) and identify branch vertices
+    # In a subdivision of K5: branch vertices have degree 4
+    # In a subdivision of K3,3: branch vertices have degree 3
+    # Subdivision vertices have degree 2
+    branch_verts = [v for v, d in degrees.items() if d >= 3]
+
+    # Smooth degree-2 vertices to find the underlying structure
+    # Each degree-2 vertex is on a subdivision path between two branch vertices
+    # Build the contracted graph (only branch vertices, with paths between them)
+    # Also track which original edges are on each path
+    contracted_adj: dict[int, set[int]] = {v: set() for v in branch_verts}
+    path_edges: dict[tuple[int, int], list[tuple[int, int]]] = {}
+
+    visited_deg2: set[int] = set()
+    for bv in branch_verts:
+        for w in work_adj[bv]:
+            if w in visited_deg2:
+                continue
+            # Follow the path from bv through degree-2 vertices
+            path = [(bv, w)]  # original edges on this path
+            cur = w
+            prev = bv
+            while cur in degrees and degrees[cur] == 2:
+                visited_deg2.add(cur)
+                nbs = [x for x in work_adj[cur] if x != prev]
+                if not nbs:
+                    break
+                nxt = nbs[0]
+                path.append((cur, nxt))
+                prev = cur
+                cur = nxt
+            # cur should now be a branch vertex (or we ran out)
+            if cur in contracted_adj and bv != cur:
+                key = (min(bv, cur), max(bv, cur))
+                contracted_adj[bv].add(cur)
+                contracted_adj[cur].add(bv)
+                if key not in path_edges:
+                    path_edges[key] = []
+                path_edges[key].extend(path)
+
+    nb = len(branch_verts)
+    ne = sum(len(s) for s in contracted_adj.values()) // 2
+
+    # Check for K5: 5 branch vertices, 10 edges
+    if nb == 5 and ne == 10:
+        all_orig: list[tuple[int, int]] = []
+        for key, edges in path_edges.items():
+            all_orig.extend(edges)
+        return ("K5", _canonicalize_edges(all_orig))
+
+    # Check for K3,3: 6 branch vertices, 9 edges, bipartite
+    if nb == 6 and ne == 9:
+        # Check bipartiteness
+        bv_list = sorted(branch_verts)
+        bv_set = set(bv_list)
+        # BFS 2-coloring
+        color: dict[int, int] = {}
+        color[bv_list[0]] = 0
+        queue = [bv_list[0]]
+        is_bipartite = True
+        while queue and is_bipartite:
+            v = queue.pop(0)
+            for w in contracted_adj[v]:
+                if w not in bv_set:
+                    continue
+                if w not in color:
+                    color[w] = 1 - color[v]
+                    queue.append(w)
+                elif color[w] == color[v]:
+                    is_bipartite = False
+        if is_bipartite and len(color) == 6:
+            all_orig = []
+            for key, edges in path_edges.items():
+                all_orig.extend(edges)
+            return ("K3,3", _canonicalize_edges(all_orig))
+
+    return None
+
+
+def _canonicalize_edges(
+    edges: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    """Deduplicate and canonicalize edge list."""
+    seen: set[tuple[int, int]] = set()
+    result: list[tuple[int, int]] = []
+    for u, v in edges:
+        canon = (min(u, v), max(u, v))
+        if canon not in seen:
+            seen.add(canon)
+            result.append(canon)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Biconnected component decomposition
 # ---------------------------------------------------------------------------
 
@@ -564,7 +761,16 @@ def test_biconnected(
 
         result = lr_planarity_test(n_local, local_adj)
         if not result.is_planar:
-            return PlanarityResult(is_planar=False)
+            # Map Kuratowski witness edges back to global vertex IDs
+            k_edges = None
+            k_type = result.kuratowski_type
+            if result.kuratowski_edges is not None:
+                k_edges = [(comp_verts[a], comp_verts[b]) for a, b in result.kuratowski_edges]
+            return PlanarityResult(
+                is_planar=False,
+                kuratowski_edges=k_edges,
+                kuratowski_type=k_type,
+            )
 
         if result.embedding:
             for local_v, neighbors in result.embedding.items():

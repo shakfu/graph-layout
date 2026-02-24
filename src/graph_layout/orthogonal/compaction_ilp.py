@@ -135,72 +135,147 @@ def _solve_ilp_compaction(
     box_width = [box.width for box in boxes]
     box_height = [box.height for box in boxes]
 
-    # Sort indices by coordinate to establish ordering constraints
-    x_sorted = sorted(range(n), key=lambda i: box_x[i])
-    y_sorted = sorted(range(n), key=lambda i: box_y[i])
+    # Collect parent-child edges (cross-layer edges) for centering objective.
+    centering_edges: list[tuple[int, int]] = []
+    for edge in edges:
+        src, tgt = edge.source, edge.target
+        if src < n and tgt < n and abs(box_y[src] - box_y[tgt]) > 1e-6:
+            centering_edges.append((src, tgt))
+    num_centering = len(centering_edges)
 
-    # Number of variables: x coords + y coords + W + H
-    num_vars = 2 * n + 2
+    # Number of variables: x coords + y coords + W + H + d_e (centering aux)
+    num_vars = 2 * n + 2 + num_centering
     idx_W = 2 * n
     idx_H = 2 * n + 1
+    idx_d_start = 2 * n + 2  # auxiliary variables d_e for |x_src - x_tgt|
 
-    # Objective: minimize W + H
+    # Objective: minimize W + H + alpha * sum(d_e)
+    # alpha balances area minimization vs parent-child centering.
+    alpha = 0.5
     c = np.zeros(num_vars)
     c[idx_W] = 1.0
     c[idx_H] = 1.0
+    for k in range(num_centering):
+        c[idx_d_start + k] = alpha
 
     # Build constraint matrices
     # We need A_ub @ x <= b_ub for inequality constraints
     A_ub_rows = []
     b_ub_rows = []
 
-    # Constraint 1: Horizontal ordering and separation
-    # For consecutive pairs in x-sorted order that overlap vertically:
-    # x[j] >= x[i] + (w_i/2 + sep + w_j/2)
-    # => -x[i] + x[j] >= gap
-    # => x[i] - x[j] <= -gap
-    for k in range(len(x_sorted) - 1):
-        i = x_sorted[k]
-        j = x_sorted[k + 1]
+    # Non-overlap constraints for ALL pairs of nodes.
+    # For each pair (i,j), we choose a separation axis based on initial
+    # relative positions: separate horizontally if they're mostly side-by-side,
+    # vertically if they're mostly stacked, or both if ambiguous.
+    for i in range(n):
+        for j in range(i + 1, n):
+            dx = box_x[j] - box_x[i]
+            dy = box_y[j] - box_y[i]
 
-        # Check vertical overlap
-        top_i = box_y[i] - box_height[i] / 2
-        bottom_i = box_y[i] + box_height[i] / 2
-        top_j = box_y[j] - box_height[j] / 2
-        bottom_j = box_y[j] + box_height[j] / 2
+            # Determine separation axis based on initial layout geometry
+            # Horizontal separation needed: nodes on the same row (similar y)
+            # Vertical separation needed: nodes in the same column (similar x)
+            same_x = abs(dx) < 1e-6
+            same_y = abs(dy) < 1e-6
 
-        if not (bottom_i < top_j or bottom_j < top_i):
-            # They overlap vertically, need horizontal separation
-            gap = box_width[i] / 2 + node_separation + box_width[j] / 2
+            if same_x and same_y:
+                # Identical position: separate in both dimensions
+                h_gap = box_width[i] / 2 + node_separation + box_width[j] / 2
+                row = np.zeros(num_vars)
+                row[i] = 1.0
+                row[j] = -1.0
+                A_ub_rows.append(row)
+                b_ub_rows.append(-h_gap)
+                continue
 
-            row = np.zeros(num_vars)
-            row[i] = 1.0  # x_i
-            row[j] = -1.0  # -x_j
-            A_ub_rows.append(row)
-            b_ub_rows.append(-gap)
+            if same_x:
+                # Same column: vertical separation
+                a, b = (i, j) if dy > 0 else (j, i)
+                gap = box_height[a] / 2 + layer_separation + box_height[b] / 2
+                row = np.zeros(num_vars)
+                row[n + a] = 1.0
+                row[n + b] = -1.0
+                A_ub_rows.append(row)
+                b_ub_rows.append(-gap)
+                continue
 
-    # Constraint 2: Vertical ordering and separation
-    # For consecutive pairs in y-sorted order that overlap horizontally:
-    # y[j] >= y[i] + (h_i/2 + sep + h_j/2)
-    for k in range(len(y_sorted) - 1):
-        i = y_sorted[k]
-        j = y_sorted[k + 1]
+            if same_y:
+                # Same row: horizontal separation
+                a, b = (i, j) if dx > 0 else (j, i)
+                gap = box_width[a] / 2 + node_separation + box_width[b] / 2
+                row = np.zeros(num_vars)
+                row[a] = 1.0
+                row[b] = -1.0
+                A_ub_rows.append(row)
+                b_ub_rows.append(-gap)
+                continue
 
-        # Check horizontal overlap
-        left_i = box_x[i] - box_width[i] / 2
-        right_i = box_x[i] + box_width[i] / 2
-        left_j = box_x[j] - box_width[j] / 2
-        right_j = box_x[j] + box_width[j] / 2
+            # Different x and y: choose axis that gives the larger ratio
+            # (i.e., the axis along which they're more separated).
+            # This preserves the relative layout direction.
+            x_gap_needed = (box_width[i] + box_width[j]) / 2 + node_separation
+            y_gap_needed = (box_height[i] + box_height[j]) / 2 + layer_separation
+            x_ratio = abs(dx) / x_gap_needed
+            y_ratio = abs(dy) / y_gap_needed
 
-        if not (right_i < left_j or right_j < left_i):
-            # They overlap horizontally, need vertical separation
-            gap = box_height[i] / 2 + layer_separation + box_height[j] / 2
+            if x_ratio >= y_ratio:
+                # Primarily separated horizontally: add x-constraint
+                a, b = (i, j) if dx > 0 else (j, i)
+                gap = box_width[a] / 2 + edge_separation + box_width[b] / 2
+                row = np.zeros(num_vars)
+                row[a] = 1.0
+                row[b] = -1.0
+                A_ub_rows.append(row)
+                b_ub_rows.append(-gap)
+            else:
+                # Primarily separated vertically: add y-constraint
+                a, b = (i, j) if dy > 0 else (j, i)
+                gap = box_height[a] / 2 + edge_separation + box_height[b] / 2
+                row = np.zeros(num_vars)
+                row[n + a] = 1.0
+                row[n + b] = -1.0
+                A_ub_rows.append(row)
+                b_ub_rows.append(-gap)
 
-            row = np.zeros(num_vars)
-            row[n + i] = 1.0  # y_i
-            row[n + j] = -1.0  # -y_j
-            A_ub_rows.append(row)
-            b_ub_rows.append(-gap)
+    # Centering constraints: linearize |x_src - x_tgt| via auxiliary d_e.
+    # d_e >= x_src - x_tgt  =>  x_src - x_tgt - d_e <= 0
+    # d_e >= x_tgt - x_src  =>  x_tgt - x_src - d_e <= 0
+    for k, (src, tgt) in enumerate(centering_edges):
+        d_idx = idx_d_start + k
+        # d_e >= x_src - x_tgt
+        row = np.zeros(num_vars)
+        row[src] = 1.0
+        row[tgt] = -1.0
+        row[d_idx] = -1.0
+        A_ub_rows.append(row)
+        b_ub_rows.append(0.0)
+        # d_e >= x_tgt - x_src
+        row = np.zeros(num_vars)
+        row[tgt] = 1.0
+        row[src] = -1.0
+        row[d_idx] = -1.0
+        A_ub_rows.append(row)
+        b_ub_rows.append(0.0)
+
+    # Edge-based constraints: connected nodes in different layers must maintain
+    # layer_separation vertically to preserve hierarchical structure.
+    for edge in edges:
+        src, tgt = edge.source, edge.target
+        if src >= n or tgt >= n:
+            continue
+        dy = box_y[tgt] - box_y[src]
+        if abs(dy) < 1e-6:
+            continue  # Same layer
+        if dy > 0:
+            top_idx, bottom_idx = src, tgt
+        else:
+            top_idx, bottom_idx = tgt, src
+        gap = box_height[top_idx] / 2 + layer_separation + box_height[bottom_idx] / 2
+        row = np.zeros(num_vars)
+        row[n + top_idx] = 1.0  # y_top
+        row[n + bottom_idx] = -1.0  # -y_bottom
+        A_ub_rows.append(row)
+        b_ub_rows.append(-gap)
 
     # Constraint 3: W bounds all x coordinates
     # For each i: x[i] + w[i]/2 <= W - margin

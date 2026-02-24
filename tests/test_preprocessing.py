@@ -2,6 +2,7 @@
 
 from graph_layout import (
     assign_layers_longest_path,
+    assign_layers_width_bounded,
     connected_components,
     count_crossings,
     detect_cycle,
@@ -299,3 +300,105 @@ class TestCountCrossings:
         """Empty graph should have no crossings."""
         assert count_crossings([], []) == 0
         assert count_crossings([[0, 1]], []) == 0
+
+
+class TestAssignLayersWidthBounded:
+    """Tests for BFS width-bounded layering."""
+
+    def test_empty_graph(self):
+        """Empty graph produces no layers."""
+        assert assign_layers_width_bounded(0, []) == []
+
+    def test_single_node(self):
+        """Single node produces one layer."""
+        layers = assign_layers_width_bounded(1, [])
+        assert layers == [[0]]
+
+    def test_linear_chain(self):
+        """Linear chain should produce reasonable layers."""
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+        ]
+        layers = assign_layers_width_bounded(4, links)
+        # All nodes assigned
+        all_nodes = sorted(n for layer in layers for n in layer)
+        assert all_nodes == [0, 1, 2, 3]
+        # Should have fewer layers than nodes (merging happens)
+        assert len(layers) <= 4
+
+    def test_4x4_grid_fewer_layers_than_longest_path(self):
+        """4x4 grid should get far fewer layers with width_bounded vs longest_path."""
+        # 4x4 grid: nodes 0..15, edges connecting adjacent cells
+        n = 16
+        links = []
+        for r in range(4):
+            for c in range(4):
+                node = r * 4 + c
+                if c < 3:
+                    links.append({"source": node, "target": node + 1})
+                if r < 3:
+                    links.append({"source": node, "target": node + 4})
+
+        wb_layers = assign_layers_width_bounded(n, links)
+        lp_layers = assign_layers_longest_path(n, links)
+
+        # All nodes present
+        wb_nodes = sorted(n for layer in wb_layers for n in layer)
+        assert wb_nodes == list(range(16))
+
+        # Longest path produces 7 diagonal layers for the grid
+        assert len(lp_layers) == 7
+        # Width-bounded should produce significantly fewer (ideally 4-5)
+        assert len(wb_layers) <= 5
+
+    def test_all_nodes_assigned(self):
+        """Every node must appear in exactly one layer."""
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 0, "target": 2},
+            {"source": 1, "target": 3},
+            {"source": 2, "target": 3},
+        ]
+        layers = assign_layers_width_bounded(4, links)
+        all_nodes = sorted(n for layer in layers for n in layer)
+        assert all_nodes == [0, 1, 2, 3]
+
+    def test_disconnected_graph(self):
+        """Disconnected nodes should still be assigned to layers."""
+        links = [{"source": 0, "target": 1}]
+        layers = assign_layers_width_bounded(4, links)
+        all_nodes = sorted(n for layer in layers for n in layer)
+        assert all_nodes == [0, 1, 2, 3]
+
+    def test_explicit_max_width(self):
+        """Explicit max_width should be respected."""
+        # 6 nodes in a line
+        links = [{"source": i, "target": i + 1} for i in range(5)]
+        layers = assign_layers_width_bounded(6, links, max_width=2)
+        all_nodes = sorted(n for layer in layers for n in layer)
+        assert all_nodes == [0, 1, 2, 3, 4, 5]
+        # Each layer should have at most 2 nodes
+        for layer in layers:
+            assert len(layer) <= 2
+
+    def test_complete_graph_k4(self):
+        """Complete graph should produce layers without error."""
+        links = []
+        for i in range(4):
+            for j in range(i + 1, 4):
+                links.append({"source": i, "target": j})
+        layers = assign_layers_width_bounded(4, links)
+        all_nodes = sorted(n for layer in layers for n in layer)
+        assert all_nodes == [0, 1, 2, 3]
+
+    def test_star_graph(self):
+        """Star graph (hub + spokes) should layer reasonably."""
+        # Hub node 0 connected to all others
+        links = [{"source": 0, "target": i} for i in range(1, 8)]
+        layers = assign_layers_width_bounded(8, links)
+        all_nodes = sorted(n for layer in layers for n in layer)
+        assert all_nodes == list(range(8))
+        # BFS from hub gives 2 distance layers, merging may keep 1-2
+        assert len(layers) <= 3

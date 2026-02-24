@@ -197,6 +197,10 @@ class SugiyamaLayout(StaticLayout):
             sources = [0]  # Fallback
 
         # Compute longest path from any source
+        # Cap at n layers to guarantee termination on cyclic graphs.
+        # In a DAG with n nodes the longest path has at most n-1 edges,
+        # so any layer >= n is proof of a cycle.
+        max_layer = n - 1
         layers = [-1] * n
         queue: deque[int] = deque()
 
@@ -208,7 +212,7 @@ class SugiyamaLayout(StaticLayout):
             node = queue.popleft()
             for child in outgoing[node]:
                 new_layer = layers[node] + 1
-                if new_layer > layers[child]:
+                if new_layer > layers[child] and new_layer <= max_layer:
                     layers[child] = new_layer
                     queue.append(child)
 

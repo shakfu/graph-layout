@@ -3,7 +3,7 @@
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
 		lint format check typecheck all dev sync build publish publish-test \
-		wheel-check rebuild-cython qa
+		wheel-check rebuild-cython qa showcase
 
 # Source and test directories
 SRC_DIR := src/graph_layout
@@ -26,6 +26,7 @@ help:
 	@echo "  make test-watch   - Run tests in watch mode"
 	@echo "  make test-coverage - Run tests with coverage report"
 	@echo "  make test-html    - Run tests with HTML coverage report"
+	@echo "  make showcase     - Generate showcase HTML with visual demos"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make format       - Format code with ruff"
@@ -70,6 +71,11 @@ test-watch:
 # Run tests with coverage
 test-coverage:
 	@uv run pytest --cov=$(SRC_DIR) --cov-report=term-missing
+
+# Generate showcase HTML with visual demos
+showcase:
+	@uv run python tests/demos/showcase.py
+	@if [ "$$(uname)" = "Darwin" ]; then open build/showcase.html; fi
 
 # Run tests with HTML coverage report
 test-html:

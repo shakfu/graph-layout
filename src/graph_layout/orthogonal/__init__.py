@@ -23,10 +23,22 @@ from .compaction import (
     compact_layout,
     compact_vertical,
 )
+from .compaction_flow import (
+    compact_layout_flow,
+    compact_layout_longest_path,
+)
 from .compaction_ilp import (
     ILPCompactionResult,
     compact_layout_ilp,
     is_scipy_available,
+)
+from .edge_routing import (
+    assign_ports,
+    determine_port_sides,
+    nudge_overlapping_segments,
+    route_all_edges,
+    route_edge,
+    route_self_loop,
 )
 from .giotto import GIOTTOLayout
 from .kandinsky import KandinskyLayout
@@ -70,10 +82,20 @@ __all__ = [
     "compact_horizontal",
     "compact_vertical",
     "compact_layout",
+    # Flow/Longest-Path Compaction
+    "compact_layout_flow",
+    "compact_layout_longest_path",
     # ILP Compaction
     "ILPCompactionResult",
     "compact_layout_ilp",
     "is_scipy_available",
+    # Edge Routing
+    "assign_ports",
+    "determine_port_sides",
+    "nudge_overlapping_segments",
+    "route_all_edges",
+    "route_edge",
+    "route_self_loop",
     # Orthogonalization
     "AngleType",
     "Face",

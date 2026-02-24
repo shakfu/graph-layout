@@ -21,7 +21,8 @@ if TYPE_CHECKING:
     pass
 
 from ..base import StaticLayout
-from ..planarity import check_planarity
+from ..planarity import PlanarityResult, check_planarity
+from ..planarity.embedders import MaxFaceEmbedder, PlanarEmbedder
 from ..types import (
     Event,
     GroupLike,
@@ -30,9 +31,11 @@ from ..types import (
     SizeType,
 )
 from .compaction import CompactionResult, compact_layout
+from .compaction_flow import compact_layout_flow, compact_layout_longest_path
+from .edge_routing import route_all_edges
 from .orthogonalization import OrthogonalRepresentation, compute_orthogonal_representation
 from .planarization import is_planar_quick_check
-from .types import NodeBox, OrthogonalEdge, Port, Side
+from .types import NodeBox, OrthogonalEdge, Side
 
 
 class GIOTTOLayout(StaticLayout):
@@ -85,6 +88,8 @@ class GIOTTOLayout(StaticLayout):
         edge_separation: float = 15,
         layer_separation: float = 80,
         strict: bool = True,
+        embedder: Optional[PlanarEmbedder] = None,
+        compaction_method: str = "greedy",
     ) -> None:
         """
         Initialize GIOTTO layout.
@@ -105,6 +110,11 @@ class GIOTTOLayout(StaticLayout):
             layer_separation: Vertical gap between layers
             strict: If True, raise ValueError for invalid graphs.
                    If False, fall back to Kandinsky-like behavior.
+            embedder: Planar embedding strategy. Defaults to MaxFaceEmbedder.
+            compaction_method: Method to use for compaction. Options:
+                - "greedy": Greedy constraint-based compaction (default)
+                - "flow": Flow-based compaction using min-cost flow
+                - "longest_path": Longest-path compaction on constraint DAG
         """
         super().__init__(
             nodes=nodes,
@@ -124,6 +134,8 @@ class GIOTTOLayout(StaticLayout):
         self._edge_separation = float(edge_separation)
         self._layer_separation = float(layer_separation)
         self._strict = bool(strict)
+        self._embedder: PlanarEmbedder = embedder or MaxFaceEmbedder()
+        self._compaction_method = compaction_method
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
@@ -131,6 +143,7 @@ class GIOTTOLayout(StaticLayout):
         self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
         self._compaction_result: Optional[CompactionResult] = None
         self._is_valid_input: bool = False
+        self._planarity_result: Optional[PlanarityResult] = None
 
     # -------------------------------------------------------------------------
     # Properties
@@ -266,8 +279,7 @@ class GIOTTOLayout(StaticLayout):
         Definitive planarity check using LR-planarity algorithm.
 
         Uses linear-time LR-planarity test to determine whether the graph
-        is planar. Replaces the previous heuristic (Euler formula + K5
-        brute-force) with a correct O(n+m) algorithm.
+        is planar. Stores the PlanarityResult so the embedding can be reused.
 
         Returns:
             True if graph is planar, False otherwise.
@@ -288,6 +300,7 @@ class GIOTTOLayout(StaticLayout):
                 edges.append((src, tgt))
 
         result = check_planarity(n, edges)
+        self._planarity_result = result
         return result.is_planar
 
     # -------------------------------------------------------------------------
@@ -381,14 +394,13 @@ class GIOTTOLayout(StaticLayout):
         """
         Compute bend-optimal orthogonal representation.
 
-        For planar graphs with max degree 4, this produces the minimum
-        number of bends using min-cost flow.
+        Uses the configured embedder to obtain a combinatorial planar
+        embedding, then runs min-cost flow bend minimization on the
+        resulting face structure.
         """
         n = len(self._nodes)
         if n == 0 or not self._node_boxes:
             return
-
-        positions = [(box.x, box.y) for box in self._node_boxes]
 
         edges: list[tuple[int, int]] = []
         for link in self._links:
@@ -397,7 +409,19 @@ class GIOTTOLayout(StaticLayout):
             if 0 <= src < n and 0 <= tgt < n:
                 edges.append((src, tgt))
 
-        self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
+        # Try to get a combinatorial embedding from the embedder
+        embedding = None
+        try:
+            embedding = self._embedder.embed(n, edges, planarity_result=self._planarity_result)
+        except (ValueError, AttributeError):
+            pass
+
+        if embedding is not None:
+            self._orthogonal_rep = compute_orthogonal_representation(n, edges, embedding=embedding)
+        else:
+            # Fallback: use position-based face computation
+            positions = [(box.x, box.y) for box in self._node_boxes]
+            self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
 
     def _assign_layers(self) -> list[list[int]]:
         """
@@ -505,7 +529,7 @@ class GIOTTOLayout(StaticLayout):
             self._node_boxes.append(box)
 
     def _route_edges(self) -> None:
-        """Route edges between positioned nodes."""
+        """Route edges using global constraint-aware routing."""
         self._orthogonal_edges = []
 
         if not self._node_boxes:
@@ -513,35 +537,21 @@ class GIOTTOLayout(StaticLayout):
 
         n = len(self._nodes)
 
+        edges: list[tuple[int, int]] = []
+        edge_indices: list[int] = []
         for edge_idx, link in enumerate(self._links):
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
+            if 0 <= src < n and 0 <= tgt < n:
+                edges.append((src, tgt))
+                edge_indices.append(edge_idx)
 
-            if not (0 <= src < n and 0 <= tgt < n):
-                continue
-
-            src_box = self._node_boxes[src]
-            tgt_box = self._node_boxes[tgt]
-
-            src_side, tgt_side = self._determine_port_sides(src_box, tgt_box)
-
-            src_port = Port(node=src, side=src_side, edge=edge_idx)
-            tgt_port = Port(node=tgt, side=tgt_side, edge=edge_idx)
-
-            src_pos = src_box.get_port_position(src_side)
-            tgt_pos = tgt_box.get_port_position(tgt_side)
-
-            bends = self._compute_edge_route(src_pos, tgt_pos, src_side, tgt_side)
-
-            ortho_edge = OrthogonalEdge(
-                source=src,
-                target=tgt,
-                source_port=src_port,
-                target_port=tgt_port,
-                bends=bends,
-            )
-
-            self._orthogonal_edges.append(ortho_edge)
+        self._orthogonal_edges = route_all_edges(
+            boxes=self._node_boxes[:n],
+            edges=edges,
+            edge_indices=edge_indices,
+            edge_separation=self._edge_separation,
+        )
 
     def _determine_port_sides(self, src_box: NodeBox, tgt_box: NodeBox) -> tuple[Side, Side]:
         """
@@ -638,13 +648,30 @@ class GIOTTOLayout(StaticLayout):
         n = len(self._nodes)
         original_boxes = self._node_boxes[:n]
 
-        self._compaction_result = compact_layout(
-            boxes=original_boxes,
-            edges=self._orthogonal_edges,
-            node_separation=self._node_separation,
-            layer_separation=self._layer_separation,
-            edge_separation=self._edge_separation,
-        )
+        if self._compaction_method == "flow":
+            self._compaction_result = compact_layout_flow(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
+        elif self._compaction_method == "longest_path":
+            self._compaction_result = compact_layout_longest_path(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
+        else:
+            self._compaction_result = compact_layout(
+                boxes=original_boxes,
+                edges=self._orthogonal_edges,
+                node_separation=self._node_separation,
+                layer_separation=self._layer_separation,
+                edge_separation=self._edge_separation,
+            )
 
         for i, (new_x, new_y) in enumerate(self._compaction_result.node_positions):
             if i < len(self._node_boxes):

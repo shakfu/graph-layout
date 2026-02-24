@@ -360,6 +360,26 @@ class BaseLayout(ABC):
             node.x += dx
             node.y += dy
 
+        # Translate orthogonal layout structures (node boxes and edge bends)
+        # if present, so they stay aligned with node positions.
+        node_boxes = getattr(self, "_node_boxes", None)
+        if node_boxes:
+            from .orthogonal.types import NodeBox
+
+            for i, box in enumerate(node_boxes):
+                node_boxes[i] = NodeBox(
+                    index=box.index,
+                    x=box.x + dx,
+                    y=box.y + dy,
+                    width=box.width,
+                    height=box.height,
+                )
+
+        ortho_edges = getattr(self, "_orthogonal_edges", None)
+        if ortho_edges:
+            for edge in ortho_edges:
+                edge.bends = [(bx + dx, by + dy) for bx, by in edge.bends]
+
     def _get_source_index(self, link: Link) -> int:
         """Get source node index from a link."""
         if isinstance(link.source, int):

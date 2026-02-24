@@ -16,7 +16,10 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from ..planarity._embedding import PlanarEmbedding
 
 
 class AngleType(Enum):
@@ -91,21 +94,52 @@ class FlowNetwork:
     flow: dict[tuple[int, int], int] = field(default_factory=dict)
 
 
+def _sanitize_edges(
+    edges: list[tuple[int, int]],
+) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """Remove self-loops and deduplicate multi-edges for face computation.
+
+    Returns:
+        Tuple of (clean_edges, removed_self_loops).
+    """
+    self_loops: list[tuple[int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    clean: list[tuple[int, int]] = []
+    for u, v in edges:
+        if u == v:
+            self_loops.append((u, v))
+            continue
+        canon = (min(u, v), max(u, v))
+        if canon not in seen:
+            seen.add(canon)
+            clean.append((u, v))
+    return clean, self_loops
+
+
 def compute_faces(
     num_nodes: int,
     edges: list[tuple[int, int]],
     positions: Optional[list[tuple[float, float]]] = None,
+    embedding: Optional[PlanarEmbedding] = None,
 ) -> list[Face]:
     """
     Compute faces of a planar graph given its embedding.
 
-    Uses the positions to determine clockwise ordering around vertices.
-    If positions are not given, assumes edges are already in embedding order.
+    When *embedding* is provided, faces are derived directly from the
+    combinatorial rotation system and the embedding's ``outer_face_index``
+    is used to mark the outer face.  This avoids the fragile position-based
+    angular sorting.
+
+    Otherwise falls back to using *positions* (or largest-face heuristic).
+
+    Self-loops and duplicate multi-edges are filtered before face computation
+    (they do not participate in the planar face structure).
 
     Args:
         num_nodes: Number of vertices
         edges: List of undirected edges as (u, v) pairs
         positions: Optional vertex positions for determining embedding
+        embedding: Optional PlanarEmbedding from a planarity test / embedder
 
     Returns:
         List of Face objects
@@ -113,11 +147,64 @@ def compute_faces(
     if num_nodes == 0:
         return []
 
+    # Sanitize: strip self-loops and duplicate multi-edges
+    clean_edges, _self_loops = _sanitize_edges(edges)
+
+    # ---- Fast path: use combinatorial embedding directly ----
+    if embedding is not None:
+        # Validate embedding consistency; fall back to legacy if broken
+        if not embedding.verify():
+            import warnings
+
+            warnings.warn(
+                "PlanarEmbedding failed verification; falling back to position-based "
+                "face computation.",
+                stacklevel=2,
+            )
+            return _compute_faces_legacy(num_nodes, clean_edges, positions)
+
+        raw_faces = embedding.faces()
+        faces: list[Face] = []
+        for fi, directed_edges in enumerate(raw_faces):
+            verts = [u for u, _ in directed_edges]
+            face = Face(
+                index=fi,
+                vertices=verts,
+                edges=directed_edges,
+                is_outer=(fi == embedding.outer_face_index),
+            )
+            faces.append(face)
+
+        # If outer_face_index was not set, fall back to largest face
+        if embedding.outer_face_index is None and faces:
+            max_face = max(faces, key=lambda f: len(f.vertices))
+            max_face.is_outer = True
+
+        return faces
+
+    return _compute_faces_legacy(num_nodes, clean_edges, positions)
+
+
+def _compute_faces_legacy(
+    num_nodes: int,
+    edges: list[tuple[int, int]],
+    positions: Optional[list[tuple[float, float]]] = None,
+) -> list[Face]:
+    """Legacy position-based face computation.
+
+    Edges must already be sanitized (no self-loops, no duplicate multi-edges).
+    Handles disconnected components by tracing faces per component and
+    selecting the global outer face from the largest face overall.
+    """
     # Build adjacency with angular ordering
     adj: dict[int, list[int]] = defaultdict(list)
     for u, v in edges:
         adj[u].append(v)
         adj[v].append(u)
+
+    # Deduplicate neighbor lists (guards against any residual multi-edge entries)
+    for v in adj:
+        adj[v] = sorted(set(adj[v]))
 
     if positions:
         # Sort neighbors by angle from each vertex
@@ -126,23 +213,26 @@ def compute_faces(
         for v in adj:
             vx, vy = positions[v]
 
-            def angle_key(u: int) -> float:
+            def angle_key(u: int, _vx: float = vx, _vy: float = vy) -> float:
                 ux, uy = positions[u]
-                return math.atan2(uy - vy, ux - vx)
+                return math.atan2(uy - _vy, ux - _vx)
 
             adj[v].sort(key=angle_key)
 
     # Find faces by walking around the embedding
     # Each directed edge (u, v) belongs to exactly one face
     used_edges: set[tuple[int, int]] = set()
-    faces: list[Face] = []
+    faces_list: list[Face] = []
 
     def next_edge(u: int, v: int) -> tuple[int, int]:
         """Get next edge after (u, v) in clockwise order around v."""
         neighbors = adj[v]
         if not neighbors:
             return (v, u)
-        idx = neighbors.index(u) if u in neighbors else 0
+        try:
+            idx = neighbors.index(u)
+        except ValueError:
+            idx = 0
         # Next in clockwise order (previous in the sorted list)
         next_idx = (idx - 1) % len(neighbors)
         return (v, neighbors[next_idx])
@@ -157,48 +247,53 @@ def compute_faces(
             face_edges: list[tuple[int, int]] = []
             curr_u, curr_v = start_u, start_v
 
-            while True:
+            max_steps = 2 * len(edges) + 2  # safety bound
+            steps = 0
+            while steps < max_steps:
                 if (curr_u, curr_v) in used_edges:
                     break
                 used_edges.add((curr_u, curr_v))
                 face_vertices.append(curr_u)
                 face_edges.append((curr_u, curr_v))
                 curr_u, curr_v = next_edge(curr_u, curr_v)
+                steps += 1
                 if curr_u == start_u and curr_v == start_v:
                     break
 
             if face_vertices:
                 face = Face(
-                    index=len(faces),
+                    index=len(faces_list),
                     vertices=face_vertices,
                     edges=face_edges,
                 )
-                faces.append(face)
+                faces_list.append(face)
 
     # Identify outer face (largest face by vertex count, or use positions)
-    if faces:
+    if faces_list:
         if positions:
-            # Outer face has leftmost vertex with edges going up and down
-            min_x = min(positions[v][0] for v in range(num_nodes) if v in adj)
-            leftmost = [v for v in range(num_nodes) if v in adj and positions[v][0] == min_x]
-            # Find face containing leftmost vertex with counterclockwise orientation
-            for face in faces:
-                if any(v in leftmost for v in face.vertices):
-                    # Check orientation using signed area
-                    area = 0.0
-                    for i, v in enumerate(face.vertices):
-                        u = face.vertices[(i + 1) % len(face.vertices)]
-                        area += positions[v][0] * positions[u][1]
-                        area -= positions[u][0] * positions[v][1]
-                    if area < 0:  # Clockwise = outer face in our convention
-                        face.is_outer = True
-                        break
+            # Find vertices that participate in edges
+            verts_in_adj = [v for v in range(num_nodes) if v in adj and adj[v]]
+            if verts_in_adj:
+                min_x = min(positions[v][0] for v in verts_in_adj)
+                leftmost = [v for v in verts_in_adj if positions[v][0] == min_x]
+                for face in faces_list:
+                    if any(v in leftmost for v in face.vertices):
+                        area = 0.0
+                        for i, v in enumerate(face.vertices):
+                            u = face.vertices[(i + 1) % len(face.vertices)]
+                            area += positions[v][0] * positions[u][1]
+                            area -= positions[u][0] * positions[v][1]
+                        if area < 0:
+                            face.is_outer = True
+                            break
+            if not any(f.is_outer for f in faces_list):
+                max_face = max(faces_list, key=lambda f: len(f.vertices))
+                max_face.is_outer = True
         else:
-            # Just pick the largest face as outer
-            max_face = max(faces, key=lambda f: len(f.vertices))
+            max_face = max(faces_list, key=lambda f: len(f.vertices))
             max_face.is_outer = True
 
-    return faces
+    return faces_list
 
 
 def build_flow_network(
@@ -215,6 +310,9 @@ def build_flow_network(
     - Arcs from vertices to adjacent faces (angle arcs)
     - Arcs between adjacent faces (bend arcs)
 
+    Self-loops are filtered from ``edges`` before degree computation so they
+    do not corrupt supply values.
+
     Args:
         num_nodes: Number of graph vertices
         edges: Graph edges
@@ -225,14 +323,23 @@ def build_flow_network(
     """
     network = FlowNetwork(num_vertices=num_nodes, faces=faces)
 
-    # Compute vertex degrees
+    # Filter self-loops for degree computation
+    clean_edges = [(u, v) for u, v in edges if u != v]
+
+    # Compute vertex degrees (only count vertices that appear in faces)
     degrees: dict[int, int] = defaultdict(int)
-    for u, v in edges:
+    for u, v in clean_edges:
         degrees[u] += 1
         degrees[v] += 1
 
-    # Vertex supplies: 4 - degree (since sum of angles at vertex = 360° = 4×90°)
-    for v in range(num_nodes):
+    # Determine which vertices participate in faces
+    face_vertices: set[int] = set()
+    for face in faces:
+        face_vertices.update(face.vertices)
+
+    # Vertex supplies: 4 - degree (since sum of angles at vertex = 360° = 4*90 degrees)
+    # Only include vertices that actually appear in the face structure
+    for v in face_vertices:
         supply = 4 - degrees.get(v, 0)
         if supply != 0:
             network.supplies[v] = supply
@@ -242,10 +349,10 @@ def build_flow_network(
         face_node = num_nodes + face.index
         num_vertices_on_face = len(face.vertices)
         if face.is_outer:
-            # Outer face: angles sum to (n+2)×90° where n = #vertices
+            # Outer face: angles sum to (n+2)*90 degrees where n = #vertices
             demand = -(num_vertices_on_face + 4)
         else:
-            # Inner face: angles sum to (n-2)×90° where n = #vertices
+            # Inner face: angles sum to (n-2)*90 degrees where n = #vertices
             demand = -(num_vertices_on_face - 4)
 
         if demand != 0:
@@ -260,7 +367,7 @@ def build_flow_network(
             edge_faces[(edge[1], edge[0])].append(face.index)
 
     # Arcs from vertices to faces (angle assignments)
-    # Capacity = 3 (angle can be 90°, 180°, or 270° = 1, 2, or 3 units)
+    # Capacity = 3 (angle can be 90 degrees, 180 degrees, or 270 degrees = 1, 2, or 3 units)
     # Cost = 0 (angles don't cost anything)
     for face in faces:
         face_node = num_nodes + face.index
@@ -288,18 +395,11 @@ def build_flow_network(
     return network
 
 
-def solve_min_cost_flow_simple(network: FlowNetwork) -> bool:
+def _solve_bellman_ford(network: FlowNetwork) -> bool:
     """
-    Solve min-cost flow using a simple successive shortest path algorithm.
+    Solve min-cost flow using successive shortest paths with Bellman-Ford.
 
-    This is a simplified implementation suitable for small graphs.
-    For larger graphs, a more efficient algorithm would be needed.
-
-    Args:
-        network: Flow network to solve
-
-    Returns:
-        True if a feasible flow was found, False otherwise
+    Kept as a private reference implementation for equivalence testing.
     """
     # Initialize flow to zero
     network.flow = {arc: 0 for arc in network.arcs}
@@ -416,6 +516,25 @@ def solve_min_cost_flow_simple(network: FlowNetwork) -> bool:
     return True
 
 
+def solve_min_cost_flow_simple(network: FlowNetwork) -> bool:
+    """
+    Solve min-cost flow for orthogonalization bend minimization.
+
+    Delegates to the Dijkstra-based successive shortest paths solver
+    which is O(V^2 log V) for planar graphs, replacing the previous
+    Bellman-Ford implementation.
+
+    Args:
+        network: Flow network to solve
+
+    Returns:
+        True if a feasible flow was found, False otherwise
+    """
+    from ._min_cost_flow import solve_min_cost_flow
+
+    return solve_min_cost_flow(network)
+
+
 def flow_to_orthogonal_rep(
     network: FlowNetwork,
     edges: list[tuple[int, int]],
@@ -483,6 +602,7 @@ def compute_orthogonal_representation(
     num_nodes: int,
     edges: list[tuple[int, int]],
     positions: Optional[list[tuple[float, float]]] = None,
+    embedding: Optional[PlanarEmbedding] = None,
 ) -> OrthogonalRepresentation:
     """
     Compute optimal orthogonal representation using min-cost flow.
@@ -493,6 +613,7 @@ def compute_orthogonal_representation(
         num_nodes: Number of vertices
         edges: Graph edges
         positions: Optional vertex positions for embedding
+        embedding: Optional PlanarEmbedding (preferred over positions)
 
     Returns:
         OrthogonalRepresentation with minimized bends
@@ -500,20 +621,25 @@ def compute_orthogonal_representation(
     if num_nodes == 0 or not edges:
         return OrthogonalRepresentation()
 
+    # Sanitize edges for flow network (compute_faces does its own sanitization)
+    clean_edges, _self_loops = _sanitize_edges(edges)
+    if not clean_edges:
+        return OrthogonalRepresentation()
+
     # Compute faces
-    faces = compute_faces(num_nodes, edges, positions)
+    faces = compute_faces(num_nodes, clean_edges, positions, embedding=embedding)
 
     if not faces:
         return OrthogonalRepresentation()
 
     # Build flow network
-    network = build_flow_network(num_nodes, edges, faces)
+    network = build_flow_network(num_nodes, clean_edges, faces)
 
     # Solve min-cost flow
     solve_min_cost_flow_simple(network)
 
     # Convert to orthogonal representation
-    ortho_rep = flow_to_orthogonal_rep(network, edges)
+    ortho_rep = flow_to_orthogonal_rep(network, clean_edges)
 
     return ortho_rep
 

@@ -617,7 +617,9 @@ Beyond Cython speedups, several algorithms use asymptotically better approaches:
 
 **Recommendations by graph size:**
 - **< 500 nodes**: Any algorithm works well
+
 - **500-2,000 nodes**: Use Yifan Hu, ForceAtlas2, or FR+Barnes-Hut
+
 - **> 2,000 nodes**: Use Yifan Hu (fastest) or ForceAtlas2 (best for communities)
 
 ### Barnes-Hut Approximation
@@ -655,13 +657,21 @@ make qa            # Run all qualtiy checks
 ## Credits
 
 - **Cola**: Port of [WebCola](https://github.com/tgdwyer/WebCola) by Tim Dwyer (see also [libcola-releated papers](https://www.adaptagrams.org/documentation/libcola.html) in the [adaptagrams project](https://www.adaptagrams.org).
+
 - **ForceAtlas2**: Based on "ForceAtlas2, a Continuous Graph Layout Algorithm for Handy Network Visualization" by Jacomy et al. (2014)
+
 - **Fruchterman-Reingold**: Based on "Graph Drawing by Force-directed Placement" (1991)
+
 - **Kamada-Kawai**: Based on "An Algorithm for Drawing General Undirected Graphs" (1989)
+
 - **Yifan Hu**: Based on "Efficient and High Quality Force-Directed Graph Drawing" (2005)
+
 - **Sugiyama**: Based on "Methods for Visual Understanding of Hierarchical System Structures" (1981)
+
 - **Reingold-Tilford**: Based on "Tidier Drawings of Trees" (1981)
+
 - **Kandinsky**: Based on the Kandinsky model and Tamassia's bend minimization algorithm (1987)
+
 - **GIOTTO**: Based on Tamassia's "On Embedding a Graph in the Grid with the Minimum Number of Bends" (1987)
 
 ## License

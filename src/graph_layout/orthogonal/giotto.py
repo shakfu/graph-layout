@@ -35,7 +35,12 @@ from .compaction_flow import compact_layout_flow, compact_layout_longest_path
 from .edge_routing import route_all_edges
 from .orthogonalization import OrthogonalRepresentation, compute_orthogonal_representation
 from .planarization import is_planar_quick_check
-from .types import NodeBox, OrthogonalEdge, Side
+from .types import NodeBox, OrthogonalEdge, Port, Side
+
+
+def _opp(direction: int) -> int:
+    """Opposite compass direction (metrics quarter-turn encoding)."""
+    return (direction + 2) % 4
 
 
 class GIOTTOLayout(StaticLayout):
@@ -90,6 +95,7 @@ class GIOTTOLayout(StaticLayout):
         strict: bool = True,
         embedder: Optional[PlanarEmbedder] = None,
         compaction_method: str = "greedy",
+        bend_optimal: bool = False,
     ) -> None:
         """
         Initialize GIOTTO layout.
@@ -136,11 +142,17 @@ class GIOTTOLayout(StaticLayout):
         self._strict = bool(strict)
         self._embedder: PlanarEmbedder = embedder or MaxFaceEmbedder()
         self._compaction_method = compaction_method
+        # When True, drive the drawing from the bend-minimal orthogonal
+        # representation (Topology-Shape-Metrics) rather than the geometric
+        # routing heuristic, whenever the representation is a realizable shape
+        # (biconnected, max degree 4). Falls back to the heuristic otherwise.
+        self._bend_optimal = bool(bend_optimal)
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
         self._node_boxes: list[NodeBox] = []
         self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
+        self._faces: list = []
         self._compaction_result: Optional[CompactionResult] = None
         self._is_valid_input: bool = False
         self._planarity_result: Optional[PlanarityResult] = None
@@ -208,6 +220,15 @@ class GIOTTOLayout(StaticLayout):
     def strict(self, value: bool) -> None:
         """Set strict mode."""
         self._strict = bool(value)
+
+    @property
+    def bend_optimal(self) -> bool:
+        """Whether the drawing is driven by the bend-minimal representation."""
+        return self._bend_optimal
+
+    @bend_optimal.setter
+    def bend_optimal(self, value: bool) -> None:
+        self._bend_optimal = bool(value)
 
     @property
     def orthogonal_edges(self) -> list[OrthogonalEdge]:
@@ -352,17 +373,122 @@ class GIOTTOLayout(StaticLayout):
         # Phase 3: Compute orthogonal representation (bend-optimal for planar)
         self._compute_orthogonal_rep()
 
-        # Phase 4: Route edges
-        self._route_edges()
-
-        # Phase 5: Compaction
-        self._apply_compaction()
+        # Phase 4: If requested and the representation is a realizable shape,
+        # draw directly from it (bend-minimal). Otherwise route heuristically.
+        if not (self._bend_optimal and self._apply_bend_optimal_drawing()):
+            self._route_edges()
+            self._apply_compaction()
 
         # Update node positions from boxes
         for i, box in enumerate(self._node_boxes):
             if i < len(self._nodes):
                 self._nodes[i].x = box.x
                 self._nodes[i].y = box.y
+
+    def _apply_bend_optimal_drawing(self) -> bool:
+        """Draw from the orthogonal representation via Topology-Shape-Metrics.
+
+        Computes the shape (compass direction of every segment) and integer
+        coordinates, then scales them onto the canvas, rebuilding ``node_boxes``
+        (centered on the grid points) and ``orthogonal_edges`` (ports on box
+        sides, bends from the route). Returns False -- leaving the heuristic
+        pipeline to run -- when the representation is not a realizable shape
+        (degree > 4, non-biconnected) so the drawing never regresses.
+        """
+        from .metrics import (
+            EAST,
+            NORTH,
+            SOUTH,
+            WEST,
+            compute_coordinates,
+            compute_orthogonal_shape,
+        )
+
+        n = len(self._nodes)
+        if not self._orthogonal_rep or not self._faces or n == 0:
+            return False
+
+        edges: list[tuple[int, int]] = []
+        for link in self._links:
+            src = self._get_source_index(link)
+            tgt = self._get_target_index(link)
+            if 0 <= src < n and 0 <= tgt < n and src != tgt:
+                edges.append((src, tgt))
+
+        shape = compute_orthogonal_shape(self._faces, self._orthogonal_rep)
+        if not shape.valid:
+            return False
+        drawing = compute_coordinates(shape, edges)
+        if not drawing.valid or len(drawing.vertex_positions) != n:
+            return False
+
+        # --- Scale the integer grid onto the canvas ------------------------
+        gxs = [p[0] for p in drawing.vertex_positions.values()]
+        gys = [p[1] for p in drawing.vertex_positions.values()]
+        for route in drawing.edge_routes.values():
+            gxs += [p[0] for p in route]
+            gys += [p[1] for p in route]
+        min_x, max_x = min(gxs), max(gxs)
+        min_y, max_y = min(gys), max(gys)
+
+        cell = max(self._node_width, self._node_height) + self._node_separation
+        span_x = (max_x - min_x) * cell
+        span_y = (max_y - min_y) * cell
+        canvas_w, canvas_h = self._canvas_size
+        off_x = (canvas_w - span_x) / 2.0
+        off_y = (canvas_h - span_y) / 2.0
+
+        def to_canvas(gx: float, gy: float) -> tuple[float, float]:
+            # Flip y so grid-North (+y) is up on screen (smaller screen y).
+            return (off_x + (gx - min_x) * cell, off_y + (max_y - gy) * cell)
+
+        dir_to_side = {EAST: Side.EAST, WEST: Side.WEST, NORTH: Side.NORTH, SOUTH: Side.SOUTH}
+
+        # --- Rebuild node boxes centered on grid points --------------------
+        self._node_boxes = []
+        for i in range(n):
+            gx, gy = drawing.vertex_positions[i]
+            cx, cy = to_canvas(gx, gy)
+            node = self._nodes[i]
+            width = getattr(node, "width", None) or self._node_width
+            height = getattr(node, "height", None) or self._node_height
+            self._node_boxes.append(
+                NodeBox(index=i, x=cx, y=cy, width=float(width), height=float(height))
+            )
+
+        # --- Build orthogonal edges from the routes ------------------------
+        self._orthogonal_edges = []
+        for edge_idx, link in enumerate(self._links):
+            src = self._get_source_index(link)
+            tgt = self._get_target_index(link)
+            if not (0 <= src < n and 0 <= tgt < n) or src == tgt:
+                continue
+            key = (min(src, tgt), max(src, tgt))
+            route = drawing.edge_routes.get(key)
+            dart = (src, tgt) if (src, tgt) in shape.edge_shapes else (tgt, src)
+            es = shape.edge_shapes.get(dart)
+            if route is None or es is None:
+                continue
+
+            # The canonical route runs dart.tail -> dart.head; orient it so it
+            # goes src -> tgt for this link.
+            pts = list(route)
+            if dart[0] != src:
+                pts = pts[::-1]
+            src_side = dir_to_side[es.start_direction if dart[0] == src else _opp(es.end_direction)]
+            tgt_side = dir_to_side[_opp(es.end_direction) if dart[1] == tgt else es.start_direction]
+
+            interior = [to_canvas(gx, gy) for gx, gy in pts[1:-1]]
+            self._orthogonal_edges.append(
+                OrthogonalEdge(
+                    source=src,
+                    target=tgt,
+                    source_port=Port(node=src, side=src_side, position=0.5, edge=edge_idx),
+                    target_port=Port(node=tgt, side=tgt_side, position=0.5, edge=edge_idx),
+                    bends=interior,
+                )
+            )
+        return True
 
     def _compute_fallback(self) -> None:
         """
@@ -418,10 +544,19 @@ class GIOTTOLayout(StaticLayout):
 
         if embedding is not None:
             self._orthogonal_rep = compute_orthogonal_representation(n, edges, embedding=embedding)
+            # Retain the faces (from the same embedding) so the shape stage can
+            # realize the representation without recomputing a possibly different
+            # face set.
+            from .orthogonalization import compute_faces
+
+            self._faces = compute_faces(n, edges, embedding=embedding)
         else:
             # Fallback: use position-based face computation
             positions = [(box.x, box.y) for box in self._node_boxes]
             self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
+            from .orthogonalization import compute_faces
+
+            self._faces = compute_faces(n, edges, positions)
 
     def _assign_layers(self) -> list[list[int]]:
         """
@@ -450,17 +585,25 @@ class GIOTTOLayout(StaticLayout):
         if not roots:
             roots = [0]
 
-        # Compute longest path
+        # Compute longest path. The graph may be cyclic (orthogonal layouts are
+        # usually drawn from undirected planar graphs), so guard against back
+        # edges with an on-path stack -- otherwise a cycle drives depth upward
+        # without bound and the DFS recurses forever.
         layer_assignment = [-1] * n
         visited = [False] * n
+        on_path = [False] * n
 
         def dfs(node: int, depth: int) -> None:
+            if on_path[node]:
+                return  # back edge -> ignore to keep the layering acyclic
             if visited[node] and layer_assignment[node] >= depth:
                 return
             visited[node] = True
+            on_path[node] = True
             layer_assignment[node] = max(layer_assignment[node], depth)
             for neighbor in adj[node]:
                 dfs(neighbor, depth + 1)
+            on_path[node] = False
 
         for root in roots:
             dfs(root, 0)

@@ -41,8 +41,11 @@ layout.run()
 **Characteristics:**
 
 - Uses temperature/cooling schedule for simulated annealing
+
 - Repulsive force: `k^2 / d` (inverse of distance)
+
 - Attractive force: `d^2 / k` (quadratic with distance)
+
 - Cython-accelerated for high performance
 
 **Complexity:** O(n^2) per iteration (or O(n log n) with Barnes-Hut)
@@ -60,7 +63,9 @@ layout.run()
 **When to use Barnes-Hut:**
 
 - Graphs with 2000+ nodes
+
 - When approximate positions are acceptable
+
 - Real-time or interactive applications
 
 ---
@@ -86,8 +91,11 @@ layout.run()
 **Characteristics:**
 
 - Minimizes stress: deviation between geometric and graph-theoretic distances
+
 - Computes all-pairs shortest paths (expensive for large graphs)
+
 - Produces layouts where edge length correlates with path length
+
 - Good for revealing graph structure
 
 **Complexity:** O(n^3) for shortest paths + O(n^2) per iteration
@@ -102,7 +110,9 @@ layout.run()
 **Trade-offs:**
 
 - Higher quality than Fruchterman-Reingold for small graphs
+
 - Much slower for large graphs due to all-pairs shortest paths
+
 - Best limited to graphs under ~200 nodes
 
 ---
@@ -131,8 +141,11 @@ layout.run()
 **Characteristics:**
 
 - Simple Hooke's law springs for edges
+
 - Coulomb-like repulsion between all node pairs
+
 - No cooling schedule (constant forces)
+
 - Easy to understand and modify
 
 **Complexity:** O(n^2) per iteration
@@ -173,9 +186,13 @@ layout.run()
 **Characteristics:**
 
 - Port of WebCola constraint-based layout
+
 - VPSC solver for separation constraints
+
 - Supports node overlap avoidance
+
 - Hierarchical group containment
+
 - Flow layouts (directional bias)
 
 **Complexity:** O(n^2) per iteration + constraint solving overhead
@@ -248,8 +265,11 @@ layout.run()
 **Characteristics:**
 
 - Assigns nodes to horizontal layers
+
 - Minimizes edge crossings between layers
+
 - Produces clean, readable hierarchical layouts
+
 - Handles cycles by temporarily reversing edges
 
 **Complexity:** O(n^2) for crossing minimization
@@ -285,8 +305,11 @@ layout.run()
 **Characteristics:**
 
 - Classic tree drawing algorithm
+
 - Compact, balanced layouts
+
 - Preserves tree structure clearly
+
 - Requires a tree (single root, no cycles)
 
 **Complexity:** O(n)
@@ -322,7 +345,9 @@ layout.run()
 **Characteristics:**
 
 - Root at center, children in concentric rings
+
 - Good for visualizing distance from root
+
 - Works best with roughly balanced trees
 
 **Complexity:** O(n)
@@ -359,8 +384,11 @@ layout.run()
 **Characteristics:**
 
 - All nodes placed on a single circle
+
 - Simple and predictable
+
 - Edge crossings can be minimized by node ordering
+
 - Good for small to medium dense graphs
 
 **Complexity:** O(n)
@@ -403,7 +431,9 @@ layout.run()
 **Characteristics:**
 
 - Multiple concentric circles
+
 - Can group nodes by degree or custom criteria
+
 - Inner shells typically for important/central nodes
 
 **Complexity:** O(n)
@@ -440,8 +470,11 @@ layout.run()
 **Characteristics:**
 
 - Uses eigenvectors of the graph Laplacian matrix
+
 - Positions based on graph's spectral properties
+
 - Often reveals natural clustering
+
 - Deterministic (same graph = same layout)
 
 **Complexity:** O(n^3) for eigendecomposition
@@ -456,7 +489,9 @@ layout.run()
 **Trade-offs:**
 
 - Good at revealing structure but may not be visually optimal
+
 - Expensive for large graphs
+
 - Best for graphs under ~500 nodes
 
 ---

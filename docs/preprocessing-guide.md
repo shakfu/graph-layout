@@ -7,9 +7,13 @@ This guide explains how to use the preprocessing utilities in `graph-layout` to 
 Graph preprocessing utilities help you:
 
 - **Detect and remove cycles** - Required for hierarchical layouts (Sugiyama)
+
 - **Find connected components** - Handle disconnected graphs
+
 - **Compute topological order** - Understand graph structure
+
 - **Assign layers** - Prepare for layered/hierarchical layouts
+
 - **Minimize crossings** - Improve layered layout aesthetics
 
 All functions work with the standard `graph-layout` link format (`{'source': int, 'target': int}`) and support custom accessors for other formats.
@@ -23,6 +27,7 @@ All functions work with the standard `graph-layout` link format (`{'source': int
 Hierarchical layouts like `SugiyamaLayout` are designed for **directed acyclic graphs (DAGs)**. If your graph has cycles, you have two options:
 
 1. **Let the algorithm warn you** - Sugiyama will still run but results may be suboptimal
+
 2. **Preprocess to remove cycles** - Reverse some edges to make the graph acyclic
 
 ### Detecting Cycles
@@ -86,7 +91,9 @@ layout.run()
 Topological sort orders nodes so that for every edge `u -> v`, node `u` comes before `v`. This is useful for:
 
 - Understanding dependency order
+
 - Processing nodes in correct sequence
+
 - Verifying graph is acyclic
 
 ```python

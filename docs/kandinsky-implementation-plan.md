@@ -9,14 +9,19 @@ The Kandinsky model is an orthogonal graph drawing algorithm that handles graphs
 ### Why Kandinsky?
 
 - Works on **any graph** (not just planar, not limited to degree 4)
+
 - Practical for real-world use cases: UML diagrams, ER diagrams, flowcharts
+
 - Used in commercial tools (yFiles, yEd)
+
 - Well-documented with known approximation algorithms
 
 ### Key Papers
 
 - Fößmeier & Kaufmann (1995): Original Kandinsky model
+
 - Tamassia (1987): Min-cost flow for orthogonal drawings
+
 - Eiglsperger (2003): 2-approximation algorithm for Kandinsky bend minimization
 
 ## Implementation
@@ -227,32 +232,49 @@ class KandinskyLayout(StaticLayout):
 ```
 KandinskyLayout._compute():
     1. Layer Assignment
+
        - Topological ordering using longest path
+
        - Nodes assigned to layers based on DAG structure
 
     2. Node Positioning
+
        - Position nodes on grid based on layers
+
        - Center layout within canvas
 
     3. Planarization (if handle_crossings=True)
+
        - Find all edge crossings using segment intersection
+
        - Insert CrossingVertex at each crossing point
+
        - Split edges through crossing vertices
 
     4. Orthogonalization (if optimize_bends=True)
+
        - Compute faces of planar embedding
+
        - Build min-cost flow network
+
        - Solve for optimal angle/bend assignment
+
        - Extract OrthogonalRepresentation
 
     5. Compaction (if compact=True)
+
        - Horizontal pass: minimize width
+
        - Vertical pass: minimize height
+
        - Update node positions
 
     6. Edge Routing
+
        - Determine port sides based on relative positions
+
        - Compute orthogonal routes with bends
+
        - Create OrthogonalEdge objects
 ```
 
@@ -262,10 +284,12 @@ The implementation includes several optimizations:
 
 ### Pure Python Optimizations
 - **Cached box bounds**: Pre-compute `top`, `bottom`, `left`, `right` to avoid repeated property access
+
 - **Removed redundant loops**: Eliminated O(n×edges×bends) loop in compaction
 
 ### Cython Optimizations (`_speedups.pyx`)
 - `_segments_intersect()`: Fast line segment intersection
+
 - `_find_edge_crossings()`: O(m²) crossing detection
 
 ### Benchmark Results
@@ -282,16 +306,27 @@ The implementation includes several optimizations:
 
 65 tests in `tests/test_kandinsky.py` covering:
 - Basic functionality (layout runs, positions assigned)
+
 - Configuration properties
+
 - Layer assignment
+
 - Edge routing and bends
+
 - Event system
+
 - NodeBox and Side utilities
+
 - Segment intersection
+
 - Edge crossing detection
+
 - Graph planarization
+
 - Face computation
+
 - Orthogonal representation
+
 - Compaction
 
 ## Usage Example
@@ -331,14 +366,21 @@ print(f"Edge crossings: {layout.num_crossings}")
 
 Potential enhancements:
 1. **ILP-based compaction**: Optimal area minimization (currently uses heuristic)
+
 2. **Port constraints**: Allow user to specify edge exit sides
+
 3. **Edge labels**: Consider label placement in routing
+
 4. **Incremental layout**: Support for dynamic graph updates
+
 5. **More Cython optimization**: Optimize `solve_min_cost_flow_simple()` and `_route_planarized_edges()`
 
 ## References
 
 - [Orthogonal Graph Drawing with Constraints](https://publikationen.uni-tuebingen.de/xmlui/bitstream/handle/10900/49366/pdf/diss.pdf) - Comprehensive thesis
+
 - [Implementing an Algorithm for Orthogonal Graph Layout](https://rtsys.informatik.uni-kiel.de/~biblio/downloads/theses/ocl-bt.pdf) - Implementation guide
+
 - [OGDF Library](https://ogdf.uos.de/) - Open source C++ implementation
+
 - Tamassia, R. (1987). "On embedding a graph in the grid with the minimum number of bends"

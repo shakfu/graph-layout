@@ -17,7 +17,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Added
+
+- **Orthogonal Topology-Shape-Metrics pipeline** (`orthogonal/metrics.py`):
+  - `compute_orthogonal_shape()` assigns a compass direction (E/N/W/S) to every edge segment of an orthogonal representation by propagating turns around faces; `face_turn_sum()` checks the per-face turn invariant; unrealizable representations are detected (`valid=False`) for safe fallback
+  - `compute_coordinates()` turns a shape into integer coordinates via horizontal/vertical constraint-graph longest-path, producing an orthogonal drawing (axis-aligned segments, minimum length 1)
+  - Detects drawings that are not clean (coincident vertices, overlapping or crossing edges, edges through a vertex) -- which arise when longest-path packing collapses features that face rectangularization would separate -- and reports them invalid so callers fall back rather than emit a broken drawing (verified: no valid drawing has an overlap over random biconnected max-degree-4 graphs)
+- **GIOTTO bend-optimal drawing** (`orthogonal/giotto.py`): new `bend_optimal` option (default off). When on and the representation is a realizable shape (biconnected, max degree 4), the drawing is produced directly from the bend-minimal representation instead of the geometric routing heuristic; otherwise it falls back. Verified on grids, K4, cube, wheel, prism (non-overlapping boxes, orthogonal edges).
+
 ### Fixed
+
+- **GIOTTO infinite recursion on cyclic graphs** (`orthogonal/giotto.py`):
+  - `_assign_layers` had no back-edge guard, so any cycle drove the DFS depth upward without bound (`RecursionError`) -- affecting the default path, since orthogonal layouts are almost always cyclic. Added an on-path stack guard so back edges are ignored and the layering stays acyclic.
+
 
 - **Planarity: Left-Right nesting-depth off-by-one** (`planarity/_lr_planarity.py`):
   - Back-edge nesting depth was `2*height[w] + 1` instead of the canonical `2*height[w]`
@@ -39,6 +51,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `Projection.x_project`/`y_project` were empty, so user separation/alignment constraints and `avoid_overlaps=True` had no effect in `Layout`
   - Implemented the VPSC projection: each axis solves separation, alignment, and (optionally) generated non-overlap constraints, keeping nodes close to their stepped positions
   - Note: nested-group containment (`min_var`/`max_var`) is not yet enforced
+
+- **Orthogonalization: bends modeled per face-pair instead of per edge** (`orthogonal/orthogonalization.py`, `orthogonal/_min_cost_flow.py`):
+  - Two faces sharing more than one edge (e.g. the length-2 paths of a theta graph) shared a single bend variable, so `flow_to_orthogonal_rep` assigned the same flow to every shared edge and inflated the bend count (a 2-bend drawing was reported as 4)
+  - Each edge now has an independent bend variable routed through a unique intermediate node; the number of bends in the representation matches the min-cost-flow cost
+  - The min-cost-flow solvers now include arc-only auxiliary nodes when mapping the network
+
+- **Orthogonalization: representation was not a valid orthogonal shape** (`orthogonal/orthogonalization.py`):
+  - Bends were attributed to edges by raw tuple order rather than by which directed edge (dart) borders which face, so faces did not turn by the required +/-4 quarter-turns (e.g. K4 came out `[0, 0, 4, 4]`) and no realizable shape existed -- the reason the representation was computed but discarded
+  - Bends are now attributed to the dart bordering each face with the correct sign (+1 convex on one side, -1 reflex on the reverse), so every face turns +/-4 across the model's domain (biconnected planar graphs of max degree 4): verified on grids, K4, cube, wheel, prism, theta, and random biconnected max-degree-4 graphs
+  - Out of scope and detected as invalid (callers fall back to the heuristic router): degree > 4 (needs the Kandinsky 0-degree-angle model) and non-biconnected graphs with bridges / cut vertices (need per-corner angles)
 
 - **Sugiyama: cycle removal never invoked and no dummy nodes** (`hierarchical/sugiyama.py`):
   - Cycle removal is now run before layer assignment, so cyclic input is reversed into a DAG instead of warning and falling back

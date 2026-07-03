@@ -387,3 +387,65 @@ class TestPerformance:
         elapsed = time.monotonic() - start
 
         assert elapsed < 1.0, f"500-node graph took {elapsed:.2f}s"
+
+
+class TestPerEdgeBends:
+    """Bends are modeled per edge, not per face-pair (H6b)."""
+
+    @staticmethod
+    def _flow_cost(net: FlowNetwork) -> int:
+        return sum(net.flow.get(a, 0) * cost for a, (_cap, cost) in net.arcs.items())
+
+    @staticmethod
+    def _undirected_bends(rep) -> int:
+        seen: set[tuple[int, int]] = set()
+        total = 0
+        for (u, v), bends in rep.edge_bends.items():
+            key = (min(u, v), max(u, v))
+            if key in seen:
+                continue
+            seen.add(key)
+            total += len(bends)
+        return total
+
+    def test_shared_face_pair_does_not_duplicate_bends(self):
+        """Two faces sharing several edges must not duplicate bend counts.
+
+        A theta graph with length-2 paths has two inner faces that share the
+        two edges of the middle path. Modeling bends per face-pair (the old
+        approach) assigned the pair's flow to *every* shared edge, so an optimal
+        drawing with 2 bends was reported as 4. Per-edge modeling keeps the
+        representation consistent with the min-cost-flow cost.
+        """
+        from graph_layout.orthogonal.orthogonalization import (
+            flow_to_orthogonal_rep,
+        )
+
+        n = 5
+        edges = [(0, 2), (2, 1), (0, 3), (3, 1), (0, 4), (4, 1)]
+        positions = [(0.0, 0.0), (4.0, 0.0), (2.0, 1.0), (2.0, 0.0), (2.0, -1.0)]
+
+        faces = compute_faces(n, edges, positions)
+        network = build_flow_network(n, edges, faces)
+        assert solve_min_cost_flow(network)
+
+        rep = flow_to_orthogonal_rep(network, edges)
+
+        # Each bend costs exactly 1, so the number of bends across undirected
+        # edges must equal the flow cost. The old per-face-pair model inflated
+        # this (reporting 4 for a 2-bend drawing).
+        assert self._undirected_bends(rep) == self._flow_cost(network)
+
+    def test_bend_arcs_are_per_edge(self):
+        """Every non-bridge edge gets its own bend variable."""
+        n = 5
+        edges = [(0, 2), (2, 1), (0, 3), (3, 1), (0, 4), (4, 1)]
+        positions = [(0.0, 0.0), (4.0, 0.0), (2.0, 1.0), (2.0, 0.0), (2.0, -1.0)]
+
+        faces = compute_faces(n, edges, positions)
+        network = build_flow_network(n, edges, faces)
+
+        # Each interior edge borders two distinct faces, so all six edges have
+        # an independent bend variable keyed by the undirected edge.
+        expected = {(min(u, v), max(u, v)) for u, v in edges}
+        assert set(network.bend_arcs.keys()) == expected

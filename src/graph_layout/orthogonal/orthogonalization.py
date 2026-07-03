@@ -93,6 +93,17 @@ class FlowNetwork:
     # Flow solution: (from_node, to_node) -> flow amount
     flow: dict[tuple[int, int], int] = field(default_factory=dict)
 
+    # Per-edge bend arcs. Bends are modeled one edge at a time (not one
+    # face-pair at a time) so that two faces sharing several edges get an
+    # independent bend variable per edge. Keyed by the undirected edge
+    # (min(u, v), max(u, v)) -> (dart_f1, arc_toward_f2, arc_toward_f1) where
+    # dart_f1 is the directed edge bordering the first face and each arc is the
+    # (from_node, intermediate_node) pair whose flow is the number of bends of
+    # that edge turning toward the corresponding face.
+    bend_arcs: dict[
+        tuple[int, int], tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
+    ] = field(default_factory=dict)
+
 
 def _sanitize_edges(
     edges: list[tuple[int, int]],
@@ -376,21 +387,66 @@ def build_flow_network(
             if arc not in network.arcs:
                 network.arcs[arc] = (3, 0)  # capacity=3, cost=0
 
-    # Arcs between faces (bends on edges)
-    # For each edge between two faces, add arcs in both directions
-    # Capacity = unlimited (but we use 4 as practical limit)
-    # Cost = 1 per bend
+    # Bend arcs (one bend variable *per edge*, not per face-pair).
+    #
+    # In Tamassia's flow model a bend of edge e is a unit of flow between the
+    # two faces e separates, at cost 1. Modeling it as a single arc per
+    # face-pair (the previous approach) is wrong whenever two faces share more
+    # than one edge -- e.g. the two length-2 sides of a theta graph -- because
+    # every shared edge would then read the same lumped flow.
+    #
+    # To give each edge an independent variable while keeping the arc dict
+    # keyed by node pairs (no parallel arcs), route each edge's bends through a
+    # unique intermediate node: for edge e between faces f1 and f2,
+    #   f1 -> em1 (cost 1) -> f2      flow = bends of e turning toward f2
+    #   f2 -> em2 (cost 0? no: cost 1) -> f1   flow = bends turning toward f1
+    # The cost sits on the first hop so each bend costs exactly 1; the second
+    # hop is free. Capacity is generous rather than the old hard cap of 4.
+    #
+    # Determine the (ordered) pair of faces bordering each undirected edge, in
+    # face-index order of first appearance, and remember the *directed* edge
+    # (dart) that borders the first face. The dart is needed so bends can be
+    # attributed to the correct side with the correct turn sign: a bend flowing
+    # f1 -> f2 is convex (a +1 quarter turn) on the dart bordering f1 and reflex
+    # (-1) on the dart bordering f2. Getting this incidence right is what makes
+    # every face turn by +/-4 (a valid orthogonal representation).
+    edge_face_pair: dict[tuple[int, int], list[int]] = {}
+    edge_first_dart: dict[tuple[int, int], tuple[int, int]] = {}
     for face in faces:
-        face_node = num_nodes + face.index
-        for edge in face.edges:
-            # Find the other face sharing this edge
-            u, v = edge
-            for other_face_idx in edge_faces[(v, u)]:
-                if other_face_idx != face.index:
-                    other_face_node = num_nodes + other_face_idx
-                    arc = (face_node, other_face_node)
-                    if arc not in network.arcs:
-                        network.arcs[arc] = (4, 1)  # capacity=4, cost=1
+        for u, v in face.edges:
+            key = (min(u, v), max(u, v))
+            lst = edge_face_pair.setdefault(key, [])
+            if face.index not in lst:
+                lst.append(face.index)
+                if len(lst) == 1:
+                    edge_first_dart[key] = (u, v)  # dart bordering f1
+
+    bend_capacity = 2 * len(edges) + 4  # effectively uncapped for a planar graph
+    next_node = num_nodes + len(faces)
+    for key in sorted(edge_face_pair):
+        face_list = edge_face_pair[key]
+        if len(face_list) < 2 or face_list[0] == face_list[1]:
+            # Bridge (same face on both sides) or boundary edge: not bendable
+            # in the flow model.
+            continue
+        f1, f2 = face_list[0], face_list[1]
+        dart_f1 = edge_first_dart[key]
+        f1_node = num_nodes + f1
+        f2_node = num_nodes + f2
+
+        em1 = next_node
+        next_node += 1
+        em2 = next_node
+        next_node += 1
+
+        # Bends of this edge turning toward f2.
+        network.arcs[(f1_node, em1)] = (bend_capacity, 1)
+        network.arcs[(em1, f2_node)] = (bend_capacity, 0)
+        # Bends turning toward f1.
+        network.arcs[(f2_node, em2)] = (bend_capacity, 1)
+        network.arcs[(em2, f1_node)] = (bend_capacity, 0)
+
+        network.bend_arcs[key] = (dart_f1, (f1_node, em1), (f2_node, em2))
 
     return network
 
@@ -429,6 +485,10 @@ def _solve_bellman_ford(network: FlowNetwork) -> bool:
         all_nodes.add(v)
     for face in network.faces:
         all_nodes.add(network.num_vertices + face.index)
+    # Include auxiliary nodes referenced only by arcs (per-edge bend nodes).
+    for u_arc, v_arc in network.arcs:
+        all_nodes.add(u_arc)
+        all_nodes.add(v_arc)
 
     # Get supply nodes and demand nodes
     supply_nodes = [(n, s) for n, s in network.supplies.items() if s > 0]
@@ -563,37 +623,27 @@ def flow_to_orthogonal_rep(
             angle = 1 + flow_amount
             ortho_rep.vertex_face_angles[(v, face.index)] = angle
 
-    # Extract bends from face-to-face flow
-    edge_to_faces: dict[tuple[int, int], tuple[int, int]] = {}
-    for face in network.faces:
-        for edge in face.edges:
-            u, v = edge
-            key = (min(u, v), max(u, v))
-            if key not in edge_to_faces:
-                edge_to_faces[key] = (face.index, -1)
-            else:
-                f1, _ = edge_to_faces[key]
-                edge_to_faces[key] = (f1, face.index)
+    # Extract bends per edge from its own intermediate-node flow. Each edge has
+    # its own pair of bend arcs, so two edges shared by the same face pair no
+    # longer read (and duplicate) a single lumped flow value.
+    #
+    # Sign convention (this is what makes every face turn by +/-4): a unit of
+    # flow f1 -> f2 is a bend that is convex -- a +1 quarter turn -- when the
+    # edge is traversed along the dart bordering f1, and reflex (-1) along the
+    # reverse dart bordering f2. Attributing the turn to the dart that actually
+    # borders each face is essential; keying by the raw edge tuple (the old
+    # behaviour) left the sign unaligned with the embedding and produced
+    # inconsistent, unrealizable representations.
+    for _key, (dart_f1, arc_toward_f2, arc_toward_f1) in network.bend_arcs.items():
+        flow_toward_f2 = network.flow.get(arc_toward_f2, 0)
+        flow_toward_f1 = network.flow.get(arc_toward_f1, 0)
 
-    for (u, v), (f1, f2) in edge_to_faces.items():
-        if f2 < 0:
-            continue
-
-        face1_node = num_nodes + f1
-        face2_node = num_nodes + f2
-
-        # Flow from f1 to f2 means bends turning toward f2
-        flow_12 = network.flow.get((face1_node, face2_node), 0)
-        flow_21 = network.flow.get((face2_node, face1_node), 0)
-
-        bends: list[int] = []
-        # Positive flow means bends in one direction
-        bends.extend([1] * flow_12)  # Left turns
-        bends.extend([-1] * flow_21)  # Right turns
-
-        if bends:
-            ortho_rep.edge_bends[(u, v)] = bends
-            ortho_rep.edge_bends[(v, u)] = [-b for b in bends]  # Reverse direction
+        # Turns along the dart bordering f1.
+        bends_f1 = [1] * flow_toward_f2 + [-1] * flow_toward_f1
+        if bends_f1:
+            dart_f2 = (dart_f1[1], dart_f1[0])
+            ortho_rep.edge_bends[dart_f1] = bends_f1
+            ortho_rep.edge_bends[dart_f2] = [-b for b in bends_f1]
 
     return ortho_rep
 

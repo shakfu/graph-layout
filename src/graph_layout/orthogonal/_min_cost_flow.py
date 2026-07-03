@@ -74,6 +74,11 @@ def solve_min_cost_flow(network: FlowNetwork) -> bool:
         node_set.add(v)
     for face in network.faces:
         node_set.add(network.num_vertices + face.index)
+    # Include any auxiliary nodes referenced only by arcs (e.g. the per-edge
+    # bend intermediate nodes), so they are mapped and can carry flow.
+    for u_orig, v_orig in network.arcs:
+        node_set.add(u_orig)
+        node_set.add(v_orig)
 
     node_list = sorted(node_set)
     node_to_idx: dict[int, int] = {nd: i for i, nd in enumerate(node_list)}

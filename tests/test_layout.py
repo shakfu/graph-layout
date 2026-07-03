@@ -475,6 +475,101 @@ class TestLayoutWithGroups:
         nodes = layout.nodes()
         assert len(nodes) == 3
 
+    @staticmethod
+    def _rect(node):
+        w2 = (node.width or 0.0) / 2.0
+        h2 = (node.height or 0.0) / 2.0
+        return (node.x - w2, node.x + w2, node.y - h2, node.y + h2)
+
+    @classmethod
+    def _overlap(cls, a, b):
+        ox = min(a[1], b[1]) - max(a[0], b[0])
+        oy = min(a[3], b[3]) - max(a[2], b[2])
+        return ox > 1e-6 and oy > 1e-6
+
+    @classmethod
+    def _group_box(cls, nodes, idxs, pad):
+        rs = [cls._rect(nodes[i]) for i in idxs]
+        return (
+            min(r[0] for r in rs) - pad,
+            max(r[1] for r in rs) + pad,
+            min(r[2] for r in rs) - pad,
+            max(r[3] for r in rs) + pad,
+        )
+
+    @classmethod
+    def _overlap_area(cls, a, b):
+        ox = max(0.0, min(a[1], b[1]) - max(a[0], b[0]))
+        oy = max(0.0, min(a[3], b[3]) - max(a[2], b[2]))
+        return ox * oy
+
+    def test_groups_avoid_overlap_containment(self):
+        """With avoid_overlaps + groups, the group bounding boxes must not overlap
+        even when inter-group links pull the two groups together: the VPSC
+        group-containment projection keeps each group a separated block.
+
+        Regression: previously the projection ignored groups entirely (group
+        bounding rectangles were never constrained), and the avoid_overlaps +
+        groups path additionally crashed on the missing ``stiffness`` attribute.
+        Without containment the two group boxes overlap substantially here.
+        """
+        # Group A = nodes 0..3, Group B = nodes 4..7, with each A node linked to
+        # the corresponding B node so the descent pulls the groups to overlap.
+        nodes = [Node(x=(i % 4) * 30, y=(0 if i < 4 else 5), width=20, height=20) for i in range(8)]
+        links = [Link(i, i + 4) for i in range(4)]  # inter-group
+        links += [Link(i, i + 1) for i in range(3)]  # intra A
+        links += [Link(i, i + 1) for i in range(4, 7)]  # intra B
+
+        layout = Layout()
+        layout.nodes(nodes)
+        layout.links(links)
+        layout.avoid_overlaps(True)
+        layout.groups(
+            [Group(leaves=[0, 1, 2, 3], padding=5), Group(leaves=[4, 5, 6, 7], padding=5)]
+        )
+        layout.size([400, 400])
+        layout.start(0, 0, 80, 0, False)
+
+        nodes = layout.nodes()
+
+        # No node-node overlaps anywhere.
+        for i in range(len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                assert not self._overlap(self._rect(nodes[i]), self._rect(nodes[j])), (
+                    f"nodes {i},{j} overlap"
+                )
+
+        # The two group boxes must stay disjoint (containment held the groups
+        # apart despite the inter-group links). Without the containment projection
+        # this overlap area is large.
+        box_a = self._group_box(nodes, [0, 1, 2, 3], 5)
+        box_b = self._group_box(nodes, [4, 5, 6, 7], 5)
+        assert self._overlap_area(box_a, box_b) < 1e-6, "group bounding boxes overlap"
+
+    def test_nested_groups_avoid_overlap_runs(self):
+        """A parent group over two child groups projects without error and yields
+        an overlap-free drawing (exercises the recursive containment path)."""
+        layout = Layout()
+        layout.nodes([Node(x=i, y=i, width=20, height=20) for i in range(4)])
+        layout.links([Link(0, 1), Link(2, 3)])
+        layout.avoid_overlaps(True)
+        layout.groups(
+            [
+                Group(leaves=[0, 1], padding=5),
+                Group(leaves=[2, 3], padding=5),
+                Group(groups=[0, 1], padding=10),
+            ]
+        )
+        layout.size([300, 300])
+        layout.start(0, 0, 40, 0, False)
+
+        nodes = layout.nodes()
+        for i in range(len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                assert not self._overlap(self._rect(nodes[i]), self._rect(nodes[j])), (
+                    f"nodes {i},{j} overlap"
+                )
+
 
 class TestLayoutConstraints:
     """Test Layout with constraints."""

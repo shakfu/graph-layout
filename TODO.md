@@ -37,6 +37,47 @@ The orthogonalization's bend-minimal representation now drives the GIOTTO drawin
 
 ---
 
+## Known Correctness Issues
+
+Verified open defects in shipped, documented capabilities (distinct from the new-algorithm wish list below). Each was confirmed by direct code inspection. Ordered by severity. IDs (C_/H_) are retained from the algorithm review for traceability.
+
+### High severity
+
+- [x] **C1 - Cola group containment** (Done): `Projection` now generates the full non-overlap + containment constraint set over the whole group hierarchy via `_generate_group_constraints` (faithful port of WebCola's recursive `generateGroupConstraints`, incl. the border-variable and constraint-redirection tail); the group `min_var`/`max_var` border variables enter the VPSC solve, so group boxes contain their members and sibling groups stay disjoint. Also fixed the latent `AttributeError` on the missing optional `stiffness` attribute that crashed the avoid_overlaps + groups path. Regression tests in `tests/test_layout.py` (`TestLayoutWithGroups`) assert group-box disjointness under inter-group attraction and confirm the recursive nested-group path. This completes the WebCola projection port (node-variable projection, separation/alignment/non-overlap were completed in 0.2.0).
+- [ ] **H7 - Planarization is geometric, not topological**: `orthogonal/planarization.py` inserts dummy `CrossingVertex` nodes at geometric segment intersections of straight-line coordinates (`find_edge_crossings` at `:230`) rather than computing a planar embedding of a maximal planar subgraph and reinserting edges topologically. Crossing count depends on arbitrary initial coordinates; genuinely planar graphs can gain spurious crossings; final orthogonal planarity is not guaranteed. Disconnected from the correct `check_planarity`/embedder machinery.
+- [ ] **H8 - Greedy compaction does not compact**: `CompactionSolver.solve` (`orthogonal/compaction.py:95-98`) only pushes elements right on min-gap violation and never pulls left to close interior slack; the sole size reduction is a final whole-layout margin translate (`:169-177`). This is the default GIOTTO path when scipy is unavailable. `compaction_flow.compact_longest_path_1d` compacts correctly and should be preferred.
+- [ ] **Sugiyama coordinate assignment is index-based**: `hierarchical/sugiyama.py:491` places nodes at `start_offset + pos * node_sep` (integer slot) with each layer centered independently -- no Brandes-Kopf / priority alignment, so barycenter values are discarded and avoidable bends are produced. (Cycle removal and dummy-node insertion were fixed in 0.2.0; this coordinate stage was not.)
+- [ ] **`preprocessing.count_crossings` wrong for long edges**: `preprocessing.py:607-620` buckets edges by layer-pair `(l1, l2)` and compares only endpoint layer positions, so edges spanning more than one layer are mis-counted. Correct only over a dummy-expanded graph (Sugiyama now counts internally over its own expansion; this standalone utility is still incorrect).
+
+### Medium severity
+
+- [ ] **FA2 regular vs strong gravity swapped**: `force/force_atlas2.py:659-663` and `_speedups.pyx:1065-1067` apply the constant (distance-independent) term to strong gravity and the distance-scaled term to regular gravity; canonical Jacomy et al. is the reverse. Both still pull toward center.
+- [ ] **FA2 global-speed update lacks max-rise / jitter damping**: `force_atlas2.py:479-482`. Bounded (won't explode) but convergence dynamics diverge from Jacomy et al.
+- [ ] **Yifan Hu ignores fixed nodes during optimization**: `force/yifan_hu.py` sets `_fixed` (`:160`) but never reads it in the level solver; fixed nodes move during simulation and are only restored at copy-back (`:534`, `:792`), perturbing other nodes throughout.
+- [ ] **Pure-Python quadtree infinite recursion on coincident points**: `spatial/quadtree.py:129-163` insert paths carry no depth cap (the Cython version guards with depth-50). Reachable via Spring Barnes-Hut and Python fallbacks.
+- [ ] **Cola grid-snap modulo sign mismatch**: `cola/descent.py:280` uses Python `%` (divisor sign); WebCola relies on JS `%` (dividend sign). Snap direction flips for negative coordinates, breaking `grid_snap_iterations > 0` for ~half the nodes.
+- [ ] **Cola groups initial-layout KeyError**: `cola/layout.py:949` reads `vs[v.index]["x"]`, but the `nodes()` setter (`:234`) builds fresh `Node` objects and never writes x/y back into the `vs` dicts. Fires with `groups` present and `initial_unconstrained_iterations > 0`.
+- [ ] **Spectral disconnected graphs pick zero-eigenvalue eigenvectors**: `spectral/spectral.py:195-196` takes eigenvector indices 1 and 2 blindly; for k components eigenvalue 0 has multiplicity k, so these are component indicators, collapsing each component to a point. Correct for connected graphs only.
+- [ ] **Spectral normalized Laplacian missing `D^-1/2` back-transform**: `spectral/spectral.py:153` forms the symmetric-normalized Laplacian but uses eigenvectors directly (`:196`) without the `D^-1/2` scaling the canonical degree-weighted (Koren) layout requires; high-degree nodes are mis-weighted. Default-on path.
+- [ ] **Edge-crossing metric misses collinear / T-junction cases**: `metrics.py:89-92` CCW straddle test uses strict comparisons, silently dropping collinear overlaps and endpoint-on-segment touches, contrary to its docstring.
+- [ ] **`compact_flow_1d` can be looser than longest-path**: `orthogonal/compaction_flow.py:194` starts from `compact_longest_path_1d` then redistributes slack, so it can only equal or loosen the span despite its "tighter layouts" docstring.
+- [ ] **Shell layout IndexError on out-of-range link indices**: `circular/shell.py:163-164` increments `degrees[src]`/`degrees[tgt]` without the bounds guard used elsewhere in the codebase.
+
+### Low severity
+
+- [ ] **Kandinsky mode setter rejects its own documented modes**: `orthogonal/kandinsky.py:333` raises `ValueError` for `"flow"` / `"longest_path"` although the constructor documents and implements them.
+- [ ] **Spring docstring/behavior mismatch**: `force/spring.py:34` says "constant force" repulsion; implementation is inverse-square.
+- [ ] **RandomLayout seeds the global `random` module**: `basic/random.py:147` calls `random.seed(...)` on the global module instead of a local `random.Random` instance, leaking global RNG state.
+- [ ] **Recursion-depth limits** on deep trees/graphs in `reingold_tilford.py`, `radial_tree.py`, `preprocessing.detect_cycle` (recursive walks, no explicit cap).
+- [ ] **Inconsistent `node.fixed` semantics**: honored by `RandomLayout`, ignored by Bipartite, Circular, and Shell layouts.
+- [ ] **Unpositioned nodes left unvalidated**: nodes absent from user-supplied bipartite sets / shells are silently left unpositioned (`bipartite.py:235-236`, `shell.py:194-196`).
+- [ ] **Radial tree wedge allocation by node count, not leaf count**: `radial_tree.py:285-294` (spacing-quality variant, not an overlap bug).
+- [ ] **Cola minor nits**: coincident-node perturbation omitted (`descent.py`, `offset_dir` is dead code); grid-snap boundary strictness; `_alpha is None` fragility in `tick()`; misleading docstrings in `cola/shortestpaths.py`.
+- [ ] **Metrics reporting nits**: `metrics.stress` returns normalized (not raw) stress and its BFS ignores link weights; `angular_resolution` reports spurious 0 degrees for self-loops and parallel edges.
+- [ ] **Dead / unused code**: `nudge_overlapping_segments` (see Advanced Edge Routing above); finite bend capacity 4 in the flow network; `preprocessing.connected_components` has an unused `directed` parameter.
+
+---
+
 ## Medium Priority
 
 ### Stress Majorization (SMACOF)

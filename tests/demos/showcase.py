@@ -189,7 +189,12 @@ LAYOUTS: list[LayoutSpec] = [
     LayoutSpec(
         name="GIOTTO",
         cls=GIOTTOLayout,
-        params={"node_width": 30, "node_height": 20, "node_separation": 40},
+        params={
+            "node_width": 30,
+            "node_height": 20,
+            "node_separation": 40,
+            "bend_optimal": True,
+        },
         description="Bend-optimal for degree-4 planar graphs",
         suitable_for=("degree4_planar",),
     ),

@@ -454,6 +454,94 @@ def generate_y_constraints(rs: list[Rectangle], vars: list[Variable]) -> list[Co
     return _generate_constraints(rs, vars, _y_rect, 1e-6)
 
 
+def _generate_group_constraints(
+    root: ProjectionGroup,
+    rect: _RectAccessors,
+    min_sep: float,
+    is_contained: bool = False,
+) -> list[Constraint]:
+    """Recursively generate non-overlap + group-containment constraints.
+
+    Faithful port of WebCola's ``generateGroupConstraints``. For each group in
+    the hierarchy this generates the non-overlap constraints among its direct
+    children (leaves and child groups), representing each child group by a
+    single rectangle spanning its bounds. When a group is *contained* by a
+    parent, two dummy border variables (``min_var``/``max_var``) are added at
+    the group's opening/closing edges so the parent's non-overlap sweep keeps
+    siblings outside the group's extent, and the constraints touching a child
+    group's representative are redirected onto that child's border variables
+    (with a gap adjustment) so the group box actually contains its members.
+    """
+    padding = root.padding
+    groups = root.groups or []
+    leaves = root.leaves or []
+    gn = len(groups)
+
+    child_constraints: list[Constraint] = []
+    for g in groups:
+        child_constraints += _generate_group_constraints(g, rect, min_sep, True)
+
+    vs: list[Variable] = []
+    rs: list[Rectangle] = []
+
+    def add(r: Rectangle, v: Variable) -> None:
+        rs.append(r)
+        vs.append(v)
+
+    if is_contained and root.bounds is not None:
+        # This group is contained by another: add dummy vars/rects for its borders.
+        b = root.bounds
+        c = rect.get_centre(b)
+        s = rect.get_size(b) / 2.0
+        open_ = rect.get_open(b)
+        close = rect.get_close(b)
+        border_min = c - s + padding / 2.0
+        border_max = c + s - padding / 2.0
+        assert root.min_var is not None and root.max_var is not None
+        root.min_var.desired_position = border_min
+        add(rect.make_rect(open_, close, border_min, padding), root.min_var)
+        root.max_var.desired_position = border_max
+        add(rect.make_rect(open_, close, border_max, padding), root.max_var)
+
+    for leaf in leaves:
+        if leaf.bounds is not None and leaf.variable is not None:
+            add(leaf.bounds, leaf.variable)
+    for g in groups:
+        if g.bounds is not None and g.min_var is not None:
+            b = g.bounds
+            add(
+                rect.make_rect(
+                    rect.get_open(b), rect.get_close(b), rect.get_centre(b), rect.get_size(b)
+                ),
+                g.min_var,
+            )
+
+    cs = _generate_constraints(rs, vs, rect, min_sep)
+
+    if gn:
+        # Redirect the constraints touching each child group's representative
+        # variable onto its border variables so the group box contains its
+        # members. Uses c_in/c_out purely as scratch here; the Solver rebuilds
+        # them from the constraint list, so this does not corrupt solver state.
+        for v in vs:
+            v.c_out = []
+            v.c_in = []
+        for c in cs:
+            c.left.c_out.append(c)
+            c.right.c_in.append(c)
+        for g in groups:
+            if g.bounds is None or g.min_var is None or g.max_var is None:
+                continue
+            gap_adjustment = (g.padding - rect.get_size(g.bounds)) / 2.0
+            for c in g.min_var.c_in:
+                c.gap += gap_adjustment
+            for c in g.min_var.c_out:
+                c.left = g.max_var
+                c.gap += gap_adjustment
+
+    return child_constraints + cs
+
+
 def remove_overlaps(rs: list[Rectangle]) -> None:
     """
     Remove overlaps between rectangles.
@@ -541,7 +629,11 @@ class Projection:
 
             i = len(nodes)
             for g in groups:
-                stiffness = g.stiffness if g.stiffness is not None else 0.01
+                # stiffness is optional on a group (mirrors WebCola's
+                # `typeof g.stiffness !== "undefined" ? g.stiffness : 0.01`).
+                stiffness = getattr(g, "stiffness", None)
+                if stiffness is None:
+                    stiffness = 0.01
                 g.min_var = IndexedVariable(i, stiffness)
                 self.variables.append(g.min_var)
                 i += 1
@@ -625,7 +717,9 @@ class Projection:
         non-overlap constraints. ``y0`` supplies the vertical extents used to
         decide which node pairs overlap.
         """
-        self._project_axis(x, y0, self.x_constraints, generate_x_constraints, horizontal=True)
+        self._project_axis(
+            x, y0, self.x_constraints, generate_x_constraints, _x_rect, horizontal=True
+        )
 
     def y_project(self, x0: list[float], y0: list[float], y: list[float]) -> None:
         """Project y coordinates onto the active constraints.
@@ -635,7 +729,9 @@ class Projection:
         horizontal extents for non-overlap constraint generation while ``y`` is
         the freshly-stepped array projected in place.
         """
-        self._project_axis(y, x0, self.y_constraints, generate_y_constraints, horizontal=False)
+        self._project_axis(
+            y, x0, self.y_constraints, generate_y_constraints, _y_rect, horizontal=False
+        )
 
     def _project_axis(
         self,
@@ -643,6 +739,7 @@ class Projection:
         other: list[float],
         base_constraints: list[Constraint],
         gen_constraints: Callable[[list["Rectangle"], list[Variable]], list[Constraint]],
+        rect: _RectAccessors,
         horizontal: bool,
     ) -> None:
         """Solve one axis of the VPSC projection.
@@ -650,30 +747,53 @@ class Projection:
         ``coord`` is the array being projected (desired positions, updated in
         place); ``other`` holds the fixed positions on the perpendicular axis,
         used only to size node rectangles for non-overlap constraint generation.
+
+        When groups are active (``avoid_overlaps`` and a ``root_group`` with
+        subgroups), the non-overlap and group-containment constraints are
+        generated together over the whole group hierarchy via
+        :func:`_generate_group_constraints`; otherwise a flat node-only
+        non-overlap sweep is used.
         """
         nodes = self.nodes
         if not nodes:
             return
 
-        variables = [node.variable for node in nodes]
         for i, node in enumerate(nodes):
             node.variable.desired_position = coord[i]
 
-        cs = list(base_constraints)
+        groups_active = (
+            self.avoid_overlaps
+            and self.root_group is not None
+            and self.root_group.groups is not None
+        )
+
+        # Refresh each node's bounds rectangle from the current positions on
+        # both axes; used to size non-overlap rects and to compute group bounds.
         if self.avoid_overlaps:
-            rects: list[Rectangle] = []
             for i, node in enumerate(nodes):
                 w2 = (node.width or 0.0) / 2.0
                 h2 = (node.height or 0.0) / 2.0
                 if horizontal:
-                    rects.append(
-                        Rectangle(coord[i] - w2, coord[i] + w2, other[i] - h2, other[i] + h2)
+                    node.bounds = Rectangle(
+                        coord[i] - w2, coord[i] + w2, other[i] - h2, other[i] + h2
                     )
                 else:
-                    rects.append(
-                        Rectangle(other[i] - w2, other[i] + w2, coord[i] - h2, coord[i] + h2)
+                    node.bounds = Rectangle(
+                        other[i] - w2, other[i] + w2, coord[i] - h2, coord[i] + h2
                     )
+
+        cs = list(base_constraints)
+        if groups_active:
+            assert self.root_group is not None
+            compute_group_bounds(self.root_group)
+            cs = cs + _generate_group_constraints(self.root_group, rect, 1e-6)
+            variables = self.variables
+        elif self.avoid_overlaps:
+            rects = [node.bounds for node in nodes if node.bounds is not None]
+            variables = [node.variable for node in nodes]
             cs = cs + gen_constraints(rects, variables)
+        else:
+            variables = [node.variable for node in nodes]
 
         if not cs:
             # Unconstrained axis: the projected positions equal the desired

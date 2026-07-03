@@ -17,6 +17,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Fixed
+
+- **Cola: group containment now enforced in the constraint projection** (`cola/rectangle.py`):
+  - `Projection` previously built the VPSC solve from node variables only, so the `min_var`/`max_var` group border variables were created but never entered the solver -- nested-group bounding rectangles were left unconstrained. Grouped layouts ran but groups could freely overlap and interleave.
+  - Ported WebCola's recursive `generateGroupConstraints` (`_generate_group_constraints`), including the border-variable representation of contained groups and the constraint-redirection tail, so the non-overlap and containment constraints are generated together over the whole group hierarchy. Group boxes now contain their members and sibling groups stay disjoint (verified: two groups pulled together by inter-group links stay as separated blocks; without containment their boxes overlap substantially).
+  - Also fixed a latent `AttributeError` that crashed the `avoid_overlaps` + groups path: group `stiffness` is optional (matching WebCola's `typeof g.stiffness !== "undefined" ? g.stiffness : 0.01`) but was accessed unconditionally.
+  - Regression tests (`tests/test_layout.py::TestLayoutWithGroups`) assert group-box disjointness under inter-group attraction and exercise the recursive nested-group path. This completes the WebCola projection port begun in 0.2.0 (node-variable separation/alignment/non-overlap).
+
+### Changed
+
+- **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):
+  - `showcase.py`: the GIOTTO catalog entry now actually enables `bend_optimal`, so it renders the bend-minimal Topology-Shape-Metrics drawing instead of the routing heuristic (the entry was labelled "bend-optimal" but never passed the flag). On the degree-4 planar demo graphs this drops the 3x3 grid from 24 to 0 bends and the ladder from 26 to 2 bends.
+  - `improvements_showcase.py`: added a Cola nested-group containment (C1) panel -- a before/after (`avoid_overlaps` off vs on) of two groups pulled together by inter-group links, drawing the group bounding boxes and member-colored node boxes. Group-box overlap area goes from 788 (interleaved) to 0 (separated blocks).
+
 ## [0.2.0]
 
 ### Changed

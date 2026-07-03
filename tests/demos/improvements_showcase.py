@@ -7,6 +7,8 @@ Renders side-by-side SVG comparisons that make the changes visible:
     the bend-minimal orthogonal representation now drives the drawing.
   * Cola constraint enforcement (C1) -- overlap avoidance and separation
     constraints, which were previously inert stubs.
+  * Cola nested-group containment (C1) -- group bounding rectangles now keep
+    their members in and sibling groups apart (previously unconstrained).
   * Sugiyama on a cyclic graph (H3/H4) -- cycle removal + dummy nodes; GIOTTO on
     a cyclic graph (recursion fix).
 
@@ -21,7 +23,7 @@ from __future__ import annotations
 from html import escape
 from pathlib import Path
 
-from graph_layout import GIOTTOLayout, Link, Node, SugiyamaLayout
+from graph_layout import GIOTTOLayout, Group, Link, Node, SugiyamaLayout
 from graph_layout.cola import Layout as ColaLayout
 
 BUILD_DIR = Path(__file__).parent.parent.parent / "build"
@@ -142,6 +144,83 @@ def _node_svg(
     return _card(title, subtitle, "".join(parts))
 
 
+_GROUP_FILL = ["rgba(74,144,217,0.12)", "rgba(217,126,74,0.12)"]
+_GROUP_STROKE = ["#2c5aa0", "#b5651d"]
+_NODE_FILL = ["#4a90d9", "#d97e4a"]
+_NODE_STROKE = ["#2c5aa0", "#b5651d"]
+
+
+def _group_boxes(nodes, groups_members, box_wh, pad):
+    """Bounding box (data coords) of each group: union of member node boxes + padding."""
+    bw, bh = box_wh
+    result = []
+    for members in groups_members:
+        xs0 = [nodes[i].x - bw / 2 for i in members]
+        xs1 = [nodes[i].x + bw / 2 for i in members]
+        ys0 = [nodes[i].y - bh / 2 for i in members]
+        ys1 = [nodes[i].y + bh / 2 for i in members]
+        result.append((min(xs0) - pad, max(xs1) + pad, min(ys0) - pad, max(ys1) + pad))
+    return result
+
+
+def _group_svg(
+    layout,
+    edges: list[tuple[int, int]],
+    groups_members: list[list[int]],
+    title: str,
+    subtitle: str,
+    box_wh: tuple[float, float],
+    pad: float,
+) -> str:
+    """Render a grouped layout: group bounding boxes + member-colored node boxes."""
+    nodes = _nodes_of(layout)
+    node_group = {i: g for g, members in enumerate(groups_members) for i in members}
+    boxes = _group_boxes(nodes, groups_members, box_wh, pad)
+
+    pts: list[tuple[float, float]] = []
+    for x0, x1, y0, y1 in boxes:
+        pts.extend([(x0, y0), (x1, y1)])
+    tf = _fit(pts, W, H, PAD)
+
+    parts = [f'<svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">']
+    parts.append(f'<rect width="{W}" height="{H}" fill="#fbfbfd"/>')
+    # Group boxes underneath.
+    for g, (x0, x1, y0, y1) in enumerate(boxes):
+        gx0, gy0 = tf(x0, y0)
+        gx1, gy1 = tf(x1, y1)
+        parts.append(
+            f'<rect x="{gx0:.1f}" y="{gy0:.1f}" width="{gx1 - gx0:.1f}" '
+            f'height="{gy1 - gy0:.1f}" rx="4" fill="{_GROUP_FILL[g % 2]}" '
+            f'stroke="{_GROUP_STROKE[g % 2]}" stroke-width="1.5" stroke-dasharray="4 3"/>'
+        )
+    # Edges.
+    for u, v in edges:
+        x1, y1 = tf(nodes[u].x, nodes[u].y)
+        x2, y2 = tf(nodes[v].x, nodes[v].y)
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'stroke="#bbb" stroke-width="1.4"/>'
+        )
+    # Node boxes, colored by group.
+    bw, bh = box_wh
+    for i, n in enumerate(nodes):
+        cx, cy = tf(n.x, n.y)
+        sx = tf(n.x + bw / 2, n.y)[0] - cx
+        sy = tf(n.x, n.y + bh / 2)[1] - cy
+        g = node_group.get(i, 0)
+        parts.append(
+            f'<rect x="{cx - sx:.1f}" y="{cy - sy:.1f}" width="{2 * sx:.1f}" '
+            f'height="{2 * sy:.1f}" rx="2" fill="{_NODE_FILL[g % 2]}" '
+            f'stroke="{_NODE_STROKE[g % 2]}" stroke-width="1.5"/>'
+        )
+        parts.append(
+            f'<text x="{cx:.1f}" y="{cy + 3:.1f}" text-anchor="middle" '
+            f'font-size="9" fill="#fff" font-family="sans-serif">{i}</text>'
+        )
+    parts.append("</svg>")
+    return _card(title, subtitle, "".join(parts))
+
+
 def _card(title: str, subtitle: str, svg: str) -> str:
     return (
         '<div class="card">'
@@ -174,6 +253,15 @@ def _min_node_gap(layout) -> float:
             d = ((ns[i].x - ns[j].x) ** 2 + (ns[i].y - ns[j].y) ** 2) ** 0.5
             best = min(best, d)
     return best
+
+
+def _group_overlap_area(layout, groups_members, box_wh, pad) -> float:
+    """Overlap area between the two group bounding boxes (0 => fully separated)."""
+    boxes = _group_boxes(_nodes_of(layout), groups_members, box_wh, pad)
+    (ax0, ax1, ay0, ay1), (bx0, bx1, by0, by1) = boxes[0], boxes[1]
+    ox = max(0.0, min(ax1, bx1) - max(ax0, bx0))
+    oy = max(0.0, min(ay1, by1) - max(ay0, by0))
+    return ox * oy
 
 
 # --------------------------------------------------------------------------- #
@@ -320,6 +408,76 @@ def _section_cola() -> str:
     )
 
 
+def _section_groups() -> str:
+    # Two groups whose inter-group links pull them together. Without group
+    # containment the two groups interleave; with it they stay separated blocks.
+    members = [[0, 1, 2, 3], [4, 5, 6, 7]]
+    box_wh = (20.0, 20.0)
+    pad = 5.0
+
+    def grouped(avoid):
+        layout = ColaLayout()
+        layout.nodes(
+            [Node(x=(i % 4) * 30, y=(0 if i < 4 else 5), width=20, height=20) for i in range(8)]
+        )
+        layout.links(
+            [Link(i, i + 4) for i in range(4)]  # inter-group
+            + [Link(i, i + 1) for i in range(3)]  # intra group A
+            + [Link(i, i + 1) for i in range(4, 7)]  # intra group B
+        )
+        layout.avoid_overlaps(avoid)
+        layout.groups(
+            [Group(leaves=members[0], padding=pad), Group(leaves=members[1], padding=pad)]
+        )
+        layout.size([400, 400])
+        # All-constraints iterations only (grouped unconstrained iterations are a
+        # separate, still-open issue).
+        layout.start(0, 0, 80, 0, False)
+        return layout
+
+    edges = (
+        [(i, i + 4) for i in range(4)]
+        + [(i, i + 1) for i in range(3)]
+        + [(i, i + 1) for i in range(4, 7)]
+    )
+    off = grouped(False)
+    on = grouped(True)
+    cards = (
+        '<div class="pair">'
+        + _group_svg(
+            off,
+            edges,
+            members,
+            "group containment off",
+            f"group-box overlap area {_group_overlap_area(off, members, box_wh, pad):.0f}"
+            " (groups interleave)",
+            box_wh,
+            pad,
+        )
+        + _group_svg(
+            on,
+            edges,
+            members,
+            "group containment on (C1)",
+            f"group-box overlap area {_group_overlap_area(on, members, box_wh, pad):.0f}"
+            " (separated blocks)",
+            box_wh,
+            pad,
+        )
+        + "</div>"
+    )
+    return _block(
+        "Cola: nested-group containment now enforced (C1)",
+        "The VPSC projection ignored groups entirely, so group bounding rectangles "
+        "were never constrained -- groups could freely overlap. The projection now "
+        "generates non-overlap and containment constraints over the whole group "
+        "hierarchy (a port of WebCola's recursive generateGroupConstraints), so each "
+        "group's members stay within its box and sibling groups keep apart even when "
+        "inter-group links pull them together.",
+        cards,
+    )
+
+
 def _section_cyclic() -> str:
     # Sugiyama on a cyclic graph (previously warned + mislayered; GIOTTO crashed).
     n = 6
@@ -361,7 +519,7 @@ def _block(title: str, desc: str, body: str) -> str:
 
 def main() -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    sections = _section_giotto() + _section_cola() + _section_cyclic()
+    sections = _section_giotto() + _section_cola() + _section_groups() + _section_cyclic()
     html = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>graph-layout: review improvements</title>
 <style>

@@ -219,9 +219,9 @@ class SugiyamaLayout(StaticLayout):
         )
 
         edges: list[tuple[int, int]] = []
-        for link in new_links:
-            src = link["source"]
-            tgt = link["target"]
+        for new_link in new_links:
+            src = new_link["source"]
+            tgt = new_link["target"]
             if src != tgt:
                 edges.append((src, tgt))
         return edges

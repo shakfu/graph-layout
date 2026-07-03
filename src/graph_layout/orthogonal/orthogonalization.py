@@ -100,9 +100,9 @@ class FlowNetwork:
     # dart_f1 is the directed edge bordering the first face and each arc is the
     # (from_node, intermediate_node) pair whose flow is the number of bends of
     # that edge turning toward the corresponding face.
-    bend_arcs: dict[
-        tuple[int, int], tuple[tuple[int, int], tuple[int, int], tuple[int, int]]
-    ] = field(default_factory=dict)
+    bend_arcs: dict[tuple[int, int], tuple[tuple[int, int], tuple[int, int], tuple[int, int]]] = (
+        field(default_factory=dict)
+    )
 
 
 def _sanitize_edges(

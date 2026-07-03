@@ -166,7 +166,7 @@ rebuild-cython:
 	@echo "Cleaning build artifacts..."
 	@rm -rf build/
 	@echo "Installing build dependencies..."
-	@uv pip install setuptools cython numpy
+	@uv pip install scikit-build-core cython
 	@echo "Rebuilding Cython extension in place..."
 	@uv pip install --no-build-isolation -e .
 	@echo "Done. Verifying Cython module..."

@@ -24,6 +24,17 @@ Visibility graph routing is implemented. Segment nudging needs rework.
 - [x] Segment nudging: `nudge_overlapping_segments()` post-processing separates coincident parallel edge segments
 - [ ] **Obstacle-aware segment nudging**: Current nudging blindly offsets segments without checking node-box collisions, causing edges to route through nodes. Fix requires: (1) checking nudged positions against node boxes, (2) re-routing segments that collide with obstacles after nudging, or (3) integrating nudging into the routing phase so obstacle avoidance is preserved. See `edge_routing.py:nudge_overlapping_segments()`.
 
+#### Topology-Shape-Metrics bend-optimal drawing (Partial)
+
+The orthogonalization's bend-minimal representation now drives the GIOTTO drawing (previously it was computed and discarded). `orthogonal/metrics.py` implements the shape stage (compass direction per segment) and coordinate assignment, wired into `GIOTTOLayout(bend_optimal=True)` with a `used_bend_optimal` signal and safe fallback to the heuristic router.
+
+- [x] Flow model emits valid orthogonal representations (every face turns +/-4) for biconnected max-degree-4 planar graphs
+- [x] Shape + integer-coordinate assignment (two-tier compact/spread); conflict detection so nothing broken is emitted
+- [x] `GIOTTOLayout(bend_optimal=...)` opt-in, `used_bend_optimal` signal
+- [ ] **Turn-regularization for compaction**: ~11% of in-scope graphs still fall back (non-planar coordinate assignment / crossings). Add kitty-corner-based separation constraints so every face is rectangular, taking coverage to ~100% and enabling `bend_optimal` by default. Full design, reference algorithm (Bridgeman et al. 2000), and verification oracle in [`docs/rectangularization-plan.md`](docs/rectangularization-plan.md).
+- [ ] **Kandinsky degree > 4** (H5): 0-degree-angle flow model for vertices of degree > 4 (out of the current TSM domain)
+- [ ] **Non-biconnected graphs** (H6a): per-corner angles for bridges / cut vertices
+
 ---
 
 ## Medium Priority

@@ -74,9 +74,7 @@ def _orthogonal_svg(layout, title: str, subtitle: str) -> str:
     parts.append(f'<rect width="{W}" height="{H}" fill="#fbfbfd"/>')
     for line in polylines:
         d = " ".join(f"{tf(x, y)[0]:.1f},{tf(x, y)[1]:.1f}" for x, y in line)
-        parts.append(
-            f'<polyline points="{d}" fill="none" stroke="#888" stroke-width="1.6"/>'
-        )
+        parts.append(f'<polyline points="{d}" fill="none" stroke="#888" stroke-width="1.6"/>')
     # boxes
     box_w = 18.0
     box_h = 14.0
@@ -95,8 +93,13 @@ def _orthogonal_svg(layout, title: str, subtitle: str) -> str:
     return _card(title, subtitle, "".join(parts))
 
 
-def _node_svg(layout, edges: list[tuple[int, int]], title: str, subtitle: str,
-              boxes_wh: tuple[float, float] | None = None) -> str:
+def _node_svg(
+    layout,
+    edges: list[tuple[int, int]],
+    title: str,
+    subtitle: str,
+    boxes_wh: tuple[float, float] | None = None,
+) -> str:
     """Render a node/edge layout (circles + straight edges), optional boxes."""
     nodes = _nodes_of(layout)
     pts = [(n.x, n.y) for n in nodes]
@@ -111,22 +114,30 @@ def _node_svg(layout, edges: list[tuple[int, int]], title: str, subtitle: str,
     for u, v in edges:
         x1, y1 = tf(nodes[u].x, nodes[u].y)
         x2, y2 = tf(nodes[v].x, nodes[v].y)
-        parts.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
-                     f'stroke="#bbb" stroke-width="1.4"/>')
+        parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'stroke="#bbb" stroke-width="1.4"/>'
+        )
     for i, n in enumerate(nodes):
         cx, cy = tf(n.x, n.y)
         if boxes_wh:
             bw, bh = boxes_wh
-            sx = (tf(n.x + bw / 2, n.y)[0] - cx)
-            sy = (tf(n.x, n.y + bh / 2)[1] - cy)
-            parts.append(f'<rect x="{cx - sx:.1f}" y="{cy - sy:.1f}" width="{2 * sx:.1f}" '
-                         f'height="{2 * sy:.1f}" rx="2" fill="#7bb37b" stroke="#3f7a3f" '
-                         f'stroke-width="1.5"/>')
+            sx = tf(n.x + bw / 2, n.y)[0] - cx
+            sy = tf(n.x, n.y + bh / 2)[1] - cy
+            parts.append(
+                f'<rect x="{cx - sx:.1f}" y="{cy - sy:.1f}" width="{2 * sx:.1f}" '
+                f'height="{2 * sy:.1f}" rx="2" fill="#7bb37b" stroke="#3f7a3f" '
+                f'stroke-width="1.5"/>'
+            )
         else:
-            parts.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="8" fill="#4a90d9" '
-                         f'stroke="#2c5aa0" stroke-width="1.5"/>')
-        parts.append(f'<text x="{cx:.1f}" y="{cy + 3:.1f}" text-anchor="middle" '
-                     f'font-size="9" fill="#fff" font-family="sans-serif">{i}</text>')
+            parts.append(
+                f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="8" fill="#4a90d9" '
+                f'stroke="#2c5aa0" stroke-width="1.5"/>'
+            )
+        parts.append(
+            f'<text x="{cx:.1f}" y="{cy + 3:.1f}" text-anchor="middle" '
+            f'font-size="9" fill="#fff" font-family="sans-serif">{i}</text>'
+        )
     parts.append("</svg>")
     return _card(title, subtitle, "".join(parts))
 
@@ -171,13 +182,42 @@ def _min_node_gap(layout) -> float:
 
 GRAPHS = {
     "K4": (4, [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]),
-    "Cube": (8, [(0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4),
-                 (0, 4), (1, 5), (2, 6), (3, 7)]),
+    "Cube": (
+        8,
+        [
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 0),
+            (4, 5),
+            (5, 6),
+            (6, 7),
+            (7, 4),
+            (0, 4),
+            (1, 5),
+            (2, 6),
+            (3, 7),
+        ],
+    ),
     "Wheel-5": (5, [(1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4)]),
-    "Prism": (6, [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3),
-                  (0, 3), (1, 4), (2, 5)]),
-    "3x3 grid": (9, [(0, 1), (1, 2), (3, 4), (4, 5), (6, 7), (7, 8),
-                     (0, 3), (3, 6), (1, 4), (4, 7), (2, 5), (5, 8)]),
+    "Prism": (6, [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3), (0, 3), (1, 4), (2, 5)]),
+    "3x3 grid": (
+        9,
+        [
+            (0, 1),
+            (1, 2),
+            (3, 4),
+            (4, 5),
+            (6, 7),
+            (7, 8),
+            (0, 3),
+            (3, 6),
+            (1, 4),
+            (4, 7),
+            (2, 5),
+            (5, 8),
+        ],
+    ),
 }
 
 
@@ -200,10 +240,12 @@ def _section_giotto() -> str:
         opt = _giotto(n, edges, True)
         rows.append(
             '<div class="pair">'
-            + _orthogonal_svg(heur, f"{name} - heuristic router",
-                              f"{_total_bends(heur)} bends (default)")
-            + _orthogonal_svg(opt, f"{name} - bend_optimal",
-                              f"{_total_bends(opt)} bends (Topology-Shape-Metrics)")
+            + _orthogonal_svg(
+                heur, f"{name} - heuristic router", f"{_total_bends(heur)} bends (default)"
+            )
+            + _orthogonal_svg(
+                opt, f"{name} - bend_optimal", f"{_total_bends(opt)} bends (Topology-Shape-Metrics)"
+            )
             + "</div>"
         )
     return _block(
@@ -220,9 +262,13 @@ def _section_cola() -> str:
     # Overlap avoidance: two big boxes starting on top of each other.
     def cola_overlap(avoid):
         layout = ColaLayout()
-        layout.nodes([Node(x=0, y=0, width=60, height=60),
-                      Node(x=8, y=8, width=60, height=60),
-                      Node(x=120, y=40, width=60, height=60)])
+        layout.nodes(
+            [
+                Node(x=0, y=0, width=60, height=60),
+                Node(x=8, y=8, width=60, height=60),
+                Node(x=120, y=40, width=60, height=60),
+            ]
+        )
         layout.links([Link(0, 1), Link(1, 2)])
         layout.avoid_overlaps(avoid)
         layout.start(10, 10, 30, 0, False)
@@ -232,11 +278,20 @@ def _section_cola() -> str:
     on = cola_overlap(True)
     cards = (
         '<div class="pair">'
-        + _node_svg(off, [(0, 1), (1, 2)], "avoid_overlaps=False",
-                    f"min node gap {_min_node_gap(off):.0f}", boxes_wh=(60, 60))
-        + _node_svg(on, [(0, 1), (1, 2)], "avoid_overlaps=True",
-                    f"min node gap {_min_node_gap(on):.0f} (was an inert stub)",
-                    boxes_wh=(60, 60))
+        + _node_svg(
+            off,
+            [(0, 1), (1, 2)],
+            "avoid_overlaps=False",
+            f"min node gap {_min_node_gap(off):.0f}",
+            boxes_wh=(60, 60),
+        )
+        + _node_svg(
+            on,
+            [(0, 1), (1, 2)],
+            "avoid_overlaps=True",
+            f"min node gap {_min_node_gap(on):.0f} (was an inert stub)",
+            boxes_wh=(60, 60),
+        )
         + "</div>"
     )
 
@@ -249,9 +304,12 @@ def _section_cola() -> str:
     gap = sep.nodes()[1].x - sep.nodes()[0].x
     cards += (
         '<div class="pair">'
-        + _node_svg(sep, [(0, 1), (1, 2)],
-                    "separation constraint x(1) - x(0) >= 120",
-                    f"achieved gap {gap:.0f}")
+        + _node_svg(
+            sep,
+            [(0, 1), (1, 2)],
+            "separation constraint x(1) - x(0) >= 120",
+            f"achieved gap {gap:.0f}",
+        )
         + "</div>"
     )
     return _block(
@@ -266,17 +324,24 @@ def _section_cyclic() -> str:
     # Sugiyama on a cyclic graph (previously warned + mislayered; GIOTTO crashed).
     n = 6
     edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0), (0, 3)]  # cycle + chord
-    sug = SugiyamaLayout(nodes=[{} for _ in range(n)],
-                         links=[{"source": u, "target": v} for u, v in edges],
-                         size=(600, 500))
+    sug = SugiyamaLayout(
+        nodes=[{} for _ in range(n)],
+        links=[{"source": u, "target": v} for u, v in edges],
+        size=(600, 500),
+    )
     sug.run()
     giotto = _giotto(n, edges, True)
     cards = (
         '<div class="pair">'
-        + _node_svg(sug, edges, "Sugiyama on a cyclic graph (H3/H4)",
-                    "cycle removal + dummy nodes; no crash/warning")
-        + _orthogonal_svg(giotto, "GIOTTO on a cyclic graph",
-                          "recursion fix: cycles no longer hang the layout")
+        + _node_svg(
+            sug,
+            edges,
+            "Sugiyama on a cyclic graph (H3/H4)",
+            "cycle removal + dummy nodes; no crash/warning",
+        )
+        + _orthogonal_svg(
+            giotto, "GIOTTO on a cyclic graph", "recursion fix: cycles no longer hang the layout"
+        )
         + "</div>"
     )
     return _block(
@@ -288,8 +353,10 @@ def _section_cyclic() -> str:
 
 
 def _block(title: str, desc: str, body: str) -> str:
-    return (f'<section><h2>{escape(title)}</h2><p class="desc">{escape(desc)}</p>'
-            f'<div class="grid">{body}</div></section>')
+    return (
+        f'<section><h2>{escape(title)}</h2><p class="desc">{escape(desc)}</p>'
+        f'<div class="grid">{body}</div></section>'
+    )
 
 
 def main() -> None:

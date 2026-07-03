@@ -17,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+## [0.2.0]
+
+### Changed
+
+- **Build system migrated from setuptools to scikit-build-core** (`pyproject.toml`, `CMakeLists.txt`): the `graph_layout._speedups` Cython extension is now built via CMake through the `scikit-build-core` backend. A new `CMakeLists.txt` drives Cython compilation (out-of-source) and the module install; `[tool.scikit-build]` governs wheel/sdist packaging. The legacy `setup.py` and `MANIFEST.in` are removed.
+  - Note: `_speedups` is now a hard build requirement -- a C compiler is required to install from source. The previous setuptools build treated the extension as optional and silently fell back to pure Python if compilation failed; the pure-Python fallbacks still exist at runtime, but a source install can no longer skip compilation.
+
 ### Added
 
 - **Orthogonal Topology-Shape-Metrics pipeline** (`orthogonal/metrics.py`):
@@ -24,7 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `compute_coordinates()` turns a shape into integer coordinates via constraint-graph assignment, producing an orthogonal drawing (axis-aligned segments, minimum length 1). It tries a compact longest-path assignment first, then a "spread" assignment that gives every coordinate class a distinct value (separating independent features that longest-path collapses), keeping the first clean result
   - Detects drawings that are not clean (coincident vertices, overlapping or crossing edges, edges through a vertex) and reports them invalid so callers fall back rather than emit a broken drawing (verified: no valid drawing has a conflict over random biconnected max-degree-4 graphs)
   - Coverage: ~89% of in-scope (biconnected, max-degree-4) graphs draw cleanly with the bend-minimal representation; the rest (genuine crossings that only full face rectangularization resolves) fall back to the heuristic
-- **GIOTTO bend-optimal drawing** (`orthogonal/giotto.py`): new `bend_optimal` option (default off). When on and the representation is a realizable shape (biconnected, max degree 4), the drawing is produced directly from the bend-minimal representation instead of the geometric routing heuristic; otherwise it falls back. Verified on grids, K4, cube, wheel, prism (non-overlapping boxes, orthogonal edges).
+- **GIOTTO bend-optimal drawing** (`orthogonal/giotto.py`): new `bend_optimal` option (default off). When on and the representation is a realizable shape (biconnected, max degree 4), the drawing is produced directly from the bend-minimal representation instead of the geometric routing heuristic; otherwise it falls back. Verified on grids, K4, cube, wheel, prism (non-overlapping boxes, orthogonal edges). The `used_bend_optimal` property reports whether a run actually drew from the bend-minimal representation or silently fell back to the heuristic.
 - **Review-improvements showcase** (`tests/demos/improvements_showcase.py`, `make showcase-improvements`): generates `build/improvements_showcase.html` with side-by-side visual evidence of the changes -- GIOTTO `bend_optimal` vs the heuristic router (e.g. a 3x3 grid drops from 24 bends to 0; K4 from 14 to 4), Cola overlap-avoidance and separation constraints now taking effect, and Sugiyama / GIOTTO handling cyclic input.
 
 ### Fixed

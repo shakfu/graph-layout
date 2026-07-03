@@ -21,7 +21,7 @@ A collection of graph layout algorithms in Python.
 | | `ShellLayout` | Concentric circles by degree or grouping |
 | **Spectral** | `SpectralLayout` | Laplacian eigenvector embedding |
 | **Orthogonal** | `KandinskyLayout` | Edges use only horizontal/vertical segments |
-| | `GIOTTOLayout` | Bend-optimal for degree-4 planar graphs |
+| | `GIOTTOLayout` | Orthogonal drawing for degree-4 planar graphs (opt-in bend-minimal via `bend_optimal`) |
 
 ## Installation
 
@@ -303,7 +303,7 @@ print(f"Edge exits from: {edge.source_port.side}")  # Side.EAST
 
 ### GIOTTO Layout (Degree-4 Planar)
 
-GIOTTO produces bend-optimal orthogonal drawings for planar graphs where every node has at most 4 edges (degree <= 4). Based on Tamassia's algorithm:
+GIOTTO produces orthogonal drawings for planar graphs where every node has at most 4 edges (degree <= 4), based on Tamassia's algorithm. Edges are routed heuristically by default; pass `bend_optimal=True` ([below](#bend-optimal-drawing-bend_optimal)) to draw from the bend-minimal representation:
 
 ```python
 from graph_layout import GIOTTOLayout
@@ -339,6 +339,24 @@ Use `strict=False` to fall back to Kandinsky-like behavior for graphs that don't
 layout = GIOTTOLayout(nodes=nodes, links=links, strict=False)
 layout.run()  # Falls back to Kandinsky-like algorithm
 ```
+
+#### Bend-optimal drawing (`bend_optimal`)
+
+By default GIOTTO routes edges with a geometric heuristic. Pass `bend_optimal=True` to instead draw directly from the bend-minimal orthogonal representation (Topology-Shape-Metrics), which dramatically reduces bends — for example a 3x3 grid drops from 24 bends to 0, and K4 from 14 to 4:
+
+```python
+layout = GIOTTOLayout(nodes=nodes, links=links, bend_optimal=True)
+layout.run()
+
+# Requesting it does not guarantee it is applied: the representation must be a
+# realizable orthogonal shape. It works for biconnected, max-degree-4 planar
+# graphs whose coordinate assignment is planar; other inputs silently fall back
+# to the heuristic router. `used_bend_optimal` reports which path actually ran.
+if not layout.used_bend_optimal:
+    print("fell back to the heuristic router (not bend-minimal)")
+```
+
+It is opt-in (default off) while the compaction is completed; see `docs/rectangularization-plan.md` for the remaining work to make it the default.
 
 ## Visualization
 

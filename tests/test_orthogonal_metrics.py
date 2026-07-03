@@ -280,14 +280,27 @@ def test_valid_drawings_are_conflict_free():
     Uses an independent overlap check (not the internal detector) over grids and
     named graphs.
     """
-    graphs = [
-        _grid(w, h) for w in range(2, 5) for h in range(2, 5)
-    ]
+    graphs = [_grid(w, h) for w in range(2, 5) for h in range(2, 5)]
     graphs += [
         (4, [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]),  # K4
         (6, [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3), (0, 3), (1, 4), (2, 5)]),  # prism
-        (8, [(0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4),
-             (0, 4), (1, 5), (2, 6), (3, 7)]),  # cube
+        (
+            8,
+            [
+                (0, 1),
+                (1, 2),
+                (2, 3),
+                (3, 0),
+                (4, 5),
+                (5, 6),
+                (6, 7),
+                (7, 4),
+                (0, 4),
+                (1, 5),
+                (2, 6),
+                (3, 7),
+            ],
+        ),  # cube
     ]
     for n, edges in graphs:
         _shape, drawing = _drawing_of(n, edges)

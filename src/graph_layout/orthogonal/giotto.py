@@ -33,7 +33,7 @@ from ..types import (
 from .compaction import CompactionResult, compact_layout
 from .compaction_flow import compact_layout_flow, compact_layout_longest_path
 from .edge_routing import route_all_edges
-from .orthogonalization import OrthogonalRepresentation, compute_orthogonal_representation
+from .orthogonalization import Face, OrthogonalRepresentation, compute_orthogonal_representation
 from .planarization import is_planar_quick_check
 from .types import NodeBox, OrthogonalEdge, Port, Side
 
@@ -147,12 +147,18 @@ class GIOTTOLayout(StaticLayout):
         # routing heuristic, whenever the representation is a realizable shape
         # (biconnected, max degree 4). Falls back to the heuristic otherwise.
         self._bend_optimal = bool(bend_optimal)
+        # Whether the last run actually drew from the bend-minimal representation
+        # (True) or fell back to the heuristic router (False). The bend-optimal
+        # path is not always usable even when requested -- out-of-domain inputs
+        # (degree > 4, non-biconnected) and the ~11% of biconnected max-degree-4
+        # graphs whose coordinate assignment would cross both fall back.
+        self._used_bend_optimal = False
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
         self._node_boxes: list[NodeBox] = []
         self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
-        self._faces: list = []
+        self._faces: list[Face] = []
         self._compaction_result: Optional[CompactionResult] = None
         self._is_valid_input: bool = False
         self._planarity_result: Optional[PlanarityResult] = None
@@ -223,12 +229,27 @@ class GIOTTOLayout(StaticLayout):
 
     @property
     def bend_optimal(self) -> bool:
-        """Whether the drawing is driven by the bend-minimal representation."""
+        """Whether the bend-minimal drawing was *requested* (see also
+        :attr:`used_bend_optimal` for whether it was actually applied)."""
         return self._bend_optimal
 
     @bend_optimal.setter
     def bend_optimal(self, value: bool) -> None:
         self._bend_optimal = bool(value)
+
+    @property
+    def used_bend_optimal(self) -> bool:
+        """Whether the last :meth:`run` actually drew from the bend-minimal
+        representation (True) rather than falling back to the heuristic router.
+
+        Requesting ``bend_optimal=True`` does not guarantee it is used: the
+        representation must be a realizable orthogonal shape. Out-of-domain
+        inputs (degree > 4, non-biconnected) and the minority of biconnected
+        max-degree-4 graphs whose coordinate assignment would cross both fall
+        back. This flag lets callers detect that silent fallback -- e.g. to warn,
+        or to decide whether the drawing is bend-minimal.
+        """
+        return self._used_bend_optimal
 
     @property
     def orthogonal_edges(self) -> list[OrthogonalEdge]:
@@ -330,6 +351,8 @@ class GIOTTOLayout(StaticLayout):
 
     def _compute(self, **kwargs: Any) -> None:
         """Compute GIOTTO orthogonal layout."""
+        # Reset per-run; only set True if the bend-optimal path drives the draw.
+        self._used_bend_optimal = False
         n = len(self._nodes)
         if n == 0:
             self._is_valid_input = True
@@ -375,7 +398,8 @@ class GIOTTOLayout(StaticLayout):
 
         # Phase 4: If requested and the representation is a realizable shape,
         # draw directly from it (bend-minimal). Otherwise route heuristically.
-        if not (self._bend_optimal and self._apply_bend_optimal_drawing()):
+        self._used_bend_optimal = bool(self._bend_optimal) and self._apply_bend_optimal_drawing()
+        if not self._used_bend_optimal:
             self._route_edges()
             self._apply_compaction()
 
@@ -464,15 +488,15 @@ class GIOTTOLayout(StaticLayout):
             if not (0 <= src < n and 0 <= tgt < n) or src == tgt:
                 continue
             key = (min(src, tgt), max(src, tgt))
-            route = drawing.edge_routes.get(key)
+            edge_route = drawing.edge_routes.get(key)
             dart = (src, tgt) if (src, tgt) in shape.edge_shapes else (tgt, src)
             es = shape.edge_shapes.get(dart)
-            if route is None or es is None:
+            if edge_route is None or es is None:
                 continue
 
             # The canonical route runs dart.tail -> dart.head; orient it so it
             # goes src -> tgt for this link.
-            pts = list(route)
+            pts = list(edge_route)
             if dart[0] != src:
                 pts = pts[::-1]
             src_side = dir_to_side[es.start_direction if dart[0] == src else _opp(es.end_direction)]

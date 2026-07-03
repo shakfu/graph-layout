@@ -390,9 +390,7 @@ def compute_coordinates(shape: ShapeResult, edges: list[tuple[int, int]]) -> Dra
             last_reason = conflict
             continue
 
-        return DrawingResult(
-            valid=True, vertex_positions=vertex_positions, edge_routes=edge_routes
-        )
+        return DrawingResult(valid=True, vertex_positions=vertex_positions, edge_routes=edge_routes)
 
     return DrawingResult(valid=False, reason=last_reason)
 
@@ -405,7 +403,7 @@ def _drawing_conflict(
     drawing (overlapping/crossing edges, or an edge through a non-endpoint
     vertex), else None."""
     # Flatten to axis-aligned segments tagged by their edge.
-    segs: list[tuple[tuple[int, int], object]] = []  # ((x1,y1,x2,y2 normalized), edge)
+    segs: list[tuple[tuple[int, int, int, int], object]] = []  # ((x1,y1,x2,y2 normalized), edge)
     for ekey, route in edge_routes.items():
         for (x1, y1), (x2, y2) in zip(route, route[1:]):
             segs.append(((min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)), ekey))

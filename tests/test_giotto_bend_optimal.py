@@ -37,9 +37,8 @@ def _boxes_overlap(boxes) -> bool:
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
             a, b = boxes[i], boxes[j]
-            if (
-                abs(a.x - b.x) * 2 < (a.width + b.width)
-                and abs(a.y - b.y) * 2 < (a.height + b.height)
+            if abs(a.x - b.x) * 2 < (a.width + b.width) and abs(a.y - b.y) * 2 < (
+                a.height + b.height
             ):
                 return True
     return False
@@ -133,3 +132,23 @@ def test_bend_optimal_falls_back_on_conflicting_drawing():
 def test_bend_optimal_defaults_off():
     layout = GIOTTOLayout(nodes=[{}], links=[])
     assert layout.bend_optimal is False
+
+
+def test_used_bend_optimal_signal():
+    """used_bend_optimal reports whether the bend-minimal path actually drove
+    the drawing, exposing the otherwise-silent fallback."""
+    k4 = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
+
+    # Requested and in-domain -> used.
+    assert _layout(4, k4, bend_optimal=True).used_bend_optimal is True
+
+    # Not requested (default) -> heuristic, not used.
+    assert _layout(4, k4).used_bend_optimal is False
+
+    # Requested but out of domain (degree 5) -> silent fallback, not used.
+    deg5 = [(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 2)]
+    assert _layout(6, deg5, bend_optimal=True).used_bend_optimal is False
+
+    # Requested, in-domain, but the coordinate assignment crosses -> fallback.
+    crossing = [(0, 1), (0, 3), (1, 2), (1, 4), (2, 5), (3, 4), (3, 6), (4, 5), (4, 7), (6, 7)]
+    assert _layout(8, crossing, bend_optimal=True).used_bend_optimal is False

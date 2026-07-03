@@ -1,12 +1,12 @@
 [project]
 name = "graph-layout"
-version = "0.1.8"
+version = "0.2.0"
 description = "A collection of graph layout algorithms in Python"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 authors = [
-    { name = "Shakeeb Alireza", email = "me@example.org" }
+    { name = "Shakeeb Alireza", email = "shakfu@users.noreply.github.com" }
 ]
 keywords = ["graph", "layout", "constraints", "optimization", "visualization", "cola", "force-directed"]
 classifiers = [
@@ -31,13 +31,36 @@ dependencies = [
 ilp = ["scipy>=1.9.0"]
 
 [build-system]
-requires = [
-    "setuptools>=64",
-    "wheel",
-    "Cython>=3.0.0; platform_python_implementation=='CPython'",
-    "numpy>=1.20.0",
+requires = ["scikit-build-core>=0.10", "cython>=3.0"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+wheel.packages = ["src/graph_layout"]
+cmake.version = ">=3.15"
+cmake.build-type = "Release"
+sdist.include = [
+    "src/",
+    "CMakeLists.txt",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
 ]
-build-backend = "setuptools.build_meta"
+sdist.exclude = [
+    ".git/",
+    ".venv/",
+    "__pycache__/",
+    "*.pyc",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    "build/",
+    "dist/",
+    "*.egg-info/",
+]
+wheel.exclude = [
+    "*.c",
+    "*.pyx",
+    "*.pxd",
+]
 
 [dependency-groups]
 dev = [
@@ -147,12 +170,3 @@ select = ["E", "F", "I", "N", "W"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"graph_layout" = ["py.typed"]
-
-[tool.setuptools.exclude-package-data]
-"graph_layout" = ["*.c", "*.pyx", "*.pxd"]

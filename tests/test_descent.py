@@ -322,3 +322,33 @@ class TestDescent:
         # Positions should change with grid snapping
         # (exact behavior depends on parameters)
         assert descent.x.shape == initial_x.shape
+
+    def test_grid_snap_negative_coordinates(self):
+        """Grid snapping must apply to negative coordinates too.
+
+        Regression: the snap offset used Python's `%` (sign of the divisor), so
+        for negative coordinates it computed an out-of-range offset and applied
+        no snap force. It now uses fmod (sign of the dividend), matching WebCola.
+        A node at x=-110 (10 units left of grid line -100) must receive a snap
+        force pulling it toward that line.
+        """
+        # node 0 at x=-110 (near grid line -100); node 1 at x=0 (on a line).
+        x = np.array([[-110.0, 0.0], [0.0, 0.0]])
+        D = np.array([[0.0, 100.0], [100.0, 0.0]])
+        descent = Descent(x.copy(), D)
+        descent.snap_grid_size = 100.0
+        descent.snap_strength = 1000.0
+
+        descent.num_grid_snap_nodes = 0
+        descent.compute_derivatives(descent.x)
+        g_base = descent.g.copy()
+
+        descent.num_grid_snap_nodes = 2
+        descent.compute_derivatives(descent.x)
+        snap = descent.g - g_base
+
+        # The negative node gets a nonzero x-snap force toward the grid line
+        # (negative gradient => descent moves it in +x, toward -100).
+        assert snap[0, 0] < -1e-9
+        # The on-grid node gets no snap force.
+        assert abs(snap[0, 1]) < 1e-9

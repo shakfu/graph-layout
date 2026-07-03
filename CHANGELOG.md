@@ -35,6 +35,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Quadtree (pure-Python): coincident points no longer infinitely recurse** (`spatial/quadtree.py`): coincident bodies always fall in the same quadrant, so subdivision never separated them (`RecursionError`). A `MAX_DEPTH = 50` cap now merges bodies in place once the cell is effectively zero-sized, mirroring the Cython kernel.
 
+- **Yifan Hu now respects fixed nodes during optimization** (`force/yifan_hu.py`): fixed nodes were only restored at copy-back but moved freely during the simulation, so their wrong intermediate positions perturbed the other nodes. `_layout_level` now accepts a fixed mask and keeps pinned vertices in place (they still exert forces on others); the finest refinement level pins fixed nodes at their true positions.
+
+- **Cola grid-snap now works for negative coordinates** (`cola/descent.py`): the snap offset used Python's `%` (sign of the divisor); WebCola relies on JS `%` (sign of the dividend), so the snap direction flipped for negative coordinates and `grid_snap_iterations > 0` snapped roughly half the nodes the wrong way (or not at all). It now uses `math.fmod`.
+
+- **Edge-crossing metric now counts collinear overlaps and T-junctions** (`metrics.py`): the strict CCW straddle test silently dropped collinear-overlapping edges and endpoint-on-segment touches. `_segments_intersect` now uses the canonical orientation + on-segment test (CLRS), so those degenerate crossings are counted while proper crossings and disjoint collinear edges are handled correctly.
+
 ### Changed
 
 - **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):

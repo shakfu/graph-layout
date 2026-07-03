@@ -74,6 +74,34 @@ class TestEdgeCrossings:
         links = [Link(0, 1), Link(0, 2)]  # V shape
         assert edge_crossings(nodes, links) == 0
 
+    def test_collinear_overlapping_edges_cross(self):
+        """Collinear edges that overlap count as a crossing.
+
+        Regression: the strict straddle test returned False for collinear
+        overlaps, so two edges lying on top of each other were not counted.
+        """
+        # (0,0)-(100,0) and (50,0)-(150,0) overlap on the x-axis, share no vertex.
+        nodes = [Node(x=0, y=0), Node(x=100, y=0), Node(x=50, y=0), Node(x=150, y=0)]
+        links = [Link(0, 1), Link(2, 3)]
+        assert edge_crossings(nodes, links) == 1
+
+    def test_t_junction_endpoint_on_edge_crosses(self):
+        """An endpoint lying on the interior of another edge counts (T-junction).
+
+        Regression: the strict straddle test missed endpoint-on-segment touches.
+        """
+        # (50,0) is the interior point of edge (0,0)-(100,0); no shared vertex.
+        nodes = [Node(x=0, y=0), Node(x=100, y=0), Node(x=50, y=0), Node(x=50, y=50)]
+        links = [Link(0, 1), Link(2, 3)]
+        assert edge_crossings(nodes, links) == 1
+
+    def test_collinear_disjoint_edges_no_crossing(self):
+        """Collinear but non-overlapping edges do not cross."""
+        # (0,0)-(50,0) and (60,0)-(100,0): collinear, disjoint.
+        nodes = [Node(x=0, y=0), Node(x=50, y=0), Node(x=60, y=0), Node(x=100, y=0)]
+        links = [Link(0, 1), Link(2, 3)]
+        assert edge_crossings(nodes, links) == 0
+
 
 class TestStress:
     """Tests for stress calculation."""

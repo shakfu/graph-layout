@@ -84,12 +84,42 @@ def _segments_intersect(
     p3: Tuple[float, float],
     p4: Tuple[float, float],
 ) -> bool:
-    """Check if line segments (p1,p2) and (p3,p4) intersect."""
+    """Check if line segments (p1,p2) and (p3,p4) intersect.
 
-    def ccw(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]) -> bool:
-        return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
+    Handles the degenerate cases a strict straddle test misses: collinear
+    overlaps and an endpoint of one segment lying on the interior of the other
+    (a T-junction). Uses the canonical orientation + on-segment test (CLRS).
+    """
 
-    return ccw(p1, p3, p4) != ccw(p2, p3, p4) and ccw(p1, p2, p3) != ccw(p1, p2, p4)
+    def orient(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]) -> float:
+        # >0 counter-clockwise, <0 clockwise, 0 collinear.
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    def on_segment(a: Tuple[float, float], b: Tuple[float, float], c: Tuple[float, float]) -> bool:
+        # Given a, b, c collinear, is c within the bounding box of segment ab?
+        return min(a[0], b[0]) <= c[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= c[1] <= max(
+            a[1], b[1]
+        )
+
+    d1 = orient(p3, p4, p1)
+    d2 = orient(p3, p4, p2)
+    d3 = orient(p1, p2, p3)
+    d4 = orient(p1, p2, p4)
+
+    # Proper intersection: each segment straddles the other's supporting line.
+    if ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)) and d1 and d2 and d3 and d4:
+        return True
+
+    # Collinear / endpoint-on-segment (T-junction) touches.
+    if d1 == 0 and on_segment(p3, p4, p1):
+        return True
+    if d2 == 0 and on_segment(p3, p4, p2):
+        return True
+    if d3 == 0 and on_segment(p1, p2, p3):
+        return True
+    if d4 == 0 and on_segment(p1, p2, p4):
+        return True
+    return False
 
 
 def stress(

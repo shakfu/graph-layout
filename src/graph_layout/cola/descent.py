@@ -276,7 +276,10 @@ class Descent:
             for i in range(self.k):
                 xiu = self.x[i, u]
                 m = xiu / g
-                f = m % 1
+                # Use fmod (sign of the dividend) to match WebCola's JS `%`.
+                # Python's `%` takes the sign of the divisor, which flips the
+                # snap direction for negative coordinates.
+                f = math.fmod(m, 1.0)
                 q = m - f
                 a = abs(f)
                 if a <= 0.5:

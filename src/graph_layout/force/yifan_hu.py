@@ -457,6 +457,15 @@ class YifanHuLayout(IterativeLayout):
         """
         n_levels = len(levels)
 
+        # Fixed-node handling: pin fixed nodes during the finest-level refinement
+        # (where level vertex i maps 1:1 to self._nodes[i]) so their positions do
+        # not drift and perturb the free nodes. Coarser levels aggregate several
+        # fine nodes per super-vertex, so pinning is only applied at the finest.
+        fixed_mask = np.array([bool(node.fixed) for node in self._nodes], dtype=bool)
+        any_fixed = bool(fixed_mask.any())
+        fixed_x = np.array([float(node.x) for node in self._nodes], dtype=np.float64)
+        fixed_y = np.array([float(node.y) for node in self._nodes], dtype=np.float64)
+
         # Layout coarsest level
         coarsest = levels[-1]
         coarsest_n = coarsest["n"]
@@ -477,6 +486,13 @@ class YifanHuLayout(IterativeLayout):
         else:
             base_k = self._compute_optimal_distance()
 
+        # When there is only one level the coarsest layout is also the finest,
+        # so pin fixed nodes there.
+        finest_here = any_fixed and n_levels == 1
+        if finest_here:
+            pos_x[fixed_mask] = fixed_x[fixed_mask]
+            pos_y[fixed_mask] = fixed_y[fixed_mask]
+
         # Layout coarsest level with adaptive step
         pos_x, pos_y = self._layout_level(
             coarsest_n,
@@ -487,6 +503,7 @@ class YifanHuLayout(IterativeLayout):
             base_k,
             self._iterations,  # More iterations for coarsest
             adaptive_step=True,
+            fixed_mask=fixed_mask if finest_here else None,
         )
 
         # Refine from coarsest to finest
@@ -515,6 +532,12 @@ class YifanHuLayout(IterativeLayout):
             gamma = math.sqrt(level_n / coarsest_n) if coarsest_n > 0 else 1.0
             level_k = base_k / gamma if gamma > 0 else base_k
 
+            # Pin fixed nodes at the finest level (identity vertex-to-node map).
+            finest_here = any_fixed and level_idx == 0
+            if finest_here:
+                new_pos_x[fixed_mask] = fixed_x[fixed_mask]
+                new_pos_y[fixed_mask] = fixed_y[fixed_mask]
+
             # Refine this level with simple cooling
             pos_x, pos_y = self._layout_level(
                 level_n,
@@ -525,6 +548,7 @@ class YifanHuLayout(IterativeLayout):
                 level_k,
                 self._level_iterations,
                 adaptive_step=False,  # Simple cooling for refinement
+                fixed_mask=fixed_mask if finest_here else None,
             )
 
             coarsest_n = level_n
@@ -545,6 +569,7 @@ class YifanHuLayout(IterativeLayout):
         k: float,
         max_iterations: int,
         adaptive_step: bool = True,
+        fixed_mask: Optional[np.ndarray] = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Layout a single level using force-directed algorithm.
@@ -558,6 +583,9 @@ class YifanHuLayout(IterativeLayout):
             k: Optimal distance
             max_iterations: Maximum iterations
             adaptive_step: Use adaptive step control
+            fixed_mask: Optional boolean array over the ``n`` vertices; vertices
+                marked True keep their (pinned) position and are not displaced,
+                though they still exert forces on the other vertices.
 
         Returns:
             Tuple of (pos_x, pos_y) arrays
@@ -644,6 +672,8 @@ class YifanHuLayout(IterativeLayout):
             # Apply displacements with step limit
             total_displacement = 0.0
             for i in range(n):
+                if fixed_mask is not None and fixed_mask[i]:
+                    continue  # pinned: still exerts forces on others but never moves
                 disp_len = math.sqrt(disp_x[i] ** 2 + disp_y[i] ** 2)
                 if disp_len > 0:
                     # Limit displacement by step

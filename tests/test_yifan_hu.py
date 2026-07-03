@@ -279,6 +279,51 @@ class TestYifanHuFixedNodes:
         assert abs(layout.nodes[0].x - 100) < 0.1
         assert abs(layout.nodes[0].y - 100) < 0.1
 
+    def test_fixed_node_pinned_during_optimization(self):
+        """A fixed vertex must not be displaced during a refinement level.
+
+        Regression: fixed nodes were only restored at copy-back (their final
+        position was correct) but moved freely during the simulation, so their
+        wrong intermediate positions perturbed the other nodes. _layout_level now
+        honors a fixed_mask, keeping pinned vertices in place while they still
+        exert forces on the rest.
+        """
+        import numpy as np
+
+        layout = YifanHuLayout(nodes=[Node(), Node(), Node()], links=[Link(0, 1), Link(1, 2)])
+        pos_x = np.array([100.0, 0.0, 50.0])
+        pos_y = np.array([100.0, 0.0, 50.0])
+        mask = np.array([True, False, False])
+
+        nx, ny = layout._layout_level(
+            3,
+            [0, 1],
+            [1, 2],
+            pos_x.copy(),
+            pos_y.copy(),
+            50.0,
+            30,
+            adaptive_step=False,
+            fixed_mask=mask,
+        )
+        # Pinned vertex 0 unchanged; free vertex 1 moved.
+        assert nx[0] == 100.0 and ny[0] == 100.0
+        assert (nx[1], ny[1]) != (0.0, 0.0)
+
+        # Control: without the mask, vertex 0 is displaced.
+        nx2, ny2 = layout._layout_level(
+            3,
+            [0, 1],
+            [1, 2],
+            pos_x.copy(),
+            pos_y.copy(),
+            50.0,
+            30,
+            adaptive_step=False,
+            fixed_mask=None,
+        )
+        assert (nx2[0], ny2[0]) != (100.0, 100.0)
+
 
 # =============================================================================
 # Event Tests

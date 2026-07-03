@@ -51,8 +51,9 @@ jobs:
           # Skip 32-bit builds and musllinux (for now)
           CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_*"
 
-          # Install dependencies before build
-          CIBW_BEFORE_BUILD: pip install numpy Cython
+          # Build dependencies (scikit-build-core, cython, and CMake/Ninja) are
+          # provisioned automatically via PEP 517 build isolation from
+          # [build-system].requires in pyproject.toml -- no CIBW_BEFORE_BUILD needed.
 
           # Run tests after build
           CIBW_TEST_REQUIRES: pytest pytest-cov

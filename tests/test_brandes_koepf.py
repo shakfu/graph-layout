@@ -75,5 +75,27 @@ class TestBrandesKopf:
         chain = [0, 11, 12, 3]
         assert len({round(x[c], 6) for c in chain}) == 1
 
+    def test_symmetric_layout_is_centered(self):
+        """The balanced four-run assignment must be symmetric: a parent is
+        centered over its children (not biased toward one side)."""
+        # Root 0 over children 1, 2.
+        layers = [[0], [1, 2]]
+        pos = {0: 0, 1: 0, 2: 1}
+        upper = {0: [], 1: [0], 2: [0]}
+        lower = {0: [1, 2], 1: [], 2: []}
+        x = assign_x(layers, pos, upper, lower, set(), 10.0)
+        assert abs(x[0] - (x[1] + x[2]) / 2) < 1e-6
+
+    def test_diamond_is_symmetric(self):
+        """A diamond 0 -> {1,2} -> 3 lays out symmetrically about its axis."""
+        layers = [[0], [1, 2], [3]]
+        pos = {0: 0, 1: 0, 2: 1, 3: 0}
+        upper = {0: [], 1: [0], 2: [0], 3: [1, 2]}
+        lower = {0: [1, 2], 1: [3], 2: [3], 3: []}
+        x = assign_x(layers, pos, upper, lower, set(), 10.0)
+        axis = (x[1] + x[2]) / 2
+        assert abs(x[0] - axis) < 1e-6
+        assert abs(x[3] - axis) < 1e-6
+
     def test_empty(self):
         assert assign_x([], {}, {}, {}, set(), 10.0) == {}

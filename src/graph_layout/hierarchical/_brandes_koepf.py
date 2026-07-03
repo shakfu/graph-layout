@@ -120,6 +120,7 @@ def _horizontal_compaction(
     layers: list[list[int]],
     root: dict[int, int],
     delta: float,
+    pack_right: bool = False,
 ) -> dict[int, float]:
     """Assign an x-coordinate to every block, packed as tight as possible.
 
@@ -130,23 +131,35 @@ def _horizontal_compaction(
     x[root(a)] + delta`` constraints between distinct block roots. The BK
     alignment keeps blocks non-crossing, so these constraints form a DAG and a
     longest-path (Bellman-Ford to a fixpoint) yields the tightest feasible
-    left-packed coordinates. This guarantees the no-overlap / ordering invariant
+    coordinates -- equivalent to the paper's shift-class compaction but without
+    its fragile bookkeeping. This guarantees the no-overlap / ordering invariant
     by construction.
+
+    ``pack_right`` packs blocks against the right instead of the left (used by
+    the rightmost-biased runs so the four runs are symmetric).
     """
     roots = {root[v] for layer in layers for v in layer}
     xr: dict[int, float] = {r: 0.0 for r in roots}
 
-    # Longest path over the within-layer left->right separation constraints.
-    # Bounded by the number of blocks (a DAG's longest path).
+    # Longest path over the within-layer separation constraints; bounded by the
+    # number of blocks (a DAG's longest path). Left packing raises each right
+    # block off its left neighbour; right packing lowers each left block under
+    # its right neighbour.
     for _ in range(len(roots) + 1):
         changed = False
         for layer in layers:
             for a, b in zip(layer, layer[1:]):
                 ra, rb = root[a], root[b]
-                required = xr[ra] + delta
-                if xr[rb] < required - 1e-9:
-                    xr[rb] = required
-                    changed = True
+                if pack_right:
+                    allowed = xr[rb] - delta
+                    if xr[ra] > allowed + 1e-9:
+                        xr[ra] = allowed
+                        changed = True
+                else:
+                    required = xr[ra] + delta
+                    if xr[rb] < required - 1e-9:
+                        xr[rb] = required
+                        changed = True
         if not changed:
             break
 
@@ -180,32 +193,42 @@ def assign_x(
 
     marked = _mark_type1_conflicts(layers, pos, upper, is_dummy)
 
+    # Four runs: {align to upper, align to lower} x {leftmost, rightmost}. The
+    # rightmost runs bias median ties right and pack right, so the set is
+    # symmetric and the balancing centres the drawing rather than biasing left.
     candidates: list[dict[int, float]] = []
-    # Four runs differ in the block structure produced by the vertical alignment:
-    # {align to upper, align to lower} x {leftmost median, rightmost median}.
+    right_biased: list[bool] = []
     for upward in (False, True):
         run_layers = list(reversed(layers)) if upward else layers
         predecessors = lower if upward else upper
         for right_to_left in (False, True):
             root, _align = _vertical_alignment(run_layers, pos, predecessors, marked, right_to_left)
-            candidates.append(_horizontal_compaction(run_layers, root, delta))
+            candidates.append(_horizontal_compaction(run_layers, root, delta, right_to_left))
+            right_biased.append(right_to_left)
 
-    # Balance: align each candidate to a common origin, then take, per vertex, the
-    # average of the two median coordinates (paper's balancing).
+    # Balance (Brandes-Köpf): shift each run onto the run of smallest width --
+    # left-biased runs by aligning their minimum, right-biased runs by aligning
+    # their maximum -- then take, per vertex, the average of the two median
+    # coordinates.
+    widths = [max(c.values()) - min(c.values()) for c in candidates]
+    ref = widths.index(min(widths))
+    ref_min = min(candidates[ref].values())
+    ref_max = max(candidates[ref].values())
+
     aligned: list[dict[int, float]] = []
-    for xc in candidates:
-        lo = min(xc.values())
-        aligned.append({v: xv - lo for v, xv in xc.items()})
+    for c, is_right in zip(candidates, right_biased):
+        shift = ref_max - max(c.values()) if is_right else ref_min - min(c.values())
+        aligned.append({v: xv + shift for v, xv in c.items()})
 
     balanced: dict[int, float] = {}
     for v in pos:
         vals = sorted(a[v] for a in aligned)
         balanced[v] = (vals[1] + vals[2]) / 2.0
 
-    # Balancing (a per-vertex median of the four runs) can, for a few vertices,
-    # place them closer than delta. Enforce the ordering / separation invariant
-    # with a final left-to-right pass per layer; it only nudges the rare
-    # offending vertex and never reorders.
+    # The per-vertex median of the four runs can, in principle, place a couple of
+    # vertices closer than delta. Enforce the ordering / separation invariant
+    # with a final left-to-right pass per layer; it only nudges an offending
+    # vertex and never reorders.
     for layer in layers:
         for a, b in zip(layer, layer[1:]):
             if balanced[b] < balanced[a] + delta:

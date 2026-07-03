@@ -510,6 +510,11 @@ class TestSugiyamaLayout:
         for _bx, by in bends:
             assert y0 < by < y3
 
+        # Brandes-Köpf aligns the dummy chain into a straight vertical segment,
+        # so the two bends share an x-coordinate (previously each layer was
+        # centered independently and the chain could zig-zag).
+        assert abs(bends[0][0] - bends[1][0]) < 1.0
+
     def test_crossing_minimization_uses_dummies(self):
         """Crossing minimization over the expanded graph finds a good ordering.
 

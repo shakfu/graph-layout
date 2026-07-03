@@ -55,6 +55,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Greedy orthogonal compaction now actually compacts** (`orthogonal/compaction.py`): `CompactionSolver.solve` only pushed elements right to satisfy minimum gaps and never pulled them left, so interior slack survived and the only size reduction was a final margin translate. It now performs longest-path compaction (each element pulled to its leftmost/topmost feasible position), and `compact_horizontal`/`compact_vertical` constrain every overlapping pair (not just consecutive ones) so the tighter packing stays overlap-free. This is the default orthogonal compaction path when scipy is unavailable.
 
+### Added
+
+- **Sugiyama: Brandes-Köpf horizontal coordinate assignment** (`hierarchical/_brandes_koepf.py`, `hierarchical/sugiyama.py`): the layered layout placed nodes at evenly-spaced integer slots and centered each layer independently, discarding the crossing-minimization ordering signal and producing avoidable bends. It now assigns within-layer x-coordinates with Brandes-Köpf ("Fast and Simple Horizontal Coordinate Assignment", 2002) -- four balanced vertical-alignment runs with type-1 conflict marking -- so each vertex aligns with the median of its neighbours and long-edge dummy chains are drawn as straight vertical segments. The block compaction uses a longest-path formulation that guarantees the within-layer ordering and minimum-separation invariant by construction.
+
 ### Changed
 
 - **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):

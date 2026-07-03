@@ -28,6 +28,7 @@ from ..types import (
     NodeLike,
     SizeType,
 )
+from ._brandes_koepf import assign_x
 
 
 class GraphStructureWarning(UserWarning):
@@ -478,19 +479,42 @@ class SugiyamaLayout(StaticLayout):
         n = len(self._nodes)
         self._dummy_pos = {}
 
+        if node_sep <= 0:
+            node_sep = self._node_separation
+
+        # Within-layer x-coordinates via Brandes-Köpf: aligns each vertex with the
+        # median of its neighbours across layers (straightening edges, especially
+        # long-edge dummy chains) instead of the old independent per-layer
+        # centering. The layer (vertical) coordinate and orientation are applied
+        # below as before.
+        position = {node_idx: pos for layer in self._layers for pos, node_idx in enumerate(layer)}
+        upper: dict[int, list[int]] = {node_idx: [] for node_idx in position}
+        lower: dict[int, list[int]] = {node_idx: [] for node_idx in position}
+        for src, tgt in self._segments:
+            lower[src].append(tgt)
+            upper[tgt].append(src)
+        for node_idx in position:
+            upper[node_idx].sort(key=lambda x: position[x])
+            lower[node_idx].sort(key=lambda x: position[x])
+
+        bk_x = assign_x(self._layers, position, upper, lower, self._dummy_nodes, node_sep)
+
+        # Normalize the BK coordinates into the canvas and centre the drawing.
+        if bk_x:
+            min_bk = min(bk_x.values())
+            width = max(bk_x.values()) - min_bk
+            x_offset = (canvas_w - width) / 2 if 0 <= width <= canvas_w else 0.0
+        else:
+            min_bk = 0.0
+            x_offset = 0.0
+
         # Assign coordinates based on layer position. Dummy nodes occupy real
         # horizontal slots (so long edges are routed around, not through, other
         # nodes) but are recorded separately rather than written to self._nodes.
         for layer_idx, layer in enumerate(self._layers):
-            layer_size = len(layer)
-
-            # Center layer horizontally
-            layer_width = (layer_size - 1) * node_sep if layer_size > 1 else 0
-            start_offset = (canvas_w - layer_width) / 2 if layer_size > 1 else canvas_w / 2
-
-            for pos, node_idx in enumerate(layer):
+            for node_idx in layer:
                 # Within-layer position (horizontal in top-to-bottom)
-                within_pos = start_offset + pos * node_sep if layer_size > 1 else start_offset
+                within_pos = x_offset + (bk_x[node_idx] - min_bk)
 
                 # Layer position (vertical in top-to-bottom)
                 layer_pos = layer_idx * layer_sep if n_layers > 1 else canvas_h / 2

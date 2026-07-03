@@ -1062,10 +1062,12 @@ cpdef void _compute_fa2_gravity(
 
         deg_factor = degrees[i] + 1.0
 
+        # Regular gravity: net pull independent of distance. Strong gravity:
+        # net pull scales with distance (Gephi/Jacomy et al.).
         if strong_gravity_mode:
-            force = gravity * deg_factor
-        else:
             force = gravity * deg_factor * dist
+        else:
+            force = gravity * deg_factor
 
         disp_x[i] += (dx / dist) * force
         disp_y[i] += (dy / dist) * force

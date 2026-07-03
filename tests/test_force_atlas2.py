@@ -388,60 +388,37 @@ class TestForceAtlas2Reproducibility:
 class TestForceAtlas2Algorithm:
     """Tests for ForceAtlas2-specific algorithm behavior."""
 
-    def test_linlog_mode_tighter_clusters(self):
-        """Test that LinLog mode produces tighter clusters."""
+    def test_linlog_mode_weaker_attraction(self):
+        """LinLog mode uses log(1+d) attraction, which is weaker than linear d,
+        so connected nodes settle farther apart (longer mean edge length).
+
+        Note: an earlier version of this test asserted LinLog produces *smaller*
+        intra-cluster diameters. That is not what LinLog does -- its weaker log
+        attraction spreads small clusters -- and it only appeared to hold because
+        the (then-buggy) regular gravity was distance-scaled and artificially
+        compressed the layout. With gravity fixed, we assert LinLog's actual
+        spec-level effect (weaker attraction => longer edges), which is robust
+        across seeds.
+        """
         nodes, links = create_two_clusters()
+        edges = [(l["source"], l["target"]) for l in links]
 
-        # Run without LinLog
-        layout_linear = ForceAtlas2Layout(
-            nodes=[dict(n) for n in nodes],
-            links=[dict(l) for l in links],
-            size=(500, 500),
-            linlog_mode=False,
-            random_seed=42,
-            iterations=100,
-        )
-        layout_linear.run(center_graph=False)
+        def mean_edge_length(linlog: bool) -> float:
+            layout = ForceAtlas2Layout(
+                nodes=[dict(n) for n in nodes],
+                links=[dict(l) for l in links],
+                size=(500, 500),
+                linlog_mode=linlog,
+                random_seed=42,
+                iterations=100,
+            )
+            layout.run(center_graph=False)
+            ns = layout.nodes
+            return sum(math.hypot(ns[a].x - ns[b].x, ns[a].y - ns[b].y) for a, b in edges) / len(
+                edges
+            )
 
-        # Calculate cluster diameter for linear mode
-        def cluster_diameter(layout, indices):
-            max_dist = 0
-            for i in indices:
-                for j in indices:
-                    if i != j:
-                        dx = layout.nodes[i].x - layout.nodes[j].x
-                        dy = layout.nodes[i].y - layout.nodes[j].y
-                        dist = math.sqrt(dx * dx + dy * dy)
-                        max_dist = max(max_dist, dist)
-            return max_dist
-
-        linear_diam1 = cluster_diameter(layout_linear, [0, 1, 2, 3])
-        linear_diam2 = cluster_diameter(layout_linear, [4, 5, 6, 7])
-
-        # Run with LinLog
-        layout_linlog = ForceAtlas2Layout(
-            nodes=[dict(n) for n in nodes],
-            links=[dict(l) for l in links],
-            size=(500, 500),
-            linlog_mode=True,
-            random_seed=42,
-            iterations=100,
-        )
-        layout_linlog.run(center_graph=False)
-
-        linlog_diam1 = cluster_diameter(layout_linlog, [0, 1, 2, 3])
-        linlog_diam2 = cluster_diameter(layout_linlog, [4, 5, 6, 7])
-
-        # LinLog should produce tighter (smaller diameter) clusters
-        # Allow some tolerance since randomness affects results
-        avg_linear = (linear_diam1 + linear_diam2) / 2
-        avg_linlog = (linlog_diam1 + linlog_diam2) / 2
-
-        # LinLog clusters should generally be tighter, but we allow
-        # some margin due to randomness and other forces
-        assert avg_linlog < avg_linear * 1.5, (
-            f"LinLog clusters ({avg_linlog:.1f}) should be tighter than linear ({avg_linear:.1f})"
-        )
+        assert mean_edge_length(linlog=True) > mean_edge_length(linlog=False)
 
     def test_strong_gravity_prevents_drift(self):
         """Test that strong gravity keeps nodes near center."""
@@ -713,3 +690,66 @@ class TestForceAtlas2Compatibility:
         layout.run()
 
         assert len(layout.nodes) == 6
+
+
+class TestForceAtlas2Gravity:
+    """Regular vs strong gravity distance behavior (Jacomy et al. / Gephi)."""
+
+    @staticmethod
+    def _pull_magnitude(dist: float, strong: bool) -> float:
+        """Net gravity pull magnitude on a single node at `dist` from center."""
+        layout = ForceAtlas2Layout(nodes=[{"x": dist, "y": 0.0}], links=[])
+        layout._canvas_size = (0.0, 0.0)  # center at origin
+        layout._gravity = 1.0
+        layout._strong_gravity_mode = strong
+        layout._pos_x = np.array([dist])
+        layout._pos_y = np.array([0.0])
+        layout._disp_x = np.zeros(1)
+        layout._disp_y = np.zeros(1)
+        layout._degrees = np.array([0])
+        layout.compute_gravity_forces()
+        return math.hypot(layout._disp_x[0], layout._disp_y[0])
+
+    def test_regular_gravity_distance_independent(self):
+        """Regular gravity's net pull must not depend on distance.
+
+        Regression: regular and strong gravity were swapped, so regular gravity
+        scaled with distance.
+        """
+        assert self._pull_magnitude(100.0, strong=False) == pytest.approx(
+            self._pull_magnitude(200.0, strong=False)
+        )
+
+    def test_strong_gravity_scales_with_distance(self):
+        """Strong gravity's net pull must scale linearly with distance."""
+        m100 = self._pull_magnitude(100.0, strong=True)
+        m200 = self._pull_magnitude(200.0, strong=True)
+        assert m200 == pytest.approx(2.0 * m100)
+
+    def test_gravity_kernel_matches_python(self):
+        """The Cython gravity kernel must match the pure-Python path."""
+        sp = pytest.importorskip("graph_layout._speedups")
+        if not hasattr(sp, "_compute_fa2_gravity"):
+            pytest.skip("Cython FA2 gravity kernel not available")
+
+        for strong in (False, True):
+            pos_x = np.array([100.0, -50.0, 200.0])
+            pos_y = np.array([0.0, 30.0, -80.0])
+            degrees = np.array([0.0, 3.0, 1.0])
+            dx = np.zeros(3)
+            dy = np.zeros(3)
+            sp._compute_fa2_gravity(pos_x, pos_y, dx, dy, degrees, 1.0, 0.0, 0.0, strong, 3)
+
+            # Reproduce the Python formula independently.
+            exp_dx = np.zeros(3)
+            exp_dy = np.zeros(3)
+            for i in range(3):
+                vx, vy = -pos_x[i], -pos_y[i]
+                d = math.hypot(vx, vy)
+                deg = degrees[i] + 1.0
+                force = 1.0 * deg * (d if strong else 1.0)
+                exp_dx[i] = (vx / d) * force
+                exp_dy[i] = (vy / d) * force
+
+            assert np.allclose(dx, exp_dx, rtol=1e-9, atol=1e-9)
+            assert np.allclose(dy, exp_dy, rtol=1e-9, atol=1e-9)

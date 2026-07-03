@@ -41,6 +41,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Edge-crossing metric now counts collinear overlaps and T-junctions** (`metrics.py`): the strict CCW straddle test silently dropped collinear-overlapping edges and endpoint-on-segment touches. `_segments_intersect` now uses the canonical orientation + on-segment test (CLRS), so those degenerate crossings are counted while proper crossings and disjoint collinear edges are handled correctly.
 
+- **ForceAtlas2: regular vs strong gravity were swapped** (`force/force_atlas2.py`, `_speedups.pyx`): regular gravity was distance-scaled and strong gravity distance-independent -- the reverse of the Gephi/Jacomy et al. definition. Regular gravity is now a distance-independent pull toward the center and strong gravity scales with distance, in both the pure-Python and Cython paths. (The fix corrected an existing FA2 test that asserted LinLog produces smaller intra-cluster diameters -- an artifact of the old distance-scaled gravity, not a real LinLog property; it now asserts LinLog's weaker log attraction yields longer edges.)
+
 ### Changed
 
 - **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):

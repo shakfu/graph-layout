@@ -655,12 +655,14 @@ class ForceAtlas2Layout(IterativeLayout):
             # Gravity is degree-weighted: gravity * (deg + 1)
             deg_factor: float = float(self._degrees[i] + 1)
 
+            # ``force`` is the net pull magnitude toward the center; the applied
+            # displacement below is (unit vector toward center) * force.
             if self._strong_gravity_mode:
-                # Strong gravity: constant force regardless of distance
-                force = self._gravity * deg_factor
-            else:
-                # Normal gravity: force scales with distance
+                # Strong gravity: net pull scales with distance (Gephi/Jacomy).
                 force = self._gravity * deg_factor * dist
+            else:
+                # Regular gravity: net pull is independent of distance.
+                force = self._gravity * deg_factor
 
             # Normalize and apply
             self._disp_x[i] += (dx / dist) * force

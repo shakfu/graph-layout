@@ -372,6 +372,55 @@ class TestSpringLayout:
 
         assert len(layout.nodes) == 6
 
+    def test_coincident_nodes_no_divide_by_zero(self):
+        """Coincident start positions must not raise ZeroDivisionError (H2).
+
+        The naive Coulomb repulsion divides by squared distance; two nodes at
+        the same coordinates make that zero. ``random_init=False`` preserves the
+        coincident input so the repulsion path is actually exercised (with the
+        default random init the inputs would be scattered and never coincide).
+        """
+        nodes = [
+            {"x": 100.0, "y": 100.0},
+            {"x": 100.0, "y": 100.0},  # coincident with node 0
+            {"x": 250.0, "y": 180.0},
+        ]
+        links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
+        layout = SpringLayout(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+            iterations=100,
+            random_seed=1,
+        )
+        layout.run(random_init=False)  # must not raise
+
+        for node in layout.nodes:
+            assert math.isfinite(node.x) and math.isfinite(node.y)
+
+    def test_coincident_nodes_barnes_hut(self):
+        """Barnes-Hut repulsion path also survives coincident nodes (H2)."""
+        # Spread most nodes but keep two exactly coincident.
+        nodes = [
+            {"x": 120.0, "y": 90.0},
+            {"x": 120.0, "y": 90.0},  # coincident with node 0
+            {"x": 300.0, "y": 200.0},
+            {"x": 80.0, "y": 260.0},
+        ]
+        links = [{"source": i, "target": i + 1} for i in range(3)]
+        layout = SpringLayout(
+            nodes=nodes,
+            links=links,
+            size=(500, 500),
+            iterations=60,
+            use_barnes_hut=True,
+            random_seed=2,
+        )
+        layout.run(random_init=False)  # must not raise
+
+        for node in layout.nodes:
+            assert math.isfinite(node.x) and math.isfinite(node.y)
+
 
 # =============================================================================
 # Kamada-Kawai Tests

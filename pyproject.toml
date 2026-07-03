@@ -49,6 +49,9 @@ dev = [
     "matplotlib>=3.9.4",
     "twine>=5.0.0",
     "typing-extensions>=4.15.0",
+    # Differential-testing oracle for the planarity suite (tests/test_planarity_regression.py).
+    # Not a runtime dependency; the oracle tests skip gracefully if it is absent.
+    "networkx>=3.0",
 ]
 
 [project.urls]

@@ -3,10 +3,12 @@ Tests for hierarchical layout algorithms.
 """
 
 import math
+import warnings
 
 import pytest
 
 from graph_layout.hierarchical import (
+    GraphStructureWarning,
     RadialTreeLayout,
     ReingoldTilfordLayout,
     SugiyamaLayout,
@@ -457,6 +459,79 @@ class TestSugiyamaLayout:
         # Should be vertically ordered
         for i in range(len(layout.nodes) - 1):
             assert layout.nodes[i].y < layout.nodes[i + 1].y
+
+    def test_cycle_removal_no_warning(self):
+        """Cyclic input is made acyclic before layering (H4).
+
+        Previously the cycle-removal phase was declared but never invoked, so a
+        cyclic graph emitted a GraphStructureWarning and produced an arbitrary
+        layering. It must now run cleanly and place every node.
+        """
+        # A pure directed cycle has no source node at all: the old code (which
+        # never ran cycle removal) warned "No source nodes found" and fell back
+        # to an arbitrary layering. After reversing a back edge there is a
+        # source and no warning is emitted.
+        nodes = [{} for _ in range(3)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 0},  # closes the cycle; no source exists
+        ]
+        layout = SugiyamaLayout(nodes=nodes, links=links, size=(600, 400))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", GraphStructureWarning)
+            layout.run()  # must not raise a GraphStructureWarning
+
+        # Every real node received a finite position.
+        for node in layout.nodes:
+            assert math.isfinite(node.x) and math.isfinite(node.y)
+
+    def test_long_edge_inserts_dummy_nodes_and_bends(self):
+        """Edges spanning multiple layers are split with dummy nodes (H3)."""
+        nodes = [{} for _ in range(4)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+            {"source": 0, "target": 3},  # spans layers 0..3
+        ]
+        layout = SugiyamaLayout(nodes=nodes, links=links, size=(600, 400))
+        layout.run()
+
+        # The 0->3 edge crosses layers 1 and 2, so exactly two dummies exist.
+        assert len(layout._dummy_nodes) == 2
+
+        # It is exposed as a two-point bend, and the bends lie strictly between
+        # the endpoints' y-coordinates (top-to-bottom orientation).
+        bends = layout.edge_bends[(0, 3)]
+        assert len(bends) == 2
+        y0 = layout.nodes[0].y
+        y3 = layout.nodes[3].y
+        for _bx, by in bends:
+            assert y0 < by < y3
+
+    def test_crossing_minimization_uses_dummies(self):
+        """Crossing minimization over the expanded graph finds a good ordering.
+
+        With proper dummy-node layering the barycenter sweeps can drive this
+        crossing-prone graph to zero crossings; the previous implementation
+        averaged non-adjacent-layer positions and could not.
+        """
+        nodes = [{} for _ in range(6)]
+        links = [
+            {"source": 0, "target": 4},
+            {"source": 1, "target": 3},
+            {"source": 2, "target": 5},
+            {"source": 0, "target": 5},
+            {"source": 2, "target": 3},
+        ]
+        layout = SugiyamaLayout(nodes=nodes, links=links, size=(600, 400), crossing_iterations=24)
+        layout.run()
+
+        outgoing: dict[int, list[int]] = {}
+        for src, tgt in layout._segments:
+            outgoing.setdefault(src, []).append(tgt)
+        assert layout._count_segment_crossings(outgoing) == 0
 
 
 # =============================================================================

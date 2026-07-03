@@ -1270,11 +1270,18 @@ cpdef void _compute_fa2_repulsive_forces_barnes_hut(
         tree.insert(pos_x[i], pos_y[i], deg_i, i)
     tree.compute_mass_distribution()
 
-    # Calculate forces (scaling factor applied here)
+    # Calculate forces (scaling factor applied here).
+    # ``calculate_force`` accumulates ``scaling * total_mass / d`` where the
+    # aggregated ``total_mass`` supplies the *source* degree factor (deg_j + 1)
+    # but not the acting node's own factor (deg_i + 1). FA2 repulsion is
+    # ``scaling * (deg_i + 1) * (deg_j + 1) / d``, so multiply the accumulated
+    # force by ``deg_i`` here (force is linear in that factor). Mirrors the
+    # pure-Python QuadTree.calculate_force fix.
     for i in range(n):
+        deg_i = degrees[i] + 1.0
         fx, fy = tree.calculate_force(pos_x[i], pos_y[i], i, scaling)
-        disp_x[i] += fx
-        disp_y[i] += fy
+        disp_x[i] += fx * deg_i
+        disp_y[i] += fy * deg_i
 
 
 # =============================================================================

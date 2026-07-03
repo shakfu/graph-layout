@@ -616,11 +616,71 @@ class Projection:
         ]
 
     def x_project(self, x0: list[float], y0: list[float], x: list[float]) -> None:
-        """Project x coordinates."""
-        # Implementation simplified for brevity
-        pass
+        """Project x coordinates onto the active constraints.
+
+        Called by ``Descent.step_and_project`` after a descent step: ``x`` holds
+        the freshly-stepped x positions (the desired positions) and is updated
+        in place to the nearest point satisfying the x separation/alignment
+        constraints and, when ``avoid_overlaps`` is set, the generated
+        non-overlap constraints. ``y0`` supplies the vertical extents used to
+        decide which node pairs overlap.
+        """
+        self._project_axis(x, y0, self.x_constraints, generate_x_constraints, horizontal=True)
 
     def y_project(self, x0: list[float], y0: list[float], y: list[float]) -> None:
-        """Project y coordinates."""
-        # Implementation simplified for brevity
-        pass
+        """Project y coordinates onto the active constraints.
+
+        Symmetric to :meth:`x_project`. Note the descent passes the
+        already-projected x positions as ``x0`` here, so they provide the
+        horizontal extents for non-overlap constraint generation while ``y`` is
+        the freshly-stepped array projected in place.
+        """
+        self._project_axis(y, x0, self.y_constraints, generate_y_constraints, horizontal=False)
+
+    def _project_axis(
+        self,
+        coord: list[float],
+        other: list[float],
+        base_constraints: list[Constraint],
+        gen_constraints: Callable[[list["Rectangle"], list[Variable]], list[Constraint]],
+        horizontal: bool,
+    ) -> None:
+        """Solve one axis of the VPSC projection.
+
+        ``coord`` is the array being projected (desired positions, updated in
+        place); ``other`` holds the fixed positions on the perpendicular axis,
+        used only to size node rectangles for non-overlap constraint generation.
+        """
+        nodes = self.nodes
+        if not nodes:
+            return
+
+        variables = [node.variable for node in nodes]
+        for i, node in enumerate(nodes):
+            node.variable.desired_position = coord[i]
+
+        cs = list(base_constraints)
+        if self.avoid_overlaps:
+            rects: list[Rectangle] = []
+            for i, node in enumerate(nodes):
+                w2 = (node.width or 0.0) / 2.0
+                h2 = (node.height or 0.0) / 2.0
+                if horizontal:
+                    rects.append(
+                        Rectangle(coord[i] - w2, coord[i] + w2, other[i] - h2, other[i] + h2)
+                    )
+                else:
+                    rects.append(
+                        Rectangle(other[i] - w2, other[i] + w2, coord[i] - h2, coord[i] + h2)
+                    )
+            cs = cs + gen_constraints(rects, variables)
+
+        if not cs:
+            # Unconstrained axis: the projected positions equal the desired
+            # (already-stepped) positions, so there is nothing to solve.
+            return
+
+        solver = Solver(variables, cs)
+        solver.solve()
+        for i, node in enumerate(nodes):
+            coord[i] = node.variable.position()

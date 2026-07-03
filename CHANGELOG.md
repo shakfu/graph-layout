@@ -17,6 +17,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Fixed
+
+- **Planarity: Left-Right nesting-depth off-by-one** (`planarity/_lr_planarity.py`):
+  - Back-edge nesting depth was `2*height[w] + 1` instead of the canonical `2*height[w]`
+  - The spurious `+1` corrupted the nesting-depth sort, so `check_planarity()`/`is_planar()` returned order-dependent wrong verdicts (planar graphs reported non-planar) and could produce non-planar (genus > 0) embeddings, degrading every embedder built on top
+  - Regression tests validate order-independence, Euler's formula (`V - E + F == 2`) on every returned embedding, and agreement with `networkx.check_planarity` over random graphs
+
+- **Planarity: planar multigraphs falsely rejected** (`planarity/__init__.py`):
+  - The Euler `3n - 6` edge bound was applied to the raw multi-edge count (up to two parallel edges per pair are kept), rejecting valid planar multigraphs such as a triangle with one doubled edge
+  - The bound now counts distinct vertex pairs
+
+- **ForceAtlas2: Barnes-Hut repulsion missing a degree factor** (`spatial/quadtree.py`, `_speedups.pyx`):
+  - The Barnes-Hut path applied only the source degree factor `(deg_j + 1)`, omitting the acting node's `(deg_i + 1)`, so hubs under-repelled for graphs above 50 nodes (the default path)
+  - Both the pure-Python quadtree and the Cython kernel now apply the acting node's factor; with `theta=0` the Barnes-Hut kernel matches the naive O(n^2) kernel exactly
+
+- **Spring: divide-by-zero on coincident nodes** (`force/spring.py`):
+  - The naive Coulomb repulsion divided by squared distance, which is zero for coincident nodes, raising `ZeroDivisionError`; exactly-coincident pairs are now skipped (matching the Barnes-Hut / Cython paths)
+
+- **Cola: constraint projection was an unimplemented stub** (`cola/rectangle.py`):
+  - `Projection.x_project`/`y_project` were empty, so user separation/alignment constraints and `avoid_overlaps=True` had no effect in `Layout`
+  - Implemented the VPSC projection: each axis solves separation, alignment, and (optionally) generated non-overlap constraints, keeping nodes close to their stepped positions
+  - Note: nested-group containment (`min_var`/`max_var`) is not yet enforced
+
+- **Sugiyama: cycle removal never invoked and no dummy nodes** (`hierarchical/sugiyama.py`):
+  - Cycle removal is now run before layer assignment, so cyclic input is reversed into a DAG instead of warning and falling back
+  - Edges spanning more than one layer are split with dummy nodes, fixing barycenter contamination (positions of non-adjacent-layer neighbors were being averaged) and enabling correct crossing counting over the expanded graph
+  - Crossing minimization now retains the best ordering seen across sweeps rather than the last one
+  - Bend points for long edges are exposed via the new `edge_bends` property
+
 ## [0.1.8]
 
 ### Added

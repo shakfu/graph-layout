@@ -341,10 +341,12 @@ class SpringLayout(IterativeLayout):
                 dx = self._nodes[i].x - self._nodes[j].x
                 dy = self._nodes[i].y - self._nodes[j].y
                 dist_sq = dx * dx + dy * dy
-                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
 
-                # Coulomb's law: F = k / d^2
-                if dist > 0:
+                # Coulomb's law: F = k / d^2. Skip exactly-coincident nodes:
+                # the repulsion direction is undefined and 1/d^2 diverges.
+                # (The Barnes-Hut / Cython paths likewise skip dist_sq ~ 0.)
+                if dist_sq > 0:
+                    dist = math.sqrt(dist_sq)
                     force = self._repulsion / dist_sq
                     fx = (dx / dist) * force
                     fy = (dy / dist) * force

@@ -415,14 +415,16 @@ class TestLayoutWithSizes:
         layout.links([Link(0, 1)])
         layout.avoid_overlaps(True)
 
-        layout.start(0, 0, 10, 0, False)
+        layout.start(5, 5, 30, 0, False)
 
-        # After layout, nodes should not overlap significantly
+        # After layout the two 20x20 boxes must not overlap: their centres must
+        # be separated by at least the summed half-widths (10 + 10 = 20) on at
+        # least one axis. The previous threshold of 10 still permitted overlap
+        # and passed even when projection was a no-op (C1).
         nodes = layout.nodes()
         dx = abs(nodes[0].x - nodes[1].x)
         dy = abs(nodes[0].y - nodes[1].y)
-        # Distance should be at least sum of half-widths
-        assert dx >= 10 or dy >= 10
+        assert dx >= 20 - 1e-6 or dy >= 20 - 1e-6, f"boxes overlap: dx={dx:.3f} dy={dy:.3f}"
 
 
 class TestLayoutWithGroups:
@@ -497,15 +499,44 @@ class TestLayoutConstraints:
         constraint = {"axis": "x", "left": 0, "right": 1, "gap": 100}
         layout.constraints([constraint])
 
-        layout.start(0, 10, 0, 0, False)
+        layout.start(10, 30, 0, 0, False)
 
         nodes = layout.nodes()
-        # Check that layout ran successfully
-        # (exact constraint enforcement depends on other parameters)
+        # The separation constraint must be satisfied: node 1 is at least `gap`
+        # to the right of node 0. VPSC enforces this as a hard constraint, so it
+        # holds to solver tolerance. (Previously this asserted only that the
+        # nodes existed, because the projection was an unimplemented stub.)
         assert len(nodes) == 2
-        # Nodes should have been positioned
-        assert nodes[0].x is not None
-        assert nodes[1].x is not None
+        assert nodes[1].x - nodes[0].x >= 100 - 1e-4, (
+            f"separation not enforced: gap={nodes[1].x - nodes[0].x:.4f}"
+        )
+
+    def test_layout_with_alignment_constraint(self):
+        """Alignment constraint must equalize the constrained coordinate."""
+        layout = Layout()
+        layout.nodes([Node(x=0, y=0), Node(x=40, y=30), Node(x=90, y=70)])
+        layout.links([Link(0, 1), Link(1, 2)])
+
+        # Align all three nodes on a vertical line (equal x coordinates).
+        layout.constraints(
+            [
+                {
+                    "type": "alignment",
+                    "axis": "x",
+                    "offsets": [
+                        {"node": 0, "offset": 0.0},
+                        {"node": 1, "offset": 0.0},
+                        {"node": 2, "offset": 0.0},
+                    ],
+                }
+            ]
+        )
+
+        layout.start(10, 30, 0, 0, False)
+
+        nodes = layout.nodes()
+        xs = [node.x for node in nodes]
+        assert max(xs) - min(xs) < 1e-4, f"alignment not enforced: xs={xs}"
 
 
 class TestLayoutFlowLayout:

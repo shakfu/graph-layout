@@ -163,7 +163,14 @@ class _LRState:
                     if self.lowpt2_v[w] < self.height[v]:
                         self.nesting_depth[e] += 1
                 else:
-                    self.nesting_depth[e] = 2 * self.height[w] + 1
+                    # Back edge to an ancestor: nesting depth is 2*lowpt[e],
+                    # where lowpt[e] == height[w]. The chordal "+1" applies only
+                    # when lowpt2[e] < height[v]; for a pure back edge
+                    # lowpt2[e] == height[v], so no "+1" is added here. (Adding
+                    # it unconditionally corrupts the nesting-depth sort and
+                    # yields order-dependent false negatives / non-planar
+                    # embeddings.)
+                    self.nesting_depth[e] = 2 * self.height[w]
 
         # Sort adjacency: include only tree children and back edges to ancestors.
         # Exclude parent edge and "forward" edges to descendants (those are

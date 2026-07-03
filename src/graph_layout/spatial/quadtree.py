@@ -213,7 +213,16 @@ class QuadTree:
         Returns:
             (fx, fy) force vector (repulsive, pointing away from other bodies)
         """
-        return self._calculate_force(self.root, body, repulsion_constant)
+        # ``_calculate_force`` accumulates ``k * m_source / d`` per interaction,
+        # i.e. it applies the *source* mass (aggregated as ``total_mass``) but
+        # not the acting body's own mass. For ForceAtlas2 the repulsion is
+        # ``scaling * (deg_i + 1) * (deg_j + 1) / d``, so the acting body's mass
+        # ``(deg_i + 1)`` must also be applied. Force is linear in that factor,
+        # so scaling the accumulated total is equivalent to scaling each term.
+        # (Fruchterman-Reingold / Yifan Hu pass ``mass = 1.0``, so this is a
+        # no-op for them.)
+        fx, fy = self._calculate_force(self.root, body, repulsion_constant)
+        return fx * body.mass, fy * body.mass
 
     def _calculate_force(
         self,

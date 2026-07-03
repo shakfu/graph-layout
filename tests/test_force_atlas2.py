@@ -4,6 +4,9 @@ Tests for ForceAtlas2 layout algorithm.
 
 import math
 
+import numpy as np
+import pytest
+
 from graph_layout import Link, Node
 from graph_layout.force import ForceAtlas2Layout
 
@@ -548,6 +551,56 @@ class TestForceAtlas2Algorithm:
         for p1, p2 in zip(naive_pos, bh_pos):
             assert abs(p1[0] - p2[0]) < 0.01
             assert abs(p1[1] - p2[1]) < 0.01
+
+    def test_barnes_hut_kernel_matches_naive_with_degrees(self):
+        """Barnes-Hut FA2 repulsion must apply BOTH degree factors (H1).
+
+        The existing similarity test above only covers small graphs, where the
+        layout falls back to the naive path (Barnes-Hut activates for n > 50),
+        so it never exercised the Barnes-Hut kernel. Here the two Cython kernels
+        are compared directly: with theta=0 the Barnes-Hut kernel is exact and
+        must match the naive O(n^2) kernel node-for-node, including the acting
+        node's (deg_i + 1) factor. Before the fix the BH path omitted that
+        factor, so hubs were under-repelled and the kernels diverged.
+        """
+        sp = pytest.importorskip("graph_layout._speedups")
+        if not hasattr(sp, "_compute_fa2_repulsive_forces_barnes_hut"):
+            pytest.skip("Cython FA2 kernels not available")
+
+        rng = np.random.default_rng(0)
+        n = 60  # > 50 so this is the real default path
+        pos_x = rng.uniform(0, 500, n).astype(np.float64)
+        pos_y = rng.uniform(0, 500, n).astype(np.float64)
+        degrees = rng.integers(0, 8, n).astype(np.float64)
+        degrees[0] = 40.0  # a hub whose (deg_i + 1) factor must be applied
+        scaling = 50.0
+
+        dx_naive = np.zeros(n)
+        dy_naive = np.zeros(n)
+        sp._compute_fa2_repulsive_forces(pos_x, pos_y, dx_naive, dy_naive, degrees, scaling, n)
+
+        dx_bh = np.zeros(n)
+        dy_bh = np.zeros(n)
+        sp._compute_fa2_repulsive_forces_barnes_hut(
+            pos_x, pos_y, dx_bh, dy_bh, degrees, scaling, n, 0.0, 10.0
+        )
+
+        assert np.allclose(dx_naive, dx_bh, rtol=1e-9, atol=1e-9)
+        assert np.allclose(dy_naive, dy_bh, rtol=1e-9, atol=1e-9)
+
+    def test_python_quadtree_applies_acting_body_mass(self):
+        """Pure-Python QuadTree force must scale with the acting body's mass (H1)."""
+        from graph_layout.spatial.quadtree import Body, QuadTree
+
+        nodes = [Node(x=0.0, y=0.0), Node(x=100.0, y=0.0), Node(x=40.0, y=90.0)]
+        tree = QuadTree.from_nodes(nodes, padding=10.0, theta=0.0)
+
+        f_unit = tree.calculate_force(Body(0.0, 0.0, mass=1.0, index=0), repulsion_constant=10.0)
+        f_triple = tree.calculate_force(Body(0.0, 0.0, mass=3.0, index=0), repulsion_constant=10.0)
+
+        # Repulsion is linear in the acting body's mass (deg_i + 1 for FA2).
+        assert math.isclose(f_triple[0], 3.0 * f_unit[0], rel_tol=1e-9, abs_tol=1e-12)
+        assert math.isclose(f_triple[1], 3.0 * f_unit[1], rel_tol=1e-9, abs_tol=1e-12)
 
 
 # =============================================================================

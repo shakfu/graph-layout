@@ -78,9 +78,13 @@ def check_planarity(
         emb_empty: dict[int, list[int]] = {v: [] for v in range(num_nodes)}
         return PlanarityResult(is_planar=True, embedding=emb_empty)
 
-    # Quick edge-count check (Euler formula necessary condition)
-    m = len(clean_edges)
-    if num_nodes >= 3 and m > 3 * num_nodes - 6:
+    # Quick edge-count check (Euler formula necessary condition).
+    # Euler's 3n-6 bound applies to *simple* graphs, so it must be evaluated on
+    # the number of distinct vertex pairs, not the raw (multi-)edge count.
+    # Otherwise a planar multigraph (up to 2 parallel edges per pair are kept)
+    # is falsely rejected -- e.g. a triangle with one doubled edge.
+    num_simple_edges = len({(min(u, v), max(u, v)) for u, v in clean_edges})
+    if num_nodes >= 3 and num_simple_edges > 3 * num_nodes - 6:
         # Still try to extract Kuratowski witness
         adj_quick: list[list[int]] = [[] for _ in range(num_nodes)]
         for u, v in clean_edges:

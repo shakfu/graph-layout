@@ -430,8 +430,8 @@ def _section_groups() -> str:
             [Group(leaves=members[0], padding=pad), Group(leaves=members[1], padding=pad)]
         )
         layout.size([400, 400])
-        # All-constraints iterations only (grouped unconstrained iterations are a
-        # separate, still-open issue).
+        # All-constraints iterations: this is where the group-containment
+        # projection acts.
         layout.start(0, 0, 80, 0, False)
         return layout
 

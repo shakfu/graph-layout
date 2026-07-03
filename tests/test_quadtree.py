@@ -111,6 +111,21 @@ class TestQuadTreeInsertion:
 
         assert tree.body_count == 5
 
+    def test_coincident_bodies_no_infinite_recursion(self):
+        """Inserting coincident bodies must terminate via the depth cap.
+
+        Regression: coincident points always fall in the same quadrant, so the
+        recursive insert subdivided forever (RecursionError). A MAX_DEPTH cap now
+        merges bodies in place once the cell is effectively zero-sized.
+        """
+        tree = QuadTree(bounds=(0, 0, 100, 100))
+        for i in range(200):
+            tree.insert(Body(50.0, 50.0, mass=1.0, index=i))  # all coincident
+
+        assert tree.body_count == 200
+        tree.compute_mass_distribution()
+        assert tree.root.total_mass == 200.0
+
 
 class TestQuadTreeMassDistribution:
     """Tests for center of mass computation."""

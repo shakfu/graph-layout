@@ -132,27 +132,32 @@ class SpectralLayout(StaticLayout):
 
         return cast(np.ndarray, A)
 
-    def _compute_laplacian(self) -> np.ndarray:
-        """Compute the graph Laplacian matrix."""
+    def _compute_laplacian(self) -> tuple[np.ndarray, np.ndarray]:
+        """Compute the graph Laplacian matrix and the degree vector.
+
+        Returns ``(L, degrees)`` where ``degrees[i]`` is the (weighted) degree of
+        node ``i``. When ``normalized`` is set, ``L`` is the symmetric-normalized
+        Laplacian ``D^(-1/2) (D - A) D^(-1/2)``; the raw ``degrees`` are returned
+        alongside so the caller can apply the ``D^(-1/2)`` back-transform to the
+        eigenvectors (the degree-weighted / Koren layout).
+        """
         A = self._compute_adjacency_matrix()
 
-        # Degree matrix
-        D = np.diag(np.sum(A, axis=1))
+        degrees = np.sum(A, axis=1)
 
         # Laplacian: L = D - A
-        L = D - A
+        L = np.diag(degrees) - A
 
         if self._normalized:
             # Normalized Laplacian: L_norm = D^(-1/2) * L * D^(-1/2)
             # Equivalent to: I - D^(-1/2) * A * D^(-1/2)
-            d = np.diag(D)
-            d_inv_sqrt = np.zeros_like(d)
-            nonzero = d > 0
-            d_inv_sqrt[nonzero] = 1.0 / np.sqrt(d[nonzero])
+            d_inv_sqrt = np.zeros_like(degrees)
+            nonzero = degrees > 0
+            d_inv_sqrt[nonzero] = 1.0 / np.sqrt(degrees[nonzero])
             D_inv_sqrt = np.diag(d_inv_sqrt)
             L = D_inv_sqrt @ L @ D_inv_sqrt
 
-        return cast(np.ndarray, L)
+        return cast(np.ndarray, L), cast(np.ndarray, degrees)
 
     # -------------------------------------------------------------------------
     # Layout Computation
@@ -170,8 +175,8 @@ class SpectralLayout(StaticLayout):
             self._nodes[0].y = self._canvas_size[1] / 2
             return
 
-        # Compute Laplacian
-        L = self._compute_laplacian()
+        # Compute Laplacian (and raw degrees for the normalized back-transform)
+        L, degrees = self._compute_laplacian()
 
         # Compute eigenvalues and eigenvectors
         try:
@@ -186,14 +191,31 @@ class SpectralLayout(StaticLayout):
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
 
-        # Use eigenvectors corresponding to smallest non-zero eigenvalues
-        # The first eigenvector (eigenvalue ~0) is constant, skip it
         dim = min(self._dimension, n - 1)
+
+        # Skip ALL near-zero eigenvalues, not just the first. For a graph with k
+        # connected components the Laplacian has eigenvalue 0 with multiplicity k,
+        # and those eigenvectors are per-component indicators (constant within a
+        # component) rather than Fiedler vectors -- using them collapses each
+        # component to a single point. Start at the first strictly-positive
+        # eigenvalue.
+        tol = 1e-8 * max(1.0, float(eigenvalues[-1]))
+        start = max(1, int(np.searchsorted(eigenvalues, tol)))
+
+        # Degree-weighted back-transform for the normalized Laplacian: the layout
+        # vectors are D^(-1/2) u_i (Koren), not the raw symmetric-normalized
+        # eigenvectors u_i. For the unnormalized Laplacian this is the identity.
+        if self._normalized:
+            back = np.zeros(n)
+            nonzero = degrees > 0
+            back[nonzero] = 1.0 / np.sqrt(degrees[nonzero])
+        else:
+            back = np.ones(n)
 
         # Find first non-trivial eigenvectors
         coords = []
-        for i in range(1, min(dim + 1, n)):
-            coords.append(eigenvectors[:, i])
+        for i in range(start, min(start + dim, n)):
+            coords.append(eigenvectors[:, i] * back)
 
         # If we don't have enough eigenvectors, pad with zeros
         while len(coords) < self._dimension:

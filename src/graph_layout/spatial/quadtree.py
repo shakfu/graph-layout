@@ -121,13 +121,31 @@ class QuadTree:
         self.theta = theta
         self.body_count = 0
 
+    # Depth cap prevents unbounded recursion when bodies are coincident (or
+    # closer than 1/2^MAX_DEPTH of the region): they always fall in the same
+    # quadrant, so subdivision would never separate them. Mirrors the Cython
+    # kernel's guard. At depth MAX_DEPTH the cell size is region / 2^50 ~= 0.
+    MAX_DEPTH = 50
+
     def insert(self, body: Body) -> None:
         """Insert a body into the quadtree."""
-        self._insert_into(self.root, body)
+        self._insert_into(self.root, body, 0)
         self.body_count += 1
 
-    def _insert_into(self, node: QuadTreeNode, body: Body) -> None:
+    def _insert_into(self, node: QuadTreeNode, body: Body, depth: int) -> None:
         """Recursively insert body into subtree rooted at node."""
+        if depth > self.MAX_DEPTH:
+            # At max depth, merge into the node in place rather than recursing
+            # forever on coincident points (weighted-average position, summed
+            # mass) -- matches the Cython kernel.
+            if node.body is not None:
+                node.body.mass += body.mass
+                node.body.x = (node.body.x + body.x) / 2
+                node.body.y = (node.body.y + body.y) / 2
+            else:
+                node.body = body
+            return
+
         if node.is_empty():
             # Empty node becomes a leaf with this body
             node.body = body
@@ -141,12 +159,12 @@ class QuadTree:
 
             # Re-insert existing body
             if existing is not None:
-                self._insert_into_child(node, existing)
+                self._insert_into_child(node, existing, depth)
 
         # Insert new body into appropriate child
-        self._insert_into_child(node, body)
+        self._insert_into_child(node, body, depth)
 
-    def _insert_into_child(self, node: QuadTreeNode, body: Body) -> None:
+    def _insert_into_child(self, node: QuadTreeNode, body: Body, depth: int) -> None:
         """Insert body into the appropriate child of node."""
         quadrant = node.get_quadrant(body.x, body.y)
 
@@ -160,7 +178,7 @@ class QuadTree:
         if node.children is not None:
             child = node.children[quadrant]
             if child is not None:
-                self._insert_into(child, body)
+                self._insert_into(child, body, depth + 1)
 
     def compute_mass_distribution(self) -> None:
         """Compute center of mass for all nodes (post-order traversal)."""

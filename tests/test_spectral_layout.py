@@ -209,6 +209,38 @@ class TestSpectralLayout:
 
         assert len(layout.nodes) == 4
 
+    def test_disconnected_components_no_collapse(self):
+        """Disconnected components must not each collapse to a single point.
+
+        Regression: the layout took eigenvectors at indices 1 and 2, but for a
+        graph with k components the Laplacian's eigenvalue 0 has multiplicity k,
+        so those are per-component indicator vectors (constant within a
+        component). Using them placed every node of a component at one point.
+        The layout now skips all near-zero eigenvalues.
+        """
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 0},
+            {"source": 3, "target": 4},
+            {"source": 4, "target": 5},
+            {"source": 5, "target": 3},
+        ]
+        for normalized in (True, False):
+            layout = SpectralLayout(
+                nodes=[{} for _ in range(6)],
+                links=links,
+                size=(800, 600),
+                normalized=normalized,
+            )
+            layout.run()
+            ns = layout.nodes
+            for comp in ([0, 1, 2], [3, 4, 5]):
+                pts = {(round(ns[i].x, 3), round(ns[i].y, 3)) for i in comp}
+                assert len(pts) > 1, (
+                    f"component {comp} collapsed to one point (normalized={normalized})"
+                )
+
     def test_empty_graph(self):
         """Test layout with no nodes."""
         layout = SpectralLayout(

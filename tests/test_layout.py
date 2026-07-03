@@ -469,11 +469,34 @@ class TestLayoutWithGroups:
         layout.links([Link(0, 1)])
         layout.groups([Group(leaves=[0, 1])])
 
-        # Don't use initial_unconstrained_iterations with groups to avoid nested layout
         layout.start(0, 0, 5, 0, False)
 
         nodes = layout.nodes()
         assert len(nodes) == 3
+
+    def test_layout_with_groups_unconstrained_start(self):
+        """Grouped layout with initial_unconstrained_iterations > 0 must run.
+
+        Regression: the grouped unconstrained warm-up laid out a flat graph and
+        then read positions back from the input dicts (which the nodes() setter
+        never populated), raising KeyError. It now reads from the laid-out Node
+        objects.
+        """
+        layout = Layout()
+        layout.nodes([Node(x=i * 5, y=i * 5, width=20, height=20) for i in range(6)])
+        layout.links([Link(0, 1), Link(1, 2), Link(3, 4), Link(4, 5)])
+        layout.avoid_overlaps(True)
+        layout.groups([Group(leaves=[0, 1, 2], padding=5), Group(leaves=[3, 4, 5], padding=5)])
+        layout.size([300, 300])
+
+        # The path that previously raised KeyError: unconstrained iterations > 0
+        # with groups present.
+        layout.start(10, 0, 20, 0, False)
+
+        nodes = layout.nodes()
+        assert len(nodes) == 6
+        for n in nodes:
+            assert abs(n.x) < 1e6 and abs(n.y) < 1e6  # finite, no NaN/inf
 
     @staticmethod
     def _rect(node):

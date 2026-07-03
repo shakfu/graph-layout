@@ -159,8 +159,10 @@ class ShellLayout(StaticLayout):
         for link in self._links:
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
-            degrees[src] += 1
-            degrees[tgt] += 1
+            # Skip invalid indices to prevent IndexError (mirrors _build_adjacency).
+            if 0 <= src < n and 0 <= tgt < n:
+                degrees[src] += 1
+                degrees[tgt] += 1
 
         return degrees
 

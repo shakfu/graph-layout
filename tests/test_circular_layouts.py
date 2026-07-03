@@ -237,6 +237,22 @@ class TestShellLayout:
         # High degree node should be closer to center
         assert dist_0 < dist_1
 
+    def test_out_of_range_link_indices(self):
+        """Auto-shell degree computation must skip out-of-range link indices.
+
+        Regression: _compute_degrees indexed degrees[src]/degrees[tgt] without a
+        bounds guard, so a link referencing a non-existent node raised
+        IndexError. It now skips invalid indices like _build_adjacency does.
+        """
+        layout = ShellLayout(
+            nodes=[{}, {}, {}],
+            links=[{"source": 0, "target": 5}, {"source": 1, "target": 2}],
+            size=(800, 600),
+            auto_shells=2,
+        )
+        layout.run()  # must not raise
+        assert len(layout.nodes) == 3
+
     def test_configuration_properties(self):
         """Test configuration via constructor and properties."""
         layout = ShellLayout(

@@ -944,10 +944,13 @@ class Layout:
             flat_layout.convergence_threshold(1e-4)
             flat_layout.start(iterations, 0, 0, 0, False)
 
-            # Copy positions back
+            # Copy positions back. The nodes() setter builds fresh Node objects
+            # from the ``vs`` dicts and never writes positions back into those
+            # dicts, so read the laid-out coordinates from the Node objects.
+            flat_nodes = flat_layout.nodes()
             for v in self._nodes:
-                x[v.index] = vs[v.index]["x"]
-                y[v.index] = vs[v.index]["y"]
+                x[v.index] = flat_nodes[v.index].x
+                y[v.index] = flat_nodes[v.index].y
         else:
             self._descent.run(iterations)
 

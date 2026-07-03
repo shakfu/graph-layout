@@ -25,6 +25,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Also fixed a latent `AttributeError` that crashed the `avoid_overlaps` + groups path: group `stiffness` is optional (matching WebCola's `typeof g.stiffness !== "undefined" ? g.stiffness : 0.01`) but was accessed unconditionally.
   - Regression tests (`tests/test_layout.py::TestLayoutWithGroups`) assert group-box disjointness under inter-group attraction and exercise the recursive nested-group path. This completes the WebCola projection port begun in 0.2.0 (node-variable separation/alignment/non-overlap).
 
+- **Cola: grouped layout with unconstrained warm-up no longer crashes** (`cola/layout.py`): the grouped `initial_unconstrained_iterations` path laid out a flat graph, then read positions back from the input dicts that the `nodes()` setter never populated, raising `KeyError`. It now reads the laid-out coordinates from the flat layout's `Node` objects.
+
+- **Spectral: disconnected graphs no longer collapse each component to a point** (`spectral/spectral.py`): the layout took eigenvectors at indices 1 and 2, but for a graph with k connected components the Laplacian's eigenvalue 0 has multiplicity k -- those eigenvectors are per-component indicators, so every node of a component landed on one point. It now skips all near-zero eigenvalues and starts at the first strictly-positive one.
+
+- **Spectral: normalized-Laplacian layout now applies the `D^-1/2` back-transform** (`spectral/spectral.py`): the symmetric-normalized Laplacian's eigenvectors were used directly; the canonical degree-weighted (Koren) layout requires scaling them by `D^-1/2`, so high-degree nodes were mis-weighted. The scaling is now applied on the default `normalized=True` path.
+
+- **Shell layout: out-of-range link indices no longer raise `IndexError`** (`circular/shell.py`): `_compute_degrees` now skips links whose endpoints are outside the node range, matching the guard in `base._build_adjacency`.
+
+- **Quadtree (pure-Python): coincident points no longer infinitely recurse** (`spatial/quadtree.py`): coincident bodies always fall in the same quadrant, so subdivision never separated them (`RecursionError`). A `MAX_DEPTH = 50` cap now merges bodies in place once the cell is effectively zero-sized, mirroring the Cython kernel.
+
 ### Changed
 
 - **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):

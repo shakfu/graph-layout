@@ -1,5 +1,12 @@
 # graph-layout: Algorithm Correctness Review
 
+> Archived snapshot. This is the point-in-time correctness review that drove the
+> fixes now recorded in `CHANGELOG.md`. The forward-looking orthogonal-compaction
+> work (turn-regularization) has its own living design doc at
+> `docs/rectangularization-plan.md`; the broader wish list lives in `TODO.md`.
+> Kept here for the findings narrative, the "what is verified correct" record,
+> and the prioritized missing-algorithms assessment (sections 6-8).
+
 Date: 2026-07-03 Scope: correctness of the implemented layout algorithms and supporting data structures, plus an assessment of worthwhile missing algorithms. Baseline: full test suite passes (1044 tests) before this review.
 
 This review was produced by reading each algorithm family against its canonical published description. Findings marked **[verified]** were additionally reproduced or confirmed by direct code inspection or a runnable repro during the review; the rest are read-based and should be treated as high-confidence but unconfirmed by execution.
@@ -90,17 +97,27 @@ Still open in the orthogonal stack:
   - **Safe by construction:** `compute_coordinates` detects drawings that are
     not clean (overlaps, crossings, edges through a vertex) and reports them
     invalid, so `bend_optimal` falls back to the heuristic rather than emit a
-    broken drawing. Verified: no drawing reported valid has an overlap over
-    random biconnected max-degree-4 graphs. About 80% of in-scope graphs pack
-    cleanly (all of the common structured ones -- grids, K4, cube, wheel,
-    prism); the rest fall back.
-  - **Remaining for full generality / to make it the default:** **face
-    rectangularization** -- resolve reflex corners by inserting chords so every
-    face becomes a rectangle, which raises the clean-packing rate toward 100%
-    and would let `bend_optimal` be on by default. Plus **H5** (Kandinsky
-    0-degree angles for degree > 4) and **H6a** (per-corner angles for
-    non-biconnected graphs), which extend the representation model to the
-    out-of-domain cases.
+    broken drawing. Verified: no drawing reported valid has a conflict over
+    random biconnected max-degree-4 graphs.
+  - **Two-tier coordinate assignment (done):** compact longest-path first, then
+    a "spread" assignment (distinct coordinate per class) that separates the
+    independent features longest-path collapses. This raised clean bend-optimal
+    coverage from ~83% to **~89%** of in-scope graphs (all common structured
+    ones -- grids, K4, cube, wheel, prism -- clean); the rest fall back.
+  - **Remaining -- turn-regularization for compaction:** the ~11% that still
+    fall back have genuine *crossings* (the coordinate assignment is non-planar,
+    verified by conflict-type classification). Closing this needs the separation
+    constraints that keep the two sides of a non-rectangular face apart, added
+    only between the specific reflex-corner ("kitty corner") pairs that conflict
+    -- not a naive all-pairs sweep, which was tried and *regressed* coverage to
+    86% by creating constraint-graph cycles. The full design, named reference
+    algorithm (Bridgeman et al., "Turn-Regularity and Optimal Area Drawings of
+    Orthogonal Representations," 2000), integration points, and the ready-made
+    verification oracle are written up in
+    [`docs/rectangularization-plan.md`](rectangularization-plan.md). Completing
+    it takes coverage toward 100% and lets `bend_optimal` be the default. Plus
+    **H5** (Kandinsky 0-degree angles for degree > 4) and **H6a** (per-corner
+    angles for non-biconnected graphs) for the out-of-domain cases.
 
 ---
 

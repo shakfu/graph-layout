@@ -3,9 +3,8 @@
 The shape stage turns an orthogonal representation (angles + bends) into compass
 directions for every edge segment. These tests exercise it on graphs whose
 representation is a valid orthogonal shape (simple cycles) and confirm it
-*detects* representations that are not realizable (the flow model does not yet
-emit valid representations for graphs that require bends -- see the module-level
-note and REVIEW.md).
+*detects* representations that are not realizable (out-of-domain inputs -- see
+the module-level note and docs/rectangularization-plan.md).
 """
 
 from __future__ import annotations
@@ -131,7 +130,8 @@ def test_all_faces_turn_pm4_for_biconnected_maxdeg4_grids():
     Standard orthogonalization is defined for biconnected planar graphs of max
     degree <= 4; grids are a clean deterministic family of them. Every face must
     turn +/-4 and the shape must be realizable. (Cut vertices / bridges and
-    degree > 4 are separate known limitations -- see REVIEW.md.)
+    degree > 4 are separate known limitations -- see
+    docs/rectangularization-plan.md.)
     """
     for w in range(2, 6):
         for h in range(2, 6):

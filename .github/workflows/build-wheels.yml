@@ -16,6 +16,9 @@ jobs:
     name: Build wheels on ${{ matrix.os }} (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
+      # Keep every platform independent: one platform's failure (e.g. a
+      # host-sensitive timing test) must not cancel the others mid-build.
+      fail-fast: false
       matrix:
         include:
           # Linux x86_64 - native
@@ -55,9 +58,13 @@ jobs:
           # provisioned automatically via PEP 517 build isolation from
           # [build-system].requires in pyproject.toml -- no CIBW_BEFORE_BUILD needed.
 
-          # Run tests after build
+          # Run tests after build. Deselect the perf/benchmark tests: they
+          # assert absolute wall-clock budgets (e.g. test_large_cycle < 2.0s)
+          # that are unreliable on shared, loaded CI runners. They still run
+          # locally via `make test`. Wheel CI verifies the wheel builds,
+          # imports, and functions across platforms.
           CIBW_TEST_REQUIRES: pytest pytest-cov
-          CIBW_TEST_COMMAND: pytest {package}/tests -v
+          CIBW_TEST_COMMAND: pytest {package}/tests -v -k "not Performance"
 
           # Architecture selection per matrix entry
           CIBW_ARCHS: ${{ matrix.cibw_archs }}

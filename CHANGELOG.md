@@ -43,6 +43,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **ForceAtlas2: regular vs strong gravity were swapped** (`force/force_atlas2.py`, `_speedups.pyx`): regular gravity was distance-scaled and strong gravity distance-independent -- the reverse of the Gephi/Jacomy et al. definition. Regular gravity is now a distance-independent pull toward the center and strong gravity scales with distance, in both the pure-Python and Cython paths. (The fix corrected an existing FA2 test that asserted LinLog produces smaller intra-cluster diameters -- an artifact of the old distance-scaled gravity, not a real LinLog property; it now asserts LinLog's weaker log attraction yields longer edges.)
 
+- **`node.fixed` is now honored by the Circular, Shell, and Bipartite layouts** (`circular/circular.py`, `circular/shell.py`, `bipartite/bipartite.py`): these geometric layouts repositioned every node, ignoring the pin that `RandomLayout` already respected. They now skip fixed nodes, so a pinned node keeps its position.
+
+- **RandomLayout no longer mutates the global RNG** (`basic/random.py`): it called `random.seed()`/`random.uniform()` on the global `random` module, so a seeded run reseeded the process-wide generator. It now uses a local `random.Random` instance.
+
+- **Kandinsky `compaction_method` setter accepts all supported methods** (`orthogonal/kandinsky.py`): the setter rejected `"flow"` and `"longest_path"` even though the constructor documents them and the compaction dispatch implements them; all five methods (`auto`/`greedy`/`ilp`/`flow`/`longest_path`) are now accepted.
+
+- **Spring layout docstring corrected** (`force/spring.py`): it described "constant force" repulsion but implements an inverse-square Coulomb force; the docstring now matches.
+
 ### Changed
 
 - **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):

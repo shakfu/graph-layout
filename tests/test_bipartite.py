@@ -46,6 +46,18 @@ class TestBipartiteBasic:
 
         assert len(layout.nodes) == 0
 
+    def test_fixed_node_preserved(self):
+        """A fixed node must keep its position (consistent with RandomLayout)."""
+        nodes = [{"x": 555.0, "y": 666.0, "fixed": 1}] + [{} for _ in range(5)]
+        links = [
+            {"source": 0, "target": 3},
+            {"source": 1, "target": 4},
+            {"source": 2, "target": 5},
+        ]
+        layout = BipartiteLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run(center_graph=False)
+        assert layout.nodes[0].x == 555.0 and layout.nodes[0].y == 666.0
+
     def test_single_node(self):
         """Single node should be positioned."""
         nodes = [{}]

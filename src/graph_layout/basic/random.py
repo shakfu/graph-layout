@@ -142,9 +142,9 @@ class RandomLayout(StaticLayout):
         if n == 0:
             return
 
-        # Seed random number generator if specified
-        if self._random_seed is not None:
-            random.seed(self._random_seed)
+        # Use a local RNG instance so seeding does not mutate the global
+        # `random` module state (a None seed draws from system entropy).
+        rng = random.Random(self._random_seed)
 
         # Calculate placement bounds with margin
         width, height = self._canvas_size
@@ -167,8 +167,8 @@ class RandomLayout(StaticLayout):
             if node.fixed:
                 continue
 
-            node.x = random.uniform(min_x, max_x)
-            node.y = random.uniform(min_y, max_y)
+            node.x = rng.uniform(min_x, max_x)
+            node.y = rng.uniform(min_y, max_y)
 
 
 __all__ = ["RandomLayout"]

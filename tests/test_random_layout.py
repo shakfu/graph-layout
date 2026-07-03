@@ -142,6 +142,24 @@ class TestRandomLayoutReproducibility:
         )
         assert different
 
+    def test_does_not_mutate_global_rng(self):
+        """A seeded RandomLayout must not disturb the global `random` state.
+
+        Regression: the layout called random.seed()/random.uniform() on the
+        global module, so running it reseeded the process-wide RNG. It now uses
+        a local random.Random instance.
+        """
+        import random
+
+        random.seed(123)
+        expected = [random.random() for _ in range(5)]
+
+        random.seed(123)
+        RandomLayout(nodes=[{} for _ in range(8)], size=(800, 600), random_seed=999).run()
+        after = [random.random() for _ in range(5)]
+
+        assert expected == after
+
 
 class TestRandomLayoutFixedNodes:
     """Fixed node behavior tests."""

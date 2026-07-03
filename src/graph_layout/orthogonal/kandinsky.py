@@ -330,7 +330,7 @@ class KandinskyLayout(StaticLayout):
     @compaction_method.setter
     def compaction_method(self, value: str) -> None:
         """Set the compaction method."""
-        if value not in ("auto", "greedy", "ilp"):
+        if value not in ("auto", "greedy", "ilp", "flow", "longest_path"):
             raise ValueError(f"Invalid compaction method: {value}")
         self._compaction_method = value
 

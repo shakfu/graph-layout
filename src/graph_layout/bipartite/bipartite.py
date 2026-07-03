@@ -444,6 +444,8 @@ class BipartiteLayout(StaticLayout):
         start_x = (width - total_width) / 2
 
         for i, node_idx in enumerate(nodes):
+            if self._nodes[node_idx].fixed:
+                continue  # honor pinned nodes (consistent with RandomLayout)
             x = start_x + i * self._node_separation
             self._nodes[node_idx].x = x
             self._nodes[node_idx].y = y
@@ -461,6 +463,8 @@ class BipartiteLayout(StaticLayout):
         start_y = (height - total_height) / 2
 
         for i, node_idx in enumerate(nodes):
+            if self._nodes[node_idx].fixed:
+                continue  # honor pinned nodes (consistent with RandomLayout)
             y = start_y + i * self._node_separation
             self._nodes[node_idx].x = x
             self._nodes[node_idx].y = y

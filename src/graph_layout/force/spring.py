@@ -32,8 +32,9 @@ class SpringLayout(IterativeLayout):
     - k is the spring constant
     - x0 is the rest length of the spring
 
-    All nodes repel each other with a constant force, while connected
-    nodes are attracted by spring forces.
+    All nodes repel each other with an inverse-square Coulomb force
+    (repulsion / distance^2), while connected nodes are attracted by spring
+    forces.
 
     Example:
         layout = SpringLayout(

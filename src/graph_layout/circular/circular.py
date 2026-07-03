@@ -178,6 +178,8 @@ class CircularLayout(StaticLayout):
         angle_step = 2 * math.pi / n if n > 0 else 0
 
         for pos, node_idx in enumerate(sorted_indices):
+            if self._nodes[node_idx].fixed:
+                continue  # honor pinned nodes (consistent with RandomLayout)
             angle = self._start_angle + pos * angle_step
             self._nodes[node_idx].x = cx + radius * math.cos(angle)
             self._nodes[node_idx].y = cy + radius * math.sin(angle)

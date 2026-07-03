@@ -118,6 +118,21 @@ class TestKandinskyConfiguration:
         layout = KandinskyLayout(layer_separation=120)
         assert layout.layer_separation == 120
 
+    def test_compaction_method_accepts_all_dispatched_methods(self):
+        """The setter must accept every method the constructor/dispatch support.
+
+        Regression: the setter rejected "flow" and "longest_path" even though the
+        constructor documents them and the compaction dispatch implements them.
+        """
+        import pytest
+
+        layout = KandinskyLayout()
+        for method in ("auto", "greedy", "ilp", "flow", "longest_path"):
+            layout.compaction_method = method
+            assert layout.compaction_method == method
+        with pytest.raises(ValueError):
+            layout.compaction_method = "bogus"
+
 
 class TestKandinskyOrthogonalOutput:
     """Tests for orthogonal output structures."""

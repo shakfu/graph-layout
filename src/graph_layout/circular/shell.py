@@ -247,6 +247,8 @@ class ShellLayout(StaticLayout):
             angle_step = 2 * math.pi / n_in_shell if n_in_shell > 0 else 0
 
             for pos, node_idx in enumerate(shell_nodes):
+                if self._nodes[node_idx].fixed:
+                    continue  # honor pinned nodes (consistent with RandomLayout)
                 if radius == 0:
                     # Center node
                     self._nodes[node_idx].x = cx

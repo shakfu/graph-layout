@@ -65,11 +65,11 @@ Verified open defects in shipped, documented capabilities (distinct from the new
 
 ### Low severity
 
-- [ ] **Kandinsky mode setter rejects its own documented modes**: `orthogonal/kandinsky.py:333` raises `ValueError` for `"flow"` / `"longest_path"` although the constructor documents and implements them.
-- [ ] **Spring docstring/behavior mismatch**: `force/spring.py:34` says "constant force" repulsion; implementation is inverse-square.
-- [ ] **RandomLayout seeds the global `random` module**: `basic/random.py:147` calls `random.seed(...)` on the global module instead of a local `random.Random` instance, leaking global RNG state.
+- [x] **Kandinsky mode setter rejects its own documented modes** (Done): `compaction_method` setter (`orthogonal/kandinsky.py`) now accepts all five dispatched methods (`auto`/`greedy`/`ilp`/`flow`/`longest_path`), not just three.
+- [x] **Spring docstring/behavior mismatch** (Done): `force/spring.py` docstring now describes the inverse-square Coulomb repulsion it actually implements.
+- [x] **RandomLayout seeds the global `random` module** (Done): `basic/random.py` now uses a local `random.Random(seed)` instance, so seeding no longer mutates process-wide RNG state. Regression asserts the global RNG is untouched.
 - [ ] **Recursion-depth limits** on deep trees/graphs in `reingold_tilford.py`, `radial_tree.py`, `preprocessing.detect_cycle` (recursive walks, no explicit cap).
-- [ ] **Inconsistent `node.fixed` semantics**: honored by `RandomLayout`, ignored by Bipartite, Circular, and Shell layouts.
+- [x] **Inconsistent `node.fixed` semantics** (Done): Circular, Shell, and Bipartite layouts now skip repositioning fixed nodes (guard mirroring `RandomLayout`), so pinned nodes keep their positions. Regression tests per layout.
 - [ ] **Unpositioned nodes left unvalidated**: nodes absent from user-supplied bipartite sets / shells are silently left unpositioned (`bipartite.py:235-236`, `shell.py:194-196`).
 - [ ] **Radial tree wedge allocation by node count, not leaf count**: `radial_tree.py:285-294` (spacing-quality variant, not an overlap bug).
 - [ ] **Cola minor nits**: coincident-node perturbation omitted (`descent.py`, `offset_dir` is dead code); grid-snap boundary strictness; `_alpha is None` fragility in `tick()`; misleading docstrings in `cola/shortestpaths.py`.

@@ -120,11 +120,11 @@ def test_bend_optimal_falls_back_out_of_domain():
 def test_bend_optimal_falls_back_on_conflicting_drawing():
     """An in-domain graph whose packed drawing would overlap falls back cleanly.
 
-    This graph is biconnected and max degree 4, but its bend-minimal drawing
-    would route an edge through a vertex without rectangularization; GIOTTO must
-    fall back to the heuristic and still produce a drawing.
+    This graph is biconnected and max degree 4, but its bend-minimal coordinate
+    assignment crosses (neither compact nor spread clears it) without full face
+    rectangularization; GIOTTO must fall back to the heuristic and still draw.
     """
-    edges = [(0, 1), (0, 2), (1, 3), (2, 3), (2, 5), (3, 4), (3, 6), (4, 7), (5, 6), (6, 7)]
+    edges = [(0, 1), (0, 3), (1, 2), (1, 4), (2, 5), (3, 4), (3, 6), (4, 5), (4, 7), (6, 7)]
     layout = _layout(8, edges, bend_optimal=True)
     assert len(layout.node_boxes) == 8
     assert _all_edges_orthogonal(layout)

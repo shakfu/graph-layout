@@ -3,7 +3,7 @@
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
 		lint format check typecheck all dev sync build publish publish-test \
-		wheel-check rebuild-cython qa showcase
+		wheel-check rebuild-cython qa showcase showcase-improvements
 
 # Source and test directories
 SRC_DIR := src/graph_layout
@@ -76,6 +76,11 @@ test-coverage:
 showcase:
 	@uv run python tests/demos/showcase.py
 	@if [ "$$(uname)" = "Darwin" ]; then open build/showcase.html; fi
+
+# Generate the review-improvements showcase (bend-optimal GIOTTO, Cola constraints, cyclic fixes)
+showcase-improvements:
+	@uv run python tests/demos/improvements_showcase.py
+	@if [ "$$(uname)" = "Darwin" ]; then open build/improvements_showcase.html; fi
 
 # Run tests with HTML coverage report
 test-html:

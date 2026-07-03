@@ -250,14 +250,20 @@ def _assign_axis(
     n_points: int,
     segments: list[tuple[int, int, int]],
     horizontal: bool,
+    spread: bool = False,
 ) -> Optional[dict[int, int]]:
-    """Assign one integer coordinate per point via longest-path.
+    """Assign one integer coordinate per point.
 
     For the x axis (``horizontal=True``): vertical segments (N/S) force equal x
     on their endpoints; horizontal segments (E/W) order the resulting classes
     (East increases x). The y axis is symmetric. Returns None on a contradiction
     (two points forced equal yet ordered) or a cycle (not possible for a valid
     orthogonal shape).
+
+    ``spread=False`` packs coordinates with longest-path (compact). ``spread=True``
+    gives every class a distinct coordinate by topological rank, which separates
+    independent classes that longest-path would collapse to the same value -- a
+    cheap partial substitute for face rectangularization.
     """
     equal_dirs = (NORTH, SOUTH) if horizontal else (EAST, WEST)
     order_dirs = (EAST, WEST) if horizontal else (NORTH, SOUTH)
@@ -284,11 +290,16 @@ def _assign_axis(
             indeg[hi] += 1
 
     coord = {c: 0 for c in classes}
-    queue = deque(c for c in classes if indeg[c] == 0)
+    queue = deque(sorted(c for c in classes if indeg[c] == 0))
     seen = 0
+    next_rank = 0
     while queue:
         c = queue.popleft()
         seen += 1
+        if spread:
+            # Distinct coordinate per class, in topological order.
+            coord[c] = max(coord[c], next_rank)
+            next_rank = coord[c] + 1
         for nb in adj[c]:
             if coord[nb] < coord[c] + 1:
                 coord[nb] = coord[c] + 1
@@ -309,10 +320,13 @@ def compute_coordinates(shape: ShapeResult, edges: list[tuple[int, int]]) -> Dra
     orthogonal drawing in which every segment is axis-aligned in its shape
     direction.
 
-    Note: this does not yet perform face rectangularization, so for shapes with
-    non-rectangular faces the drawing is valid (segments realize the shape) but
-    not guaranteed compact or overlap-free; simple faces (cycles, grids) come
-    out clean.
+    Two coordinate assignments are tried and the first clean one is returned:
+    compact longest-path (smallest drawing), then a "spread" assignment that
+    gives every coordinate class a distinct value (separating independent
+    features that longest-path collapses). If neither is clean -- overlaps,
+    crossings, or an edge through a vertex remain, which full face
+    rectangularization would resolve -- the result is invalid so callers fall
+    back to the heuristic router.
     """
     if not shape.valid:
         return DrawingResult(valid=False, reason="invalid shape")
@@ -354,37 +368,33 @@ def compute_coordinates(shape: ShapeResult, edges: list[tuple[int, int]]) -> Dra
         edge_chain[ekey] = chain
 
     n_points = len(point_id)
-    xs = _assign_axis(n_points, segments, horizontal=True)
-    ys = _assign_axis(n_points, segments, horizontal=False)
-    if xs is None or ys is None:
-        return DrawingResult(valid=False, reason="contradictory coordinate constraints")
 
-    vertex_positions = {v: (xs[pid(("v", v))], ys[pid(("v", v))]) for v in vertices}
+    last_reason = "contradictory coordinate constraints"
+    for spread in (False, True):
+        xs = _assign_axis(n_points, segments, horizontal=True, spread=spread)
+        ys = _assign_axis(n_points, segments, horizontal=False, spread=spread)
+        if xs is None or ys is None:
+            continue
 
-    # Distinct vertices must land on distinct grid points. A collision means the
-    # shape was not a proper orthogonal drawing (e.g. an out-of-domain degree > 4
-    # or non-biconnected input whose degeneracy the shape check did not reject);
-    # flag it invalid so callers fall back to the heuristic router.
-    if len(set(vertex_positions.values())) != len(vertex_positions):
-        return DrawingResult(valid=False, reason="coincident vertices")
+        vertex_positions = {v: (xs[pid(("v", v))], ys[pid(("v", v))]) for v in vertices}
+        if len(set(vertex_positions.values())) != len(vertex_positions):
+            last_reason = "coincident vertices"
+            continue
 
-    edge_routes = {
-        ekey: [(xs[point_id[k]], ys[point_id[k]]) for k in chain]
-        for ekey, chain in edge_chain.items()
-    }
+        edge_routes = {
+            ekey: [(xs[point_id[k]], ys[point_id[k]]) for k in chain]
+            for ekey, chain in edge_chain.items()
+        }
+        conflict = _drawing_conflict(vertex_positions, edge_routes)
+        if conflict is not None:
+            last_reason = conflict
+            continue
 
-    # Longest-path packing can collapse features that share a face but are not
-    # otherwise constrained apart (this is what face rectangularization would
-    # prevent). Detect the resulting overlaps / crossings / edges-through-
-    # vertices so callers fall back to the heuristic rather than emit a broken
-    # drawing.
-    conflict = _drawing_conflict(vertex_positions, edge_routes)
-    if conflict is not None:
-        return DrawingResult(valid=False, reason=conflict)
+        return DrawingResult(
+            valid=True, vertex_positions=vertex_positions, edge_routes=edge_routes
+        )
 
-    return DrawingResult(
-        valid=True, vertex_positions=vertex_positions, edge_routes=edge_routes
-    )
+    return DrawingResult(valid=False, reason=last_reason)
 
 
 def _drawing_conflict(

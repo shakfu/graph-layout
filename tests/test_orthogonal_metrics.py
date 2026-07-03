@@ -265,9 +265,10 @@ def _drawing_has_conflict(drawing) -> bool:
 
 
 def test_conflicting_drawing_is_flagged_for_fallback():
-    """A biconnected max-degree-4 graph whose packed drawing would overlap must
-    be reported invalid so callers fall back (rectangularization would fix it)."""
-    edges = [(0, 1), (0, 2), (1, 3), (2, 3), (2, 5), (3, 4), (3, 6), (4, 7), (5, 6), (6, 7)]
+    """A biconnected max-degree-4 graph whose coordinate assignment would cross
+    must be reported invalid so callers fall back (full face rectangularization
+    would resolve it). Neither the compact nor the spread assignment clears it."""
+    edges = [(0, 1), (0, 3), (1, 2), (1, 4), (2, 5), (3, 4), (3, 6), (4, 5), (4, 7), (6, 7)]
     _shape, drawing = _drawing_of(8, edges)
     assert not drawing.valid
     assert drawing.reason  # a specific reason (overlap / crossing / through vertex)

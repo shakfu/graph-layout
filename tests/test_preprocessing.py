@@ -301,6 +301,25 @@ class TestCountCrossings:
         assert count_crossings([], []) == 0
         assert count_crossings([[0, 1]], []) == 0
 
+    def test_count_crossings_long_edge_across_layer_gaps(self):
+        """A long edge crossing a shorter edge in a layer gap it passes through
+        must be counted.
+
+        Regression: edges were grouped by their exact (layer_src, layer_tgt)
+        pair, so a long edge (spanning >1 layer) was never compared against the
+        edges in the intermediate gaps it crosses.
+        """
+        layers = [[0, 1], [2, 3], [4, 5]]
+        # A: 1 -> 4 spans layers 0..2; B: 0 -> 3 spans layers 0..1.
+        # As straight segments (1,0)-(0,2) and (0,0)-(1,1) they cross in gap 0-1,
+        # but they fall in different (l1,l2) buckets, so the old code missed it.
+        links = [{"source": 1, "target": 4}, {"source": 0, "target": 3}]
+        assert count_crossings(layers, links) == 1
+
+        # Parallel long edges do not cross.
+        parallel = [{"source": 0, "target": 4}, {"source": 1, "target": 5}]
+        assert count_crossings(layers, parallel) == 0
+
 
 class TestAssignLayersWidthBounded:
     """Tests for BFS width-bounded layering."""

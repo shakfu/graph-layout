@@ -73,7 +73,15 @@ class CompactionSolver:
 
     def solve(self) -> tuple[list[float], int]:
         """
-        Solve the constraint system.
+        Solve the constraint system by longest-path compaction.
+
+        Each element is pulled to its leftmost/topmost feasible position: the
+        maximum of ``position[left] + gap`` over its incoming constraints, or the
+        base (minimum) position if it has no incoming constraint. Elements are
+        processed in order of initial position, which is a topological order of
+        the constraint DAG (every constraint runs from a lower- to a higher-
+        positioned element). Unlike a push-right-only relaxation this closes
+        interior slack, so the layout is actually compacted.
 
         Returns:
             Tuple of (final positions, iterations used)
@@ -81,27 +89,21 @@ class CompactionSolver:
         if not self.constraints:
             return self.positions, 0
 
-        for iteration in range(self.max_iterations):
-            changed = False
+        incoming: dict[int, list[tuple[int, float]]] = {i: [] for i in range(self.num_elements)}
+        for constraint in self.constraints:
+            incoming[constraint.right].append((constraint.left, constraint.gap))
 
-            # Process each constraint
-            for constraint in self.constraints:
-                left_pos = self.positions[constraint.left]
-                right_pos = self.positions[constraint.right]
+        base = min(self.positions)
+        order = sorted(range(self.num_elements), key=lambda i: self.positions[i])
+        new_positions = list(self.positions)
+        for i in order:
+            if incoming[i]:
+                new_positions[i] = max(new_positions[left] + gap for left, gap in incoming[i])
+            else:
+                new_positions[i] = base
 
-                # Check if constraint is violated
-                required_pos = left_pos + constraint.gap
-
-                if right_pos < required_pos:
-                    # Push right element to satisfy constraint
-                    self.positions[constraint.right] = required_pos
-                    changed = True
-
-            # Check for convergence
-            if not changed:
-                return self.positions, iteration + 1
-
-        return self.positions, self.max_iterations
+        self.positions = new_positions
+        return self.positions, 1
 
 
 def compact_horizontal(
@@ -140,24 +142,30 @@ def compact_horizontal(
     # Build constraints from left-to-right ordering
     constraints: list[CompactionConstraint] = []
 
-    for i in range(len(sorted_indices) - 1):
-        left_idx = sorted_indices[i]
-        right_idx = sorted_indices[i + 1]
+    # Constrain every pair that overlaps vertically (not just consecutive
+    # pairs): the longest-path solver pulls elements left, so a non-consecutive
+    # overlapping pair with no direct constraint could otherwise be collapsed
+    # into an overlap.
+    for a in range(len(sorted_indices)):
+        left_idx = sorted_indices[a]
+        for b in range(a + 1, len(sorted_indices)):
+            right_idx = sorted_indices[b]
 
-        # Check if they overlap vertically (need horizontal separation)
-        # Using cached bounds instead of property access
-        if not (
-            box_bottom[left_idx] < box_top[right_idx] or box_bottom[right_idx] < box_top[left_idx]
-        ):
-            # Gap = half of left width + separation + half of right width
-            gap = box_width[left_idx] / 2 + node_separation + box_width[right_idx] / 2
-            constraints.append(
-                CompactionConstraint(
-                    left=left_idx,
-                    right=right_idx,
-                    gap=gap,
+            # Check if they overlap vertically (need horizontal separation)
+            # Using cached bounds instead of property access
+            if not (
+                box_bottom[left_idx] < box_top[right_idx]
+                or box_bottom[right_idx] < box_top[left_idx]
+            ):
+                # Gap = half of left width + separation + half of right width
+                gap = box_width[left_idx] / 2 + node_separation + box_width[right_idx] / 2
+                constraints.append(
+                    CompactionConstraint(
+                        left=left_idx,
+                        right=right_idx,
+                        gap=gap,
+                    )
                 )
-            )
 
     # Initial positions
     initial_x = box_x[:]
@@ -213,24 +221,29 @@ def compact_vertical(
     # Build constraints from top-to-bottom ordering
     constraints: list[CompactionConstraint] = []
 
-    for i in range(len(sorted_indices) - 1):
+    # Constrain every pair that overlaps horizontally (not just consecutive
+    # pairs); see compact_horizontal for why the longest-path solver needs the
+    # full set to stay overlap-free.
+    for i in range(len(sorted_indices)):
         top_idx = sorted_indices[i]
-        bottom_idx = sorted_indices[i + 1]
+        for j in range(i + 1, len(sorted_indices)):
+            bottom_idx = sorted_indices[j]
 
-        # Check if they overlap horizontally (need vertical separation)
-        # Using cached bounds instead of property access
-        if not (
-            box_right[top_idx] < box_left[bottom_idx] or box_right[bottom_idx] < box_left[top_idx]
-        ):
-            # Gap = half of top height + separation + half of bottom height
-            gap = box_height[top_idx] / 2 + layer_separation + box_height[bottom_idx] / 2
-            constraints.append(
-                CompactionConstraint(
-                    left=top_idx,
-                    right=bottom_idx,
-                    gap=gap,
+            # Check if they overlap horizontally (need vertical separation)
+            # Using cached bounds instead of property access
+            if not (
+                box_right[top_idx] < box_left[bottom_idx]
+                or box_right[bottom_idx] < box_left[top_idx]
+            ):
+                # Gap = half of top height + separation + half of bottom height
+                gap = box_height[top_idx] / 2 + layer_separation + box_height[bottom_idx] / 2
+                constraints.append(
+                    CompactionConstraint(
+                        left=top_idx,
+                        right=bottom_idx,
+                        gap=gap,
+                    )
                 )
-            )
 
     # Edge-based constraints: connected nodes in different layers must maintain
     # vertical separation even if they don't overlap horizontally.

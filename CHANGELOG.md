@@ -51,6 +51,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Spring layout docstring corrected** (`force/spring.py`): it described "constant force" repulsion but implements an inverse-square Coulomb force; the docstring now matches.
 
+- **`count_crossings` now counts crossings involving long edges** (`preprocessing.py`): edges were bucketed by their exact `(layer_src, layer_tgt)` pair, so an edge spanning more than one layer was never compared against the shorter edges in the layer gaps it passes through. It now tests every edge as a straight segment in `(position, layer)` space, counting proper crossings (edges sharing a node excluded).
+
+- **Greedy orthogonal compaction now actually compacts** (`orthogonal/compaction.py`): `CompactionSolver.solve` only pushed elements right to satisfy minimum gaps and never pulled them left, so interior slack survived and the only size reduction was a final margin translate. It now performs longest-path compaction (each element pulled to its leftmost/topmost feasible position), and `compact_horizontal`/`compact_vertical` constrain every overlapping pair (not just consecutive ones) so the tighter packing stays overlap-free. This is the default orthogonal compaction path when scipy is unavailable.
+
 ### Changed
 
 - **Showcase demos updated for the orthogonal and group work** (`tests/demos/`):

@@ -604,29 +604,39 @@ def count_crossings(
             node_layer[node] = layer_idx
             node_pos[node] = pos
 
-    # Group edges by layer pairs
-    layer_edges: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    # Represent every edge as a straight segment in the (position, layer) plane.
+    # This is geometrically correct for edges that span more than one layer:
+    # grouping edges only by their exact (layer_src, layer_tgt) pair (the former
+    # implementation) never compared a long edge against the shorter edges in the
+    # layer gaps it passes through, so their crossings were missed.
+    segments: list[tuple[int, int, tuple[int, int], tuple[int, int]]] = []
     for link in links:
         src = get_source(link)
         tgt = get_target(link)
         if src in node_layer and tgt in node_layer:
-            l1, l2 = node_layer[src], node_layer[tgt]
-            if l1 > l2:
-                l1, l2 = l2, l1
-                src, tgt = tgt, src
-            key = (l1, l2)
-            if key not in layer_edges:
-                layer_edges[key] = []
-            layer_edges[key].append((node_pos[src], node_pos[tgt]))
+            p1 = (node_pos[src], node_layer[src])
+            p2 = (node_pos[tgt], node_layer[tgt])
+            segments.append((src, tgt, p1, p2))
 
-    # Count crossings for each layer pair
+    def _orient(a: tuple[int, int], b: tuple[int, int], c: tuple[int, int]) -> int:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
     total = 0
-    for edges in layer_edges.values():
-        for i, (s1, t1) in enumerate(edges):
-            for s2, t2 in edges[i + 1 :]:
-                # Two edges cross if one is "above" on left and "below" on right
-                if (s1 < s2 and t1 > t2) or (s1 > s2 and t1 < t2):
-                    total += 1
+    for i in range(len(segments)):
+        sa, ta, p1, p2 = segments[i]
+        for j in range(i + 1, len(segments)):
+            sb, tb, p3, p4 = segments[j]
+            # Edges sharing a node meet at that node, not a crossing.
+            if sa == sb or sa == tb or ta == sb or ta == tb:
+                continue
+            # Proper (strict) segment intersection: each segment straddles the
+            # other's supporting line. Excludes collinear/endpoint touches.
+            d1 = _orient(p3, p4, p1)
+            d2 = _orient(p3, p4, p2)
+            d3 = _orient(p1, p2, p3)
+            d4 = _orient(p1, p2, p4)
+            if ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)) and d1 and d2 and d3 and d4:
+                total += 1
 
     return total
 

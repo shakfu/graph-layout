@@ -619,7 +619,7 @@ class TestFindEdgeCrossings:
 
 
 class TestPlanarizeGraph:
-    """Tests for graph planarization."""
+    """Tests for topological graph planarization."""
 
     def test_planar_graph_unchanged(self):
         """Planar graph should not gain crossing vertices."""
@@ -632,16 +632,41 @@ class TestPlanarizeGraph:
         assert result.num_total_nodes == 4
         assert len(result.crossings) == 0
 
-    def test_crossing_creates_vertex(self):
-        """Crossing edges should create a crossing vertex."""
-        positions = [(0, 0), (2, 2), (0, 2), (2, 0)]
-        edges = [(0, 1), (2, 3)]  # Two crossing diagonals
+    def test_planar_graph_ignores_positions(self):
+        """Planarization is topological: a planar graph gains no crossings even
+        when its nodes are positioned so its edges are drawn crossing.
 
+        Two disjoint edges (a matching) are planar; drawn as crossing diagonals
+        the old geometric planarizer inserted a spurious crossing vertex.
+        """
+        positions = [(0, 0), (2, 2), (0, 2), (2, 0)]  # 0-1 and 2-3 drawn crossing
+        edges = [(0, 1), (2, 3)]
         result = planarize_graph(4, edges, positions)
+        assert len(result.crossings) == 0
+        assert result.num_total_nodes == 4
 
-        assert result.num_original_nodes == 4
-        assert len(result.crossings) == 1
-        assert result.num_total_nodes == 5
+    def test_nonplanar_graph_gets_crossings(self):
+        """A non-planar graph (K5) gains crossing vertices, and the augmented
+        graph is planar."""
+        from graph_layout.planarity import check_planarity
+
+        n = 5
+        edges = [(i, j) for i in range(n) for j in range(i + 1, n)]  # K5
+        result = planarize_graph(n, edges)
+
+        assert len(result.crossings) >= 1
+        assert result.num_total_nodes == n + len(result.crossings)
+        # Crossing dummies are degree-4 and the augmented graph is planar.
+        assert check_planarity(result.num_total_nodes, result.edges).is_planar
+
+    def test_k33_augmented_is_planar(self):
+        """K3,3 is non-planar; planarizing it yields a planar augmented graph."""
+        from graph_layout.planarity import check_planarity
+
+        edges = [(i, 3 + j) for i in range(3) for j in range(3)]  # K3,3
+        result = planarize_graph(6, edges)
+        assert len(result.crossings) >= 1
+        assert check_planarity(result.num_total_nodes, result.edges).is_planar
 
 
 class TestKandinskyPlanarization:

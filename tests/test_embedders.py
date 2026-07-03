@@ -473,11 +473,13 @@ class TestKandinskyEmbedder:
         assert len(layout.node_boxes) == 4
 
     def test_kandinsky_non_planar_falls_back(self) -> None:
-        """Non-planar graphs should still work (embedder ValueError caught)."""
+        """Non-planar graphs should still work (embedder ValueError caught).
+
+        With topological planarization K5 gains crossing (dummy) vertices, so the
+        node-box count is the 5 original nodes plus one box per crossing.
+        """
         from graph_layout import KandinskyLayout
 
-        # Star graph (DAG, non-planar is hard to make as DAG, so use K5 with
-        # directed edges to avoid cycles)
         nodes = [{} for _ in range(5)]
         links = [{"source": i, "target": j} for i in range(5) for j in range(i + 1, 5)]
         layout = KandinskyLayout(
@@ -486,7 +488,8 @@ class TestKandinskyEmbedder:
             size=(400, 400),
         )
         layout.run()
-        assert len(layout.node_boxes) == 5
+        assert layout.num_crossings >= 1  # K5 is non-planar
+        assert len(layout.node_boxes) == 5 + layout.num_crossings
 
 
 # ---------------------------------------------------------------------------

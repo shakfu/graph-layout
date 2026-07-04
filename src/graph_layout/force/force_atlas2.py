@@ -475,11 +475,17 @@ class ForceAtlas2Layout(IterativeLayout):
         else:
             total_swing, total_traction = self.compute_swing_traction()
 
-        # Update global speed
+        # Update global speed with max-rise damping (Jacomy et al.): the speed
+        # tracks tolerance * traction / swing, but is only allowed to rise by up
+        # to 50% per iteration (it may fall freely). Jumping straight to the
+        # target speed causes jitter/oscillation; damping the rise stabilizes
+        # convergence.
         if total_swing > 0:
-            self._global_speed = self._tolerance * total_traction / total_swing
+            target_speed = self._tolerance * total_traction / total_swing
         else:
-            self._global_speed = 1.0
+            target_speed = 1.0
+        max_rise = 0.5
+        self._global_speed += min(target_speed - self._global_speed, max_rise * self._global_speed)
 
         # Apply displacements with adaptive per-node speeds
         if _HAS_CYTHON:

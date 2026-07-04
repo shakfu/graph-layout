@@ -11,7 +11,7 @@ import math
 import warnings
 from typing import Any, Callable, Optional, Sequence
 
-from ..base import StaticLayout
+from ..base import StaticLayout, raised_recursion_limit
 from ..types import (
     Event,
     GroupLike,
@@ -101,6 +101,7 @@ class RadialTreeLayout(StaticLayout):
 
         # Internal state
         self._subtree_sizes: dict[int, int] = {}
+        self._leaf_counts: dict[int, int] = {}
 
     # -------------------------------------------------------------------------
     # Properties
@@ -191,19 +192,31 @@ class RadialTreeLayout(StaticLayout):
 
     def _compute_subtree_sizes(
         self, node: int, children_map: dict[int, list[int]], visited: set[int]
-    ) -> int:
-        """Compute size of subtree rooted at node."""
+    ) -> tuple[int, int]:
+        """Compute (node count, leaf count) of the subtree rooted at ``node``.
+
+        The leaf count drives the angular wedge allocation: a subtree's angular
+        span is proportional to how many leaves it must spread out, so deep but
+        narrow subtrees do not hog space the way a raw node count would give them.
+        """
         if node in visited:
-            return 0
+            return 0, 0
 
         visited.add(node)
         size = 1  # Count this node
+        leaf_count = 0
 
         for child in children_map.get(node, []):
-            size += self._compute_subtree_sizes(child, children_map, visited)
+            child_size, child_leaves = self._compute_subtree_sizes(child, children_map, visited)
+            size += child_size
+            leaf_count += child_leaves
+
+        if leaf_count == 0:
+            leaf_count = 1  # this node is itself a leaf
 
         self._subtree_sizes[node] = size
-        return size
+        self._leaf_counts[node] = leaf_count
+        return size, leaf_count
 
     # -------------------------------------------------------------------------
     # Layout Computation
@@ -223,8 +236,12 @@ class RadialTreeLayout(StaticLayout):
 
         # Compute subtree sizes
         self._subtree_sizes = {}
+        self._leaf_counts = {}
         visited: set[int] = set()
-        self._compute_subtree_sizes(root_idx, children_map, visited)
+        # Both recursive walks recurse to the tree's depth; raise the recursion
+        # limit so a deep (chain-like) tree does not overflow it.
+        with raised_recursion_limit(n):
+            self._compute_subtree_sizes(root_idx, children_map, visited)
 
         # Check for disconnected nodes
         unvisited = [i for i in range(n) if i not in visited]
@@ -246,16 +263,17 @@ class RadialTreeLayout(StaticLayout):
         self._nodes[root_idx].y = cy
 
         # Layout children recursively
-        self._layout_subtree(
-            root_idx,
-            children_map,
-            level=1,
-            angle_start=self._start_angle,
-            angle_sweep=self._sweep_angle,
-            cx=cx,
-            cy=cy,
-            visited={root_idx},
-        )
+        with raised_recursion_limit(n):
+            self._layout_subtree(
+                root_idx,
+                children_map,
+                level=1,
+                angle_start=self._start_angle,
+                angle_sweep=self._sweep_angle,
+                cx=cx,
+                cy=cy,
+                visited={root_idx},
+            )
 
     def _layout_subtree(
         self,
@@ -281,17 +299,18 @@ class RadialTreeLayout(StaticLayout):
         # Calculate radius for this level
         radius = level * self._level_radius
 
-        # Total weight of children (based on subtree sizes)
-        total_weight = sum(self._subtree_sizes.get(c, 1) for c in children)
+        # Total weight of children (based on leaf counts, so wedges are sized by
+        # how many leaves each subtree must spread out).
+        total_weight = sum(self._leaf_counts.get(c, 1) for c in children)
 
-        # Assign angular wedges proportional to subtree size
+        # Assign angular wedges proportional to leaf count
         current_angle = angle_start
 
         for child in children:
             visited.add(child)
 
             # Angular wedge for this child's subtree
-            child_weight = self._subtree_sizes.get(child, 1)
+            child_weight = self._leaf_counts.get(child, 1)
             child_sweep = angle_sweep * (child_weight / total_weight)
 
             # Position at center of wedge

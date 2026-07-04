@@ -126,6 +126,31 @@ class TestConstraintDAG:
 # ---------------------------------------------------------------------------
 
 
+class TestFlowNeverLooserThanLongestPath:
+    def test_flow_span_not_greater_than_longest_path(self):
+        """compact_flow_1d must never widen the span beyond longest-path, which
+        is the provably-minimum 1D span (its docstring previously claimed the
+        flow produced *tighter* layouts, which is impossible).
+        """
+        # Boxes spread out with slack in both a chain and a parallel branch.
+        boxes = [
+            _make_box(0, x=0, y=0),
+            _make_box(1, x=300, y=0),
+            _make_box(2, x=700, y=0),
+            _make_box(3, x=1000, y=50),
+        ]
+        sep = 20.0
+
+        def span(coords: list[float]) -> float:
+            return max(coords[i] + boxes[i].width / 2 for i in range(len(boxes))) - min(
+                coords[i] - boxes[i].width / 2 for i in range(len(boxes))
+            )
+
+        lp = compact_longest_path_1d(boxes, sep, "horizontal")
+        flow = compact_flow_1d(boxes, sep, "horizontal")
+        assert span(flow) <= span(lp) + 1e-6
+
+
 class TestLongestPathCompaction:
     def test_two_boxes_minimum_separation(self):
         """Two boxes should end up with exactly minimum separation."""

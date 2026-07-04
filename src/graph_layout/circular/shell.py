@@ -195,7 +195,14 @@ class ShellLayout(StaticLayout):
     def _get_shells(self) -> list[list[int]]:
         """Get shells (explicit or auto-computed)."""
         if self._shells is not None:
-            return self._shells
+            # Nodes omitted from the user-supplied shells would otherwise be
+            # left unpositioned; collect them into an extra outer shell.
+            shells = [list(s) for s in self._shells]
+            placed = {i for shell in shells for i in shell}
+            leftover = [i for i in range(len(self._nodes)) if i not in placed]
+            if leftover:
+                shells.append(leftover)
+            return shells
 
         if self._n_auto_shells > 0:
             return self._compute_auto_shells()

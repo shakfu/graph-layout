@@ -261,6 +261,42 @@ class TestRadialTreeLayout:
         assert abs(root.x - 400) < 1.0
         assert abs(root.y - 300) < 1.0
 
+    def test_wedges_use_leaf_count(self):
+        """Angular wedges are sized by leaf count, not raw subtree node count.
+
+        Regression: a deep narrow subtree (many nodes, one leaf) got as much
+        angular space as a bushy subtree (few nodes, many leaves).
+        """
+        # root 0 -> chain 1-2-3 (one leaf) and bushy 4 -> {5,6,7} (three leaves).
+        nodes = [{} for _ in range(8)]
+        links = [
+            {"source": 0, "target": 1},
+            {"source": 1, "target": 2},
+            {"source": 2, "target": 3},
+            {"source": 0, "target": 4},
+            {"source": 4, "target": 5},
+            {"source": 4, "target": 6},
+            {"source": 4, "target": 7},
+        ]
+        layout = RadialTreeLayout(nodes=nodes, links=links, size=(800, 600))
+        layout.run()
+        # Both subtrees have 4 nodes, but 1 vs 3 leaves.
+        assert layout._leaf_counts[1] == 1
+        assert layout._leaf_counts[4] == 3
+
+
+class TestDeepTreeRecursion:
+    """Deep (chain-like) trees must not overflow the recursion limit."""
+
+    @pytest.mark.parametrize("LayoutClass", [ReingoldTilfordLayout, RadialTreeLayout])
+    def test_deep_chain(self, LayoutClass):
+        n = 4000  # far beyond Python's default recursion limit (~1000)
+        nodes = [{} for _ in range(n)]
+        links = [{"source": i, "target": i + 1} for i in range(n - 1)]
+        layout = LayoutClass(nodes=nodes, links=links, size=(800, 600))
+        layout.run()  # must not raise RecursionError
+        assert all(math.isfinite(node.x) and math.isfinite(node.y) for node in layout.nodes)
+
     def test_children_further_from_center(self):
         """Test that children are further from center than parent."""
         nodes, links = create_binary_tree()

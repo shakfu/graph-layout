@@ -37,7 +37,7 @@ from graph_layout import (
 from graph_layout.cola import Layout as ColaLayout
 
 # Output directory
-BUILD_DIR = Path(__file__).parent.parent / "build"
+BUILD_DIR = Path(__file__).parent.parent.parent / "build"
 
 # SVG dimensions
 SVG_WIDTH = 500

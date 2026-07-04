@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+## [0.3.0]
+
 ### Fixed
 
 - **Cola: group containment now enforced in the constraint projection** (`cola/rectangle.py`):
@@ -50,6 +52,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Kandinsky `compaction_method` setter accepts all supported methods** (`orthogonal/kandinsky.py`): the setter rejected `"flow"` and `"longest_path"` even though the constructor documents them and the compaction dispatch implements them; all five methods (`auto`/`greedy`/`ilp`/`flow`/`longest_path`) are now accepted.
 
 - **Spring layout docstring corrected** (`force/spring.py`): it described "constant force" repulsion but implements an inverse-square Coulomb force; the docstring now matches.
+
+- **Metrics: `stress` honors per-link lengths and `angular_resolution` ignores self-loops/parallel edges** (`metrics.py`): the ideal-distance computation used an unweighted hop count (ignoring `link.length`); it now uses weighted shortest paths. `angular_resolution` counted self-loops and parallel edges as spurious 0-degree angles; both are now excluded.
+
+- **Radial tree: angular wedges sized by leaf count** (`hierarchical/radial_tree.py`): wedges were proportional to subtree node count, so a deep narrow subtree hogged as much angular space as a bushy one; they are now proportional to subtree leaf count.
+
+- **Unpositioned nodes are now placed** (`bipartite/bipartite.py`, `circular/shell.py`): nodes omitted from user-supplied bipartite sets or explicit shells were left unpositioned; they are now assigned to the bottom row / an extra outer shell respectively.
+
+- **FA2 global speed is damped** (`force/force_atlas2.py`): the adaptive global speed jumped straight to `tolerance * traction / swing` each iteration, causing jitter; it now rises by at most 50% per iteration (max-rise damping, Jacomy et al.).
+
+- **`compact_flow_1d` never looser than longest-path** (`orthogonal/compaction_flow.py`): the flow compaction could widen the span beyond the longest-path minimum; it now falls back to longest-path whenever the flow solution would loosen it, and the "tighter layouts" docstring was corrected.
+
+- **Deep recursive walks no longer overflow** (`preprocessing.py`, `base.py`, `hierarchical/`): `detect_cycle` is now an iterative DFS, and the Reingold-Tilford and radial-tree walks run under a bounded recursion-limit context manager, so deep (chain-like) trees no longer raise `RecursionError`.
+
+- **Cola `tick()` before `start()` no longer crashes** (`cola/layout.py`): it compared `alpha < threshold` with `alpha` still None; it now returns converged.
+
+- **Removed the no-op `directed` parameter from `connected_components`** (`preprocessing.py`): it always computed undirected (weakly connected) components.
 
 - **`count_crossings` now counts crossings involving long edges** (`preprocessing.py`): edges were bucketed by their exact `(layer_src, layer_tgt)` pair, so an edge spanning more than one layer was never compared against the shorter edges in the layer gaps it passes through. It now tests every edge as a straight segment in `(position, layer)` space, counting proper crossings (edges sharing a node excluded).
 

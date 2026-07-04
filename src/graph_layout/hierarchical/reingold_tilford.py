@@ -14,7 +14,7 @@ import warnings
 from collections import deque
 from typing import Any, Callable, Optional, Sequence
 
-from ..base import StaticLayout
+from ..base import StaticLayout, raised_recursion_limit
 from ..types import (
     Event,
     GroupLike,
@@ -437,11 +437,12 @@ class ReingoldTilfordLayout(StaticLayout):
         if root_idx < 0:
             return
 
-        self._tree_root = self._build_tree(root_idx)
-
-        # Run Reingold-Tilford
-        self._first_walk(self._tree_root)
-        self._second_walk(self._tree_root)
+        # The tree build and both walks recurse to the tree's depth; raise the
+        # recursion limit so deep (chain-like) trees do not overflow it.
+        with raised_recursion_limit(n):
+            self._tree_root = self._build_tree(root_idx)
+            self._first_walk(self._tree_root)
+            self._second_walk(self._tree_root)
 
         # Apply orientation and scale to fit canvas
         self._apply_layout()

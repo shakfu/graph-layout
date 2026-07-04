@@ -144,6 +144,17 @@ class TestStress:
         with pytest.raises(ValueError, match="Must provide"):
             stress(nodes)
 
+    def test_honors_per_link_length(self):
+        """Ideal distances use each link's length, not just a uniform hop count.
+
+        Regression: the ideal-distance BFS ignored link lengths/weights.
+        """
+        nodes = [Node(x=0, y=0), Node(x=50, y=0)]
+        # Actual distance 50 matches the link's ideal length 50 -> ~zero stress,
+        # even though the default edge_length is 100.
+        s = stress(nodes, links=[Link(0, 1, length=50)], edge_length=100)
+        assert s < 0.01
+
 
 class TestEdgeLengthVariance:
     """Tests for edge length variance."""
@@ -256,6 +267,17 @@ class TestAngularResolution:
 
         angle = angular_resolution(nodes, links)
         assert abs(angle - 180) < 1
+
+    def test_self_loops_and_parallel_edges_ignored(self):
+        """Self-loops and parallel edges must not register as spurious 0 angles.
+
+        Regression: both fed a zero-length / duplicate direction into the angle
+        computation, so the metric collapsed to 0 degrees.
+        """
+        nodes = [Node(x=0, y=0), Node(x=100, y=0), Node(x=0, y=100)]
+        # Two edges 90 degrees apart, plus a self-loop and a parallel edge.
+        links = [Link(0, 1), Link(0, 2), Link(0, 0), Link(0, 1)]
+        assert abs(angular_resolution(nodes, links) - 90) < 1
 
 
 class TestLayoutQualitySummary:

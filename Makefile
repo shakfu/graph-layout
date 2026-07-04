@@ -3,7 +3,7 @@
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
 		lint format check typecheck all dev sync build publish publish-test \
-		wheel-check rebuild-cython qa showcase showcase-improvements
+		wheel-check rebuild-cython qa showcase showcase-improvements demos
 
 # Source and test directories
 SRC_DIR := src/graph_layout
@@ -26,6 +26,7 @@ help:
 	@echo "  make test-watch   - Run tests in watch mode"
 	@echo "  make test-coverage - Run tests with coverage report"
 	@echo "  make test-html    - Run tests with HTML coverage report"
+	@echo "  make demos        - Generate all tests/demos/ visual demos to build/"
 	@echo "  make showcase     - Generate showcase HTML with visual demos"
 	@echo ""
 	@echo "Code Quality:"
@@ -81,6 +82,16 @@ showcase:
 showcase-improvements:
 	@uv run python tests/demos/improvements_showcase.py
 	@if [ "$$(uname)" = "Darwin" ]; then open build/improvements_showcase.html; fi
+
+# Generate every demo in tests/demos/ to build/ (and open them on macOS)
+demos:
+	@mkdir -p build
+	@for demo in tests/demos/*.py; do \
+		echo "Generating $$demo ..."; \
+		uv run python "$$demo" >/dev/null; \
+	done
+	@echo "All demos written to build/"
+	@if [ "$$(uname)" = "Darwin" ]; then open build/*showcase.html; fi
 
 # Run tests with HTML coverage report
 test-html:

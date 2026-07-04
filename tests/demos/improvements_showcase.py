@@ -9,6 +9,10 @@ Renders side-by-side SVG comparisons that make the changes visible:
     constraints, which were previously inert stubs.
   * Cola nested-group containment (C1) -- group bounding rectangles now keep
     their members in and sibling groups apart (previously unconstrained).
+  * Sugiyama Brandes-Köpf coordinates -- nodes align with their neighbours and
+    long-edge dummy chains are drawn straight (was evenly-spaced slots).
+  * Topological planarization -- crossings depend on graph topology, not the
+    drawing (was geometric segment-intersection).
   * Sugiyama on a cyclic graph (H3/H4) -- cycle removal + dummy nodes; GIOTTO on
     a cyclic graph (recursion fix).
 
@@ -25,6 +29,7 @@ from pathlib import Path
 
 from graph_layout import GIOTTOLayout, Group, Link, Node, SugiyamaLayout
 from graph_layout.cola import Layout as ColaLayout
+from graph_layout.orthogonal.planarization import planarize_graph
 
 BUILD_DIR = Path(__file__).parent.parent.parent / "build"
 W, H = 360, 300
@@ -510,6 +515,120 @@ def _section_cyclic() -> str:
     )
 
 
+def _sugiyama_svg(layout, edges, title: str, subtitle: str) -> str:
+    """Render a Sugiyama layout, routing long edges through their bend points so
+    the Brandes-Köpf straightening is visible."""
+    nodes = _nodes_of(layout)
+    bends = layout.edge_bends
+    pts = [(n.x, n.y) for n in nodes]
+    for bl in bends.values():
+        pts.extend(bl)
+    tf = _fit(pts, W, H, PAD)
+
+    parts = [f'<svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">']
+    parts.append(f'<rect width="{W}" height="{H}" fill="#fbfbfd"/>')
+    for u, v in edges:
+        route = [(nodes[u].x, nodes[u].y), *bends.get((u, v), []), (nodes[v].x, nodes[v].y)]
+        d = " ".join(f"{tf(x, y)[0]:.1f},{tf(x, y)[1]:.1f}" for x, y in route)
+        parts.append(f'<polyline points="{d}" fill="none" stroke="#bbb" stroke-width="1.5"/>')
+    for i, n in enumerate(nodes):
+        cx, cy = tf(n.x, n.y)
+        parts.append(
+            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="9" fill="#4a90d9" '
+            f'stroke="#2c5aa0" stroke-width="1.5"/>'
+        )
+        parts.append(
+            f'<text x="{cx:.1f}" y="{cy + 3:.1f}" text-anchor="middle" '
+            f'font-size="9" fill="#fff" font-family="sans-serif">{i}</text>'
+        )
+    parts.append("</svg>")
+    return _card(title, subtitle, "".join(parts))
+
+
+def _text_card(title: str, subtitle: str, rows: list[str]) -> str:
+    body = "".join(f"<li>{escape(r)}</li>" for r in rows)
+    return _card(title, subtitle, f'<ul class="facts">{body}</ul>')
+
+
+def _section_brandes_koepf() -> str:
+    # A chain 0-1-2-3-4 plus a long edge 0->4 spanning every layer. Brandes-Köpf
+    # aligns the nodes and draws the long-edge dummy chain as a straight line.
+    n = 5
+    edges = [(0, 1), (1, 2), (2, 3), (3, 4), (0, 4)]
+    sug = SugiyamaLayout(
+        nodes=[{} for _ in range(n)],
+        links=[{"source": u, "target": v} for u, v in edges],
+        size=(600, 500),
+    )
+    sug.run()
+    bends = sug.edge_bends.get((0, 4), [])
+    straight = len({round(bx, 1) for bx, _ in bends}) <= 1 if bends else True
+    cards = (
+        '<div class="pair">'
+        + _sugiyama_svg(
+            sug,
+            edges,
+            "Sugiyama with Brandes-Köpf coordinates",
+            f"long edge 0->4 routed straight ({len(bends)} collinear bends)"
+            if straight
+            else "long edge 0->4",
+        )
+        + "</div>"
+    )
+    return _block(
+        "Sugiyama: Brandes-Köpf horizontal coordinates",
+        "Within-layer x-coordinates now come from Brandes-Köpf: each node aligns "
+        "with the median of its neighbours (instead of the old evenly-spaced, "
+        "independently-centred slots), so edges -- especially long-edge dummy "
+        "chains -- are drawn as straight vertical segments and parents sit "
+        "centred over their children.",
+        cards,
+    )
+
+
+def _section_planarization() -> str:
+    # Topological planarization: crossings depend on topology, not on the drawing.
+    import itertools
+
+    def _count(n, edges):
+        return len(planarize_graph(n, edges).crossings)
+
+    # A planar graph (two disjoint edges) whose nodes are placed so the edges are
+    # drawn crossing -- the old geometric planarizer inserted a spurious crossing.
+    disjoint_positions = [(0, 0), (2, 2), (0, 2), (2, 0)]
+    disjoint_edges = [(0, 1), (2, 3)]
+    planar_crossed = len(planarize_graph(4, disjoint_edges, disjoint_positions).crossings)
+
+    k5 = [(i, j) for i, j in itertools.combinations(range(5), 2)]
+    k33 = [(i, 3 + j) for i in range(3) for j in range(3)]
+
+    rows = [
+        f"planar matching drawn crossing -> {planar_crossed} crossings "
+        "(geometric planarizer added a spurious one)",
+        f"K4 (planar) -> {_count(4, list(itertools.combinations(range(4), 2)))} crossings",
+        f"K5 -> {_count(5, k5)} crossing (crossing number 1)",
+        f"K3,3 -> {_count(6, k33)} crossing (crossing number 1)",
+    ]
+    cards = (
+        '<div class="pair">'
+        + _text_card(
+            "Crossings are topological, not geometric",
+            "position-independent; augmented graph is always planar",
+            rows,
+        )
+        + "</div>"
+    )
+    return _block(
+        "Orthogonal: topological planarization",
+        "Planarization now embeds a maximal planar subgraph and reinserts the "
+        "remaining edges along minimum-crossing paths through the embedding's "
+        "faces, adding a dummy vertex per crossing. Crossings depend only on the "
+        "graph's topology -- a planar graph gains none however its nodes are "
+        "positioned -- and it recovers the known crossing numbers of small graphs.",
+        cards,
+    )
+
+
 def _block(title: str, desc: str, body: str) -> str:
     return (
         f'<section><h2>{escape(title)}</h2><p class="desc">{escape(desc)}</p>'
@@ -519,7 +638,14 @@ def _block(title: str, desc: str, body: str) -> str:
 
 def main() -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    sections = _section_giotto() + _section_cola() + _section_groups() + _section_cyclic()
+    sections = (
+        _section_giotto()
+        + _section_cola()
+        + _section_groups()
+        + _section_brandes_koepf()
+        + _section_planarization()
+        + _section_cyclic()
+    )
     html = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>graph-layout: review improvements</title>
 <style>
@@ -536,6 +662,8 @@ def main() -> None:
            padding: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }}
   .ct {{ font-size: 13px; font-weight: 600; }}
   .cs {{ font-size: 11px; color: #777; margin-bottom: 4px; }}
+  .facts {{ font-size: 12px; color: #333; margin: 4px 0 0; padding-left: 18px; }}
+  .facts li {{ margin: 3px 0; }}
 </style></head><body>
 <header><h1>graph-layout &mdash; review improvements</h1>
 <p>Visual evidence for the correctness fixes and the new GIOTTO bend-optimal drawing.</p></header>

@@ -692,6 +692,29 @@ class TestForceAtlas2Compatibility:
         assert len(layout.nodes) == 6
 
 
+class TestForceAtlas2Speed:
+    """Global-speed max-rise damping (Jacomy et al.)."""
+
+    def test_global_speed_rise_is_damped(self):
+        """The global speed must not rise by more than 50% in a single tick.
+
+        Regression: the speed jumped straight to tolerance * traction / swing
+        each iteration, causing jitter. It is now damped to rise <= 50% per step.
+        """
+        nodes, links = create_two_clusters()
+        layout = ForceAtlas2Layout(
+            nodes=nodes, links=links, size=(500, 500), random_seed=3, iterations=1
+        )
+        layout.run()
+        speeds = [layout._global_speed]
+        for _ in range(30):
+            layout.tick()
+            speeds.append(layout._global_speed)
+        for prev, cur in zip(speeds, speeds[1:]):
+            assert cur <= prev * 1.5 + 1e-9
+            assert math.isfinite(cur) and cur >= 0
+
+
 class TestForceAtlas2Gravity:
     """Regular vs strong gravity distance behavior (Jacomy et al. / Gephi)."""
 

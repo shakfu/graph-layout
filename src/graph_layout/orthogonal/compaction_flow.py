@@ -7,9 +7,10 @@ Implements two compaction strategies based on constraint DAGs:
    in the constraint DAG. O(n^2) for DAG construction, O(n + m) for
    longest path. Guaranteed correct in one pass.
 
-2. FlowCompaction: Uses min-cost flow on the constraint DAG to optimally
-   distribute compression. Produces tighter layouts when there is slack
-   to redistribute.
+2. FlowCompaction: Uses min-cost flow on the constraint DAG to redistribute
+   slack as a secondary objective (e.g. edge-length balance). Longest-path
+   already yields the minimum 1D span, so this is never looser than it -- the
+   result falls back to longest-path if the flow solution would widen the span.
 
 Reference:
     Eiglsperger, M., Fekete, S.P., Klau, G.W. (2001). Orthogonal Graph
@@ -375,12 +376,21 @@ def compact_flow_1d(
         if new_positions[v] - new_positions[u] < min_gap - 1e-6:
             return lp_positions
 
+    if dimension == "horizontal":
+        half_p = [box.width / 2 for box in boxes]
+    else:
+        half_p = [box.height / 2 for box in boxes]
+
+    def _span(pos: list[float]) -> float:
+        return max(pos[i] + half_p[i] for i in range(n)) - min(pos[i] - half_p[i] for i in range(n))
+
+    # Longest-path already gives the provably minimum 1D span; the flow
+    # redistribution optimizes a secondary objective and must never increase it.
+    if _span(new_positions) > _span(lp_positions) + 1e-6:
+        new_positions = list(lp_positions)
+
     # Ensure non-negative positions
     if new_positions:
-        if dimension == "horizontal":
-            half_p = [box.width / 2 for box in boxes]
-        else:
-            half_p = [box.height / 2 for box in boxes]
         min_pos = min(new_positions[i] - half_p[i] for i in range(n))
         if min_pos < 0:
             shift = -min_pos + separation

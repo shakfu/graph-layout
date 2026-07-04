@@ -12,7 +12,10 @@ and shared functionality for all layout algorithms:
 from __future__ import annotations
 
 import random
+import sys
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 if TYPE_CHECKING:
@@ -34,6 +37,25 @@ from .validation import (
     validate_group_indices,
     validate_link_indices,
 )
+
+
+@contextmanager
+def raised_recursion_limit(needed: int) -> Iterator[None]:
+    """Temporarily raise the interpreter recursion limit for a recursive walk.
+
+    Recursive tree layouts recurse to the depth of the tree, which for a
+    degenerate (chain-like) tree equals the node count and can exceed Python's
+    default limit (~1000). This raises the limit for the duration and restores
+    it afterwards, with a ceiling so a pathological input cannot drive the
+    interpreter into a native-stack overflow.
+    """
+    current = sys.getrecursionlimit()
+    target = min(max(current, needed + 100), 12000)
+    sys.setrecursionlimit(target)
+    try:
+        yield
+    finally:
+        sys.setrecursionlimit(current)
 
 
 class BaseLayout(ABC):

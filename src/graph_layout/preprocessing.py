@@ -81,29 +81,34 @@ def detect_cycle(
     # DFS states: 0=unvisited, 1=visiting, 2=visited
     state = [0] * n
 
-    def dfs(node: int, path: list[int]) -> Optional[list[int]]:
-        state[node] = 1
-        path.append(node)
-
-        for neighbor in adj[node]:
-            if state[neighbor] == 1:
-                # Found cycle - extract it
-                cycle_start = path.index(neighbor)
-                return path[cycle_start:] + [neighbor]
-            elif state[neighbor] == 0:
-                result = dfs(neighbor, path)
-                if result is not None:
-                    return result
-
-        path.pop()
-        state[node] = 2
-        return None
-
+    # Iterative DFS (explicit stack) so deep graphs do not hit Python's
+    # recursion limit. ``path`` is the stack of on-path (state==1) vertices.
     for start in range(n):
-        if state[start] == 0:
-            result = dfs(start, [])
-            if result is not None:
-                return result
+        if state[start] != 0:
+            continue
+
+        path: list[int] = [start]
+        stack: list[tuple[int, Any]] = [(start, iter(adj[start]))]
+        state[start] = 1
+
+        while stack:
+            node, neighbors = stack[-1]
+            descended = False
+            for neighbor in neighbors:
+                if state[neighbor] == 1:
+                    # Found a cycle: extract it from the current path.
+                    cycle_start = path.index(neighbor)
+                    return path[cycle_start:] + [neighbor]
+                if state[neighbor] == 0:
+                    state[neighbor] = 1
+                    path.append(neighbor)
+                    stack.append((neighbor, iter(adj[neighbor])))
+                    descended = True
+                    break
+            if not descended:
+                stack.pop()
+                path.pop()
+                state[node] = 2
 
     return None
 
@@ -289,18 +294,18 @@ def connected_components(
     links: Sequence[LinkLike],
     get_source: Optional[Callable[[Any], int]] = None,
     get_target: Optional[Callable[[Any], int]] = None,
-    directed: bool = False,
 ) -> list[list[int]]:
     """
     Find connected components in a graph.
+
+    Edges are treated as undirected (equivalently, this returns the weakly
+    connected components of a directed graph).
 
     Args:
         n: Number of nodes
         links: List of edges
         get_source: Function to extract source index from link
         get_target: Function to extract target index from link
-        directed: If False (default), treat graph as undirected.
-                  If True, find weakly connected components.
 
     Returns:
         List of components, where each component is a list of node indices.

@@ -322,6 +322,19 @@ class TestShellLayout:
         layout.run(center_graph=False)
         assert layout.nodes[0].x == 555.0 and layout.nodes[0].y == 666.0
 
+    def test_nodes_omitted_from_shells_are_positioned(self):
+        """Nodes absent from explicit shells must still be positioned.
+
+        Regression: nodes in no shell were left at their default position.
+        """
+        # 5 nodes, explicit shells cover only 0, 1, 2.
+        layout = ShellLayout(
+            nodes=[{} for _ in range(5)], links=[], size=(400, 400), shells=[[0], [1, 2]]
+        )
+        layout.run(center_graph=False)
+        for i in (3, 4):
+            assert layout.nodes[i].x is not None and layout.nodes[i].y is not None
+
 
 # =============================================================================
 # Cross-Algorithm Tests

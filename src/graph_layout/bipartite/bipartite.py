@@ -246,6 +246,13 @@ class BipartiteLayout(StaticLayout):
             self._top_nodes = list(range(mid))
             self._bottom_nodes = list(range(mid, n))
 
+        # Ensure every node is placed: nodes omitted from user-supplied sets
+        # would otherwise be left unpositioned. Assign them to the bottom row.
+        placed = set(self._top_nodes) | set(self._bottom_nodes)
+        leftover = [i for i in range(n) if i not in placed]
+        if leftover:
+            self._bottom_nodes = list(self._bottom_nodes) + leftover
+
         # Minimize edge crossings
         if self._minimize_crossings:
             self._top_nodes, self._bottom_nodes = self._minimize_edge_crossings(

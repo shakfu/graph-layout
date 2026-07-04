@@ -58,6 +58,23 @@ class TestBipartiteBasic:
         layout.run(center_graph=False)
         assert layout.nodes[0].x == 555.0 and layout.nodes[0].y == 666.0
 
+    def test_nodes_omitted_from_sets_are_positioned(self):
+        """Nodes absent from user-supplied sets must still be positioned.
+
+        Regression: a node in neither top_set nor bottom_set was left at its
+        default position.
+        """
+        nodes = [{} for _ in range(5)]  # node 4 is in neither set
+        layout = BipartiteLayout(
+            nodes=nodes,
+            links=[{"source": 0, "target": 2}],
+            size=(800, 600),
+            top_set=[0, 1],
+            bottom_set=[2, 3],
+        )
+        layout.run(center_graph=False)
+        assert layout.nodes[4].x is not None and layout.nodes[4].y is not None
+
     def test_single_node(self):
         """Single node should be positioned."""
         nodes = [{}]

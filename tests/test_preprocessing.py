@@ -65,6 +65,13 @@ class TestCycleDetection:
         cycle = detect_cycle(1, links)
         assert cycle is not None
 
+    def test_detect_cycle_deep_chain(self):
+        """A deep chain must not overflow the recursion limit (now iterative)."""
+        n = 5000  # far beyond Python's default recursion limit
+        chain = [{"source": i, "target": i + 1} for i in range(n - 1)]
+        assert detect_cycle(n, chain) is None  # acyclic
+        assert detect_cycle(n, chain + [{"source": n - 1, "target": 0}]) is not None
+
 
 class TestCycleRemoval:
     """Tests for cycle removal function."""

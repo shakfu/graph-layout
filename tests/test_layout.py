@@ -153,6 +153,15 @@ class TestLayout:
         assert layout.groups() == []
         assert layout.size() == [1.0, 1.0]
 
+    def test_tick_before_start_does_not_crash(self):
+        """Ticking before start() (alpha still None) returns converged, not a crash.
+
+        Regression: tick() compared ``self._alpha < threshold`` with alpha=None.
+        """
+        layout = Layout()
+        layout.nodes([Node(x=0, y=0), Node(x=10, y=0)]).links([Link(0, 1)])
+        assert layout.tick() is True
+
     def test_fluent_api_size(self):
         """Test fluent API for size."""
         layout = Layout()

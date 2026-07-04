@@ -12,8 +12,8 @@ All metrics work with final node positions from any layout algorithm.
 
 from __future__ import annotations
 
+import heapq
 import math
-from collections import deque
 from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from .types import Link, Node
@@ -188,35 +188,39 @@ def _compute_ideal_distances(
     links: Sequence[Link],
     edge_length: float,
 ) -> List[List[float]]:
-    """Compute ideal distances based on shortest path lengths."""
+    """Compute ideal distances from weighted shortest paths.
+
+    Each edge contributes its ideal length (``link.length`` when set, otherwise
+    ``edge_length``); the ideal distance between two nodes is the shortest such
+    weighted path. (Previously this used an unweighted hop count, ignoring
+    per-link lengths.)
+    """
     n = len(nodes)
     dist: List[List[float]] = [[float("inf")] * n for _ in range(n)]
 
-    # Build adjacency
-    adj: List[List[int]] = [[] for _ in range(n)]
+    # Build weighted adjacency (skip self-loops).
+    adj: List[List[tuple[int, float]]] = [[] for _ in range(n)]
     for link in links:
         s = _get_link_index(link.source)
         t = _get_link_index(link.target)
-        if 0 <= s < n and 0 <= t < n:
-            adj[s].append(t)
-            adj[t].append(s)
+        if 0 <= s < n and 0 <= t < n and s != t:
+            w = link.length if link.length is not None else edge_length
+            adj[s].append((t, w))
+            adj[t].append((s, w))
 
-    # BFS from each node
+    # Dijkstra from each node.
     for start in range(n):
-        dist[start][start] = 0
-        queue: deque[int] = deque([start])
-        while queue:
-            curr = queue.popleft()
-            for neighbor in adj[curr]:
-                if dist[start][neighbor] == float("inf"):
-                    dist[start][neighbor] = dist[start][curr] + 1
-                    queue.append(neighbor)
-
-    # Convert hop count to ideal distance
-    for i in range(n):
-        for j in range(n):
-            if dist[i][j] != float("inf"):
-                dist[i][j] *= edge_length
+        dist[start][start] = 0.0
+        pq: list[tuple[float, int]] = [(0.0, start)]
+        while pq:
+            d, curr = heapq.heappop(pq)
+            if d > dist[start][curr]:
+                continue
+            for neighbor, w in adj[curr]:
+                nd = d + w
+                if nd < dist[start][neighbor]:
+                    dist[start][neighbor] = nd
+                    heapq.heappush(pq, (nd, neighbor))
 
     return dist
 
@@ -308,14 +312,16 @@ def angular_resolution(nodes: Sequence[Node], links: Sequence[Link]) -> float:
     if n == 0 or len(links) == 0:
         return 360.0
 
-    # Build incident edges for each node
-    incident: List[List[int]] = [[] for _ in range(n)]
+    # Build the set of distinct neighbours for each node. Self-loops (which have
+    # no direction) and parallel edges (which give the same direction) are
+    # excluded so they do not register as spurious 0-degree angles.
+    incident: List[set[int]] = [set() for _ in range(n)]
     for link in links:
         s = _get_link_index(link.source)
         t = _get_link_index(link.target)
-        if 0 <= s < n and 0 <= t < n:
-            incident[s].append(t)
-            incident[t].append(s)
+        if 0 <= s < n and 0 <= t < n and s != t:
+            incident[s].add(t)
+            incident[t].add(s)
 
     min_angle = 360.0
 

@@ -151,7 +151,9 @@ class Layout:
         Returns:
             True when layout converged, False otherwise
         """
-        if self._alpha < self._threshold:
+        # ``_alpha`` is None until start() seeds it; ticking before then (or once
+        # cooled below the threshold) means there is nothing to do.
+        if self._alpha is None or self._alpha < self._threshold:
             self._running = False
             self.trigger({"type": EventType.end, "alpha": 0.0, "stress": self._lastStress})
             self._alpha = 0.0

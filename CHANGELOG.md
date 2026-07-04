@@ -63,7 +63,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **`compact_flow_1d` never looser than longest-path** (`orthogonal/compaction_flow.py`): the flow compaction could widen the span beyond the longest-path minimum; it now falls back to longest-path whenever the flow solution would loosen it, and the "tighter layouts" docstring was corrected.
 
-- **Deep recursive walks no longer overflow** (`preprocessing.py`, `base.py`, `hierarchical/`): `detect_cycle` is now an iterative DFS, and the Reingold-Tilford and radial-tree walks run under a bounded recursion-limit context manager, so deep (chain-like) trees no longer raise `RecursionError`.
+- **Deep recursive walks no longer overflow** (`preprocessing.py`, `base.py`, `hierarchical/`): `detect_cycle` is now an iterative DFS, and the Reingold-Tilford and radial-tree walks run in a worker thread with a large stack (`base.run_deep_recursive`), so deep (chain-like) trees are laid out safely on every platform, including Windows (whose ~1 MB native stack would otherwise crash on a raised recursion limit).
 
 - **Cola `tick()` before `start()` no longer crashes** (`cola/layout.py`): it compared `alpha < threshold` with `alpha` still None; it now returns converged.
 

@@ -11,7 +11,7 @@ import math
 import warnings
 from typing import Any, Callable, Optional, Sequence
 
-from ..base import StaticLayout, raised_recursion_limit
+from ..base import StaticLayout, run_deep_recursive
 from ..types import (
     Event,
     GroupLike,
@@ -238,10 +238,9 @@ class RadialTreeLayout(StaticLayout):
         self._subtree_sizes = {}
         self._leaf_counts = {}
         visited: set[int] = set()
-        # Both recursive walks recurse to the tree's depth; raise the recursion
-        # limit so a deep (chain-like) tree does not overflow it.
-        with raised_recursion_limit(n):
-            self._compute_subtree_sizes(root_idx, children_map, visited)
+        # Both recursive walks recurse to the tree's depth; run them with a large
+        # stack so a deep (chain-like) tree does not overflow the native stack.
+        run_deep_recursive(lambda: self._compute_subtree_sizes(root_idx, children_map, visited), n)
 
         # Check for disconnected nodes
         unvisited = [i for i in range(n) if i not in visited]
@@ -262,9 +261,9 @@ class RadialTreeLayout(StaticLayout):
         self._nodes[root_idx].x = cx
         self._nodes[root_idx].y = cy
 
-        # Layout children recursively
-        with raised_recursion_limit(n):
-            self._layout_subtree(
+        # Layout children recursively (large stack for deep trees).
+        run_deep_recursive(
+            lambda: self._layout_subtree(
                 root_idx,
                 children_map,
                 level=1,
@@ -273,7 +272,9 @@ class RadialTreeLayout(StaticLayout):
                 cx=cx,
                 cy=cy,
                 visited={root_idx},
-            )
+            ),
+            n,
+        )
 
     def _layout_subtree(
         self,

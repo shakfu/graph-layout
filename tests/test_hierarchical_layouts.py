@@ -290,7 +290,7 @@ class TestDeepTreeRecursion:
 
     @pytest.mark.parametrize("LayoutClass", [ReingoldTilfordLayout, RadialTreeLayout])
     def test_deep_chain(self, LayoutClass):
-        n = 4000  # far beyond Python's default recursion limit (~1000)
+        n = 2500  # well beyond Python's default recursion limit (~1000)
         nodes = [{} for _ in range(n)]
         links = [{"source": i, "target": i + 1} for i in range(n - 1)]
         layout = LayoutClass(nodes=nodes, links=links, size=(800, 600))

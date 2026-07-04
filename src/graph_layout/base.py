@@ -13,10 +13,9 @@ from __future__ import annotations
 
 import random
 import sys
+import threading
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, TypeVar, cast
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -38,24 +37,61 @@ from .validation import (
     validate_link_indices,
 )
 
+_T = TypeVar("_T")
 
-@contextmanager
-def raised_recursion_limit(needed: int) -> Iterator[None]:
-    """Temporarily raise the interpreter recursion limit for a recursive walk.
+
+def run_deep_recursive(fn: Callable[[], _T], depth: int) -> _T:
+    """Run ``fn`` with headroom for a recursion up to ~``depth`` frames.
 
     Recursive tree layouts recurse to the depth of the tree, which for a
     degenerate (chain-like) tree equals the node count and can exceed Python's
-    default limit (~1000). This raises the limit for the duration and restores
-    it afterwards, with a ceiling so a pathological input cannot drive the
-    interpreter into a native-stack overflow.
+    default recursion limit (~1000). Simply raising ``sys.setrecursionlimit`` is
+    not safe: on platforms with a small native stack (Windows defaults to ~1 MB)
+    it lets the interpreter recurse past the C stack and hard-crash. Instead the
+    work runs in a worker thread with a large stack and a matching recursion
+    limit, which is safe everywhere. Shallow work runs inline to avoid the thread
+    overhead.
     """
-    current = sys.getrecursionlimit()
-    target = min(max(current, needed + 100), 12000)
-    sys.setrecursionlimit(target)
+    if depth <= 900:
+        return fn()
+
+    needed_limit = depth + 100
+    box: dict[str, Any] = {}
+
+    def worker() -> None:
+        old_limit = sys.getrecursionlimit()
+        sys.setrecursionlimit(max(old_limit, needed_limit))
+        try:
+            box["value"] = fn()
+        except BaseException as exc:  # re-raised on the calling thread
+            box["error"] = exc
+        finally:
+            sys.setrecursionlimit(old_limit)
+
+    # Size the worker stack for the recursion depth (~16 KiB/frame is generous),
+    # rounded up to a page and capped.
+    page = 4096
+    raw = min(max(16 * 1024 * 1024, needed_limit * 16 * 1024), 512 * 1024 * 1024)
+    stack_bytes = ((raw + page - 1) // page) * page
+
+    previous = threading.stack_size()
     try:
-        yield
+        try:
+            threading.stack_size(stack_bytes)
+        except (ValueError, RuntimeError):
+            pass  # platform refused the size; fall back to the default stack
+        thread = threading.Thread(target=worker)
+        thread.start()
+        thread.join()
     finally:
-        sys.setrecursionlimit(current)
+        try:
+            threading.stack_size(previous)
+        except (ValueError, RuntimeError):
+            pass
+
+    if "error" in box:
+        raise box["error"]
+    return cast(_T, box["value"])
 
 
 class BaseLayout(ABC):

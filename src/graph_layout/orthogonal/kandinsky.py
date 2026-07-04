@@ -44,7 +44,9 @@ from .compaction_ilp import (
     is_scipy_available,
 )
 from .edge_routing import _ensure_orthogonal, route_all_edges
+from .expansion import Expansion
 from .orthogonalization import (
+    Face,
     OrthogonalRepresentation,
     compute_orthogonal_representation,
 )
@@ -53,6 +55,7 @@ from .planarization import (
     PlanarizedGraph,
     planarize_graph,
 )
+from .realization import bend_optimal_representation, realize_bend_optimal_drawing
 from .types import (
     NodeBox,
     OrthogonalEdge,
@@ -123,6 +126,7 @@ class KandinskyLayout(StaticLayout):
         layer_separation: float = 80,
         handle_crossings: bool = True,
         optimize_bends: bool = True,
+        bend_optimal: bool = False,
         compact: bool = True,
         compaction_method: str = "auto",
         embedder: Optional[PlanarEmbedder] = None,
@@ -148,9 +152,20 @@ class KandinskyLayout(StaticLayout):
             handle_crossings: If True, detect and handle edge crossings by inserting
                 dummy vertices. This allows non-planar graphs to be drawn without
                 edge overlaps.
-            optimize_bends: If True, use min-cost flow algorithm to minimize the
-                number of bends in edge routing. This produces cleaner layouts but
-                takes more computation time.
+            optimize_bends: If True, compute the bend-minimal orthogonal
+                representation via min-cost flow. It is exposed through the
+                ``orthogonal_rep`` property and is what ``bend_optimal`` draws
+                from. The default hierarchical router does not itself consume it,
+                so with ``bend_optimal=False`` this only populates the property.
+            bend_optimal: If True, draw directly from the bend-minimal
+                representation (Topology-Shape-Metrics) instead of the
+                hierarchical heuristic router -- a compact orthogonal drawing
+                with the provably minimum number of bends. Covers connected
+                planar graphs, including degree > 4 (drawn as cage boxes) and
+                bridges / cut vertices. Falls back to the heuristic router for
+                non-planar input (edge crossings) or when the representation is
+                not realizable; ``used_bend_optimal`` reports which path ran.
+                Default False preserves the layered hierarchical layout.
             compact: If True, apply compaction to reduce the total area of the
                 layout while maintaining node separation and edge routing.
             compaction_method: Method to use for compaction. Options:
@@ -185,6 +200,7 @@ class KandinskyLayout(StaticLayout):
         self._layer_separation = float(layer_separation)
         self._handle_crossings = bool(handle_crossings)
         self._optimize_bends = bool(optimize_bends)
+        self._bend_optimal = bool(bend_optimal)
         self._compact = bool(compact)
         self._compaction_method = compaction_method
         self._embedder: PlanarEmbedder = embedder or MaxFaceEmbedder()
@@ -197,7 +213,14 @@ class KandinskyLayout(StaticLayout):
         self._planarized_graph: Optional[PlanarizedGraph] = None
         self._crossing_vertices: list[CrossingVertex] = []
         self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
+        self._faces: list[Face] = []
+        self._expansion: Optional[Expansion] = None
         self._compaction_result: Optional[CompactionResult] = None
+        # Whether the last run drew from the bend-minimal representation (True)
+        # rather than the hierarchical heuristic router. Requesting
+        # bend_optimal=True does not guarantee it: non-planar / non-realizable
+        # inputs silently fall back.
+        self._used_bend_optimal = False
 
         # Port constraints: maps (source, target) to (source_side, target_side)
         self._port_constraints: dict[tuple[int, int], PortConstraint] = {}
@@ -296,6 +319,28 @@ class KandinskyLayout(StaticLayout):
     def optimize_bends(self, value: bool) -> None:
         """Set whether to optimize bends."""
         self._optimize_bends = bool(value)
+
+    @property
+    def bend_optimal(self) -> bool:
+        """Whether drawing from the bend-minimal representation was *requested*
+        (see :attr:`used_bend_optimal` for whether it was actually applied)."""
+        return self._bend_optimal
+
+    @bend_optimal.setter
+    def bend_optimal(self, value: bool) -> None:
+        self._bend_optimal = bool(value)
+
+    @property
+    def used_bend_optimal(self) -> bool:
+        """Whether the last :meth:`run` drew from the bend-minimal representation
+        (True) rather than the hierarchical heuristic router.
+
+        Requesting ``bend_optimal=True`` does not guarantee it: the drawing must
+        be planar (no crossing dummies) and the representation must be a
+        realizable shape, so non-planar or non-realizable inputs fall back to the
+        heuristic router. This flag exposes that otherwise-silent fallback.
+        """
+        return self._used_bend_optimal
 
     @property
     def orthogonal_rep(self) -> Optional[OrthogonalRepresentation]:
@@ -418,6 +463,8 @@ class KandinskyLayout(StaticLayout):
 
     def _compute(self, **kwargs: Any) -> None:
         """Compute Kandinsky orthogonal layout."""
+        self._used_bend_optimal = False
+        self._expansion = None
         n = len(self._nodes)
         if n == 0:
             return
@@ -443,16 +490,17 @@ class KandinskyLayout(StaticLayout):
         if self._handle_crossings:
             self._planarize()
 
-        # Phase 3: Orthogonalization - compute optimal bend assignment
-        if self._optimize_bends:
+        # Phase 3: Orthogonalization - compute the bend-minimal representation.
+        if self._optimize_bends or self._bend_optimal:
             self._compute_orthogonal_rep()
 
-        # Phase 4: Assign ports and route edges
-        self._route_edges()
-
-        # Phase 5: Compaction - reduce layout area
-        if self._compact:
-            self._apply_compaction()
+        # Phase 4: If requested and the representation is realizable (planar, no
+        # crossing dummies), draw directly from it; otherwise route heuristically.
+        self._used_bend_optimal = self._bend_optimal and self._apply_bend_optimal_drawing()
+        if not self._used_bend_optimal:
+            self._route_edges()
+            if self._compact:
+                self._apply_compaction()
 
         # Update node positions from boxes
         for i, box in enumerate(self._node_boxes):
@@ -460,13 +508,61 @@ class KandinskyLayout(StaticLayout):
                 self._nodes[i].x = box.x
                 self._nodes[i].y = box.y
 
+    def _apply_bend_optimal_drawing(self) -> bool:
+        """Draw from the orthogonal representation via the shared realizer.
+
+        Only attempted for planar drawings (no crossing dummy vertices); the
+        non-planar case stays on the heuristic router, which routes through the
+        crossing vertices. Returns False -- leaving the heuristic pipeline to
+        run -- when there are crossings or the representation is not a
+        realizable shape, so the drawing never regresses.
+        """
+        n = len(self._nodes)
+        if n == 0:
+            return False
+        # Crossing dummies mean the drawing is non-planar; the realizer needs a
+        # planar shape, so fall back to the heuristic router in that case.
+        if self._planarized_graph is not None and self._planarized_graph.crossings:
+            return False
+
+        link_endpoints = [
+            (self._get_source_index(link), self._get_target_index(link)) for link in self._links
+        ]
+        node_sizes = [
+            (
+                float(getattr(self._nodes[i], "width", None) or self._node_width),
+                float(getattr(self._nodes[i], "height", None) or self._node_height),
+            )
+            for i in range(n)
+        ]
+        cell = max(self._node_width, self._node_height) + self._node_separation
+
+        result = realize_bend_optimal_drawing(
+            num_nodes=n,
+            link_endpoints=link_endpoints,
+            node_sizes=node_sizes,
+            orthogonal_rep=self._orthogonal_rep,
+            faces=self._faces,
+            expansion=self._expansion,
+            canvas_size=self._canvas_size,
+            cell=cell,
+        )
+        if result is None:
+            return False
+        self._node_boxes, self._orthogonal_edges = result
+        return True
+
     def _compute_orthogonal_rep(self) -> None:
         """
-        Compute optimal orthogonal representation using min-cost flow.
+        Compute the bend-minimal orthogonal representation via min-cost flow.
 
-        When the graph is planar, uses the configured embedder to obtain
-        a combinatorial embedding before running bend minimization.
-        Falls back to position-based face computation otherwise.
+        When the graph is planar, uses the configured embedder to obtain a
+        combinatorial embedding before running bend minimization. Vertices of
+        degree > 4 are expanded into cage cycles when ``bend_optimal`` is set
+        (so the drawing can realize them); the representation and faces then
+        describe the expanded graph and ``self._expansion`` holds the mapping
+        back. Falls back to position-based face computation when no planar
+        embedding is available.
         """
         n = len(self._nodes)
         if n == 0 or not self._node_boxes:
@@ -487,12 +583,21 @@ class KandinskyLayout(StaticLayout):
         except (ValueError, AttributeError):
             pass
 
-        if embedding is not None:
-            self._orthogonal_rep = compute_orthogonal_representation(n, edges, embedding=embedding)
-        else:
-            # Fallback: use position-based face computation
+        if embedding is None:
+            # Fallback: use position-based face computation (not realizable, so
+            # only ever informs the ``orthogonal_rep`` property).
             positions = [(box.x, box.y) for box in self._node_boxes[:n]]
             self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
+            self._faces = []
+            self._expansion = None
+            return
+
+        rep, faces, expansion = bend_optimal_representation(
+            n, edges, embedding, allow_expansion=self._bend_optimal
+        )
+        self._orthogonal_rep = rep
+        self._faces = faces
+        self._expansion = expansion
 
     def _apply_compaction(self) -> None:
         """

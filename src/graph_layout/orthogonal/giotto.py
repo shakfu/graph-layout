@@ -33,23 +33,16 @@ from ..types import (
 from .compaction import CompactionResult, compact_layout
 from .compaction_flow import compact_layout_flow, compact_layout_longest_path
 from .edge_routing import route_all_edges
-from .expansion import Expansion, cage_face_indices, expand_high_degree
+from .expansion import Expansion
 from .orthogonalization import (
     Face,
     OrthogonalRepresentation,
-    build_flow_network,
     compute_faces,
     compute_orthogonal_representation,
-    flow_to_orthogonal_rep,
-    solve_min_cost_flow_simple,
 )
 from .planarization import is_planar_quick_check
-from .types import NodeBox, OrthogonalEdge, Port, Side
-
-
-def _opp(direction: int) -> int:
-    """Opposite compass direction (metrics quarter-turn encoding)."""
-    return (direction + 2) % 4
+from .realization import bend_optimal_representation, realize_bend_optimal_drawing
+from .types import NodeBox, OrthogonalEdge, Side
 
 
 class GIOTTOLayout(StaticLayout):
@@ -428,167 +421,43 @@ class GIOTTOLayout(StaticLayout):
                 self._nodes[i].y = box.y
 
     def _apply_bend_optimal_drawing(self) -> bool:
-        """Draw from the orthogonal representation via Topology-Shape-Metrics.
+        """Draw from the orthogonal representation via the shared realizer.
 
-        Computes the shape (compass direction of every segment) and integer
-        coordinates, then scales them onto the canvas, rebuilding ``node_boxes``
-        (centered on the grid points; expanded degree > 4 vertices become boxes
-        spanning their cage rectangle) and ``orthogonal_edges`` (ports on box
-        sides, bends from the route). Returns False -- leaving the heuristic
-        pipeline to run -- when the representation is not a realizable shape,
-        so the drawing never regresses.
+        Delegates to :func:`realization.realize_bend_optimal_drawing`, which
+        computes the shape and integer coordinates and scales them onto the
+        canvas. Returns False -- leaving the heuristic pipeline to run -- when
+        the representation is not a realizable shape, so the drawing never
+        regresses.
         """
-        from .metrics import (
-            EAST,
-            NORTH,
-            SOUTH,
-            WEST,
-            compute_coordinates,
-            compute_orthogonal_shape,
-        )
-
         n = len(self._nodes)
-        if not self._orthogonal_rep or not self._faces or n == 0:
+        if n == 0:
             return False
 
-        expansion = self._expansion
-
-        edges: list[tuple[int, int]] = []
-        for link in self._links:
-            src = self._get_source_index(link)
-            tgt = self._get_target_index(link)
-            if 0 <= src < n and 0 <= tgt < n and src != tgt:
-                edges.append((src, tgt))
-
-        shape = compute_orthogonal_shape(self._faces, self._orthogonal_rep)
-        if not shape.valid:
-            return False
-        coord_edges = expansion.edges if expansion is not None else edges
-        drawing = compute_coordinates(shape, coord_edges, faces=self._faces)
-        if not drawing.valid:
-            return False
-        # Every drawn vertex needs a position: all originals (minus the ones
-        # replaced by cages) plus every cage vertex.
-        needed: set[int] = set(range(n))
-        if expansion is not None:
-            needed -= set(expansion.cages.keys())
-            for ids in expansion.cages.values():
-                needed.update(ids)
-        if not needed.issubset(drawing.vertex_positions.keys()):
-            return False
-
-        # --- Scale the integer grid onto the canvas ------------------------
-        gxs = [p[0] for p in drawing.vertex_positions.values()]
-        gys = [p[1] for p in drawing.vertex_positions.values()]
-        for route in drawing.edge_routes.values():
-            gxs += [p[0] for p in route]
-            gys += [p[1] for p in route]
-        min_x, max_x = min(gxs), max(gxs)
-        min_y, max_y = min(gys), max(gys)
-
-        cell = max(self._node_width, self._node_height) + self._node_separation
-        span_x = (max_x - min_x) * cell
-        span_y = (max_y - min_y) * cell
-        canvas_w, canvas_h = self._canvas_size
-        off_x = (canvas_w - span_x) / 2.0
-        off_y = (canvas_h - span_y) / 2.0
-
-        def to_canvas(gx: float, gy: float) -> tuple[float, float]:
-            # Flip y so grid-North (+y) is up on screen (smaller screen y).
-            return (off_x + (gx - min_x) * cell, off_y + (max_y - gy) * cell)
-
-        dir_to_side = {EAST: Side.EAST, WEST: Side.WEST, NORTH: Side.NORTH, SOUTH: Side.SOUTH}
-
-        # Canonical dart per undirected edge, mirroring compute_coordinates:
-        # the stored route runs along the orientation the edge has in
-        # coord_edges, which need not match the link orientation.
-        canonical_dart: dict[tuple[int, int], tuple[int, int]] = {}
-        for u, v in coord_edges:
-            ckey = (min(u, v), max(u, v))
-            if (u, v) in shape.edge_shapes:
-                canonical_dart[ckey] = (u, v)
-            elif (v, u) in shape.edge_shapes:
-                canonical_dart[ckey] = (v, u)
-
-        # --- Rebuild node boxes -------------------------------------------
-        # Plain vertices are boxes centered on their grid point; expanded
-        # vertices become boxes spanning their cage rectangle (inflated by the
-        # base node size so ports stay on the box boundary).
-        self._node_boxes = []
-        for i in range(n):
-            node = self._nodes[i]
-            width = float(getattr(node, "width", None) or self._node_width)
-            height = float(getattr(node, "height", None) or self._node_height)
-            if expansion is not None and i in expansion.cages:
-                pts = [drawing.vertex_positions[c] for c in expansion.cages[i]]
-                gx_min, gx_max = min(p[0] for p in pts), max(p[0] for p in pts)
-                gy_min, gy_max = min(p[1] for p in pts), max(p[1] for p in pts)
-                cx, cy = to_canvas((gx_min + gx_max) / 2.0, (gy_min + gy_max) / 2.0)
-                width += (gx_max - gx_min) * cell
-                height += (gy_max - gy_min) * cell
-            else:
-                gx, gy = drawing.vertex_positions[i]
-                cx, cy = to_canvas(gx, gy)
-            self._node_boxes.append(NodeBox(index=i, x=cx, y=cy, width=width, height=height))
-
-        def port_fraction(box: NodeBox, side: Side, point: tuple[float, float]) -> float:
-            """Fraction along ``side`` of ``box`` where the port sits."""
-            if side in (Side.NORTH, Side.SOUTH):
-                span = box.width
-                frac = (point[0] - box.left) / span if span > 0 else 0.5
-            else:
-                span = box.height
-                frac = (point[1] - box.top) / span if span > 0 else 0.5
-            return min(1.0, max(0.0, frac))
-
-        # --- Build orthogonal edges from the routes ------------------------
-        # Cage cycle edges are not drawn (they are the box boundary).
-        self._orthogonal_edges = []
-        for edge_idx, link in enumerate(self._links):
-            src = self._get_source_index(link)
-            tgt = self._get_target_index(link)
-            if not (0 <= src < n and 0 <= tgt < n) or src == tgt:
-                continue
-            # Endpoints in the drawn (possibly expanded) graph.
-            if expansion is not None:
-                mapped = expansion.dart_map.get((src, tgt))
-                if mapped is None:
-                    continue
-                dsrc, dtgt = mapped
-            else:
-                dsrc, dtgt = src, tgt
-            key = (min(dsrc, dtgt), max(dsrc, dtgt))
-            edge_route = drawing.edge_routes.get(key)
-            dart = canonical_dart.get(key)
-            es = shape.edge_shapes.get(dart) if dart is not None else None
-            if edge_route is None or es is None or dart is None:
-                continue
-
-            # The canonical route runs dart.tail -> dart.head; orient it so it
-            # goes src -> tgt for this link.
-            pts = list(edge_route)
-            if dart[0] != dsrc:
-                pts = pts[::-1]
-            src_side = dir_to_side[
-                es.start_direction if dart[0] == dsrc else _opp(es.end_direction)
-            ]
-            tgt_side = dir_to_side[
-                _opp(es.end_direction) if dart[1] == dtgt else es.start_direction
-            ]
-
-            src_frac = port_fraction(self._node_boxes[src], src_side, to_canvas(*pts[0]))
-            tgt_frac = port_fraction(self._node_boxes[tgt], tgt_side, to_canvas(*pts[-1]))
-
-            interior = [to_canvas(gx, gy) for gx, gy in pts[1:-1]]
-            self._orthogonal_edges.append(
-                OrthogonalEdge(
-                    source=src,
-                    target=tgt,
-                    source_port=Port(node=src, side=src_side, position=src_frac, edge=edge_idx),
-                    target_port=Port(node=tgt, side=tgt_side, position=tgt_frac, edge=edge_idx),
-                    bends=interior,
-                )
+        link_endpoints = [
+            (self._get_source_index(link), self._get_target_index(link)) for link in self._links
+        ]
+        node_sizes = [
+            (
+                float(getattr(self._nodes[i], "width", None) or self._node_width),
+                float(getattr(self._nodes[i], "height", None) or self._node_height),
             )
+            for i in range(n)
+        ]
+        cell = max(self._node_width, self._node_height) + self._node_separation
+
+        result = realize_bend_optimal_drawing(
+            num_nodes=n,
+            link_endpoints=link_endpoints,
+            node_sizes=node_sizes,
+            orthogonal_rep=self._orthogonal_rep,
+            faces=self._faces,
+            expansion=self._expansion,
+            canvas_size=self._canvas_size,
+            cell=cell,
+        )
+        if result is None:
+            return False
+        self._node_boxes, self._orthogonal_edges = result
         return True
 
     def _compute_orthogonal_rep(self) -> None:
@@ -627,38 +496,15 @@ class GIOTTOLayout(StaticLayout):
             self._faces = compute_faces(n, edges, positions)
             return
 
-        expansion = expand_high_degree(n, embedding) if self._bend_optimal else None
-        if expansion is None:
-            self._orthogonal_rep = compute_orthogonal_representation(n, edges, embedding=embedding)
-            # Retain the faces (from the same embedding) so the shape stage can
-            # realize the representation without recomputing a possibly different
-            # face set.
-            self._faces = compute_faces(n, edges, embedding=embedding)
-            return
-
-        # Degree > 4: run the pipeline on the expanded graph, with cage faces
-        # forced rectangular and cage cycle edges kept straight (box sides).
-        faces = compute_faces(expansion.num_nodes, expansion.edges, embedding=expansion.embedding)
-        cage_faces = cage_face_indices(expansion, faces)
-        if cage_faces is None:
-            # Inconsistent expansion: leave the rep unset so drawing falls back.
-            self._orthogonal_rep = None
-            self._faces = []
-            return
-        network = build_flow_network(
-            expansion.num_nodes,
-            expansion.edges,
-            faces,
-            cage_faces=cage_faces,
-            rigid_edges=expansion.cage_edges,
+        # Expanding degree > 4 vertices into cages is only useful when we intend
+        # to draw from the representation (bend_optimal); otherwise keep the
+        # plain rep (exposed via the ``orthogonal_rep`` property).
+        rep, faces, expansion = bend_optimal_representation(
+            n, edges, embedding, allow_expansion=self._bend_optimal
         )
-        if not solve_min_cost_flow_simple(network):
-            self._orthogonal_rep = None
-            self._faces = []
-            return
-        self._expansion = expansion
-        self._orthogonal_rep = flow_to_orthogonal_rep(network, expansion.edges)
+        self._orthogonal_rep = rep
         self._faces = faces
+        self._expansion = expansion
 
     def _assign_layers(self) -> list[list[int]]:
         """

@@ -62,6 +62,7 @@ from .planarization import (
     planarize_graph,
     segments_intersect,
 )
+from .realization import bend_optimal_representation, realize_bend_optimal_drawing
 from .types import (
     BendDirection,
     EdgeSegment,
@@ -107,6 +108,9 @@ __all__ = [
     "solve_min_cost_flow_simple",
     "flow_to_orthogonal_rep",
     "compute_orthogonal_representation",
+    # Bend-optimal realization (shared TSM drawing stage)
+    "bend_optimal_representation",
+    "realize_bend_optimal_drawing",
     # Vertex expansion (degree > 4 cages)
     "Expansion",
     "expand_high_degree",

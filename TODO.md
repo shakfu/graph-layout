@@ -34,10 +34,18 @@ Together with rectangularization (`orthogonal/metrics.py:_rectangularize`),
 `GIOTTOLayout` draws from the bend-minimal orthogonal representation by
 default for **all connected planar graphs**; non-planar or disconnected inputs
 fall back to the heuristic router (`used_bend_optimal` reports which path
-ran).
+ran). The realization stage is shared (`orthogonal/realization.py`) and also
+drives `KandinskyLayout(bend_optimal=True)` (opt-in; default stays the layered
+hierarchical layout).
 
 Possible follow-ups (not planned):
 
+- [ ] **Kandinsky bend-optimal through crossings**: realize the *planarized*
+  graph so non-planar `KandinskyLayout(bend_optimal=True)` inputs also draw
+  bend-optimally. Needs the crossing-dummy gadget (degree-4 vertices whose two
+  original edges pass straight through) and reassembling each original edge's
+  polyline through its crossing points; today crossings fall back to the
+  heuristic router.
 - [ ] True Kandinsky 0-degree-angle flow model (bend-minimal in the Kandinsky
   metric proper, rather than over the expanded graph)
 - [ ] Disconnected graphs: per-component TSM drawing + component packing

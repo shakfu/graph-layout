@@ -5,6 +5,8 @@ Renders side-by-side SVG comparisons that make the changes visible:
 
   * GIOTTO ``bend_optimal`` (Topology-Shape-Metrics) vs the routing heuristic --
     the bend-minimal orthogonal representation now drives the drawing.
+  * Kandinsky ``bend_optimal`` -- the same shared realizer, opt-in, drops the
+    heuristic router's bend count to the provable minimum on planar graphs.
   * GIOTTO bend-optimal beyond the original biconnected max-degree-4 domain:
     bridges / cut vertices (per-corner angles, H6a) and degree > 4 vertices
     (cage expansion, H5) now draw bend-optimally too.
@@ -32,7 +34,7 @@ from __future__ import annotations
 from html import escape
 from pathlib import Path
 
-from graph_layout import GIOTTOLayout, Group, Link, Node, SugiyamaLayout
+from graph_layout import GIOTTOLayout, Group, KandinskyLayout, Link, Node, SugiyamaLayout
 from graph_layout.cola import Layout as ColaLayout
 from graph_layout.orthogonal.edge_routing import nudge_overlapping_segments
 from graph_layout.orthogonal.planarization import planarize_graph
@@ -336,6 +338,17 @@ def _giotto(n, edges, bend_optimal):
     return layout
 
 
+def _kandinsky(n, edges, bend_optimal):
+    layout = KandinskyLayout(
+        nodes=[{} for _ in range(n)],
+        links=[{"source": u, "target": v} for u, v in edges],
+        size=(600, 500),
+        bend_optimal=bend_optimal,
+    )
+    layout.run()
+    return layout
+
+
 def _section_giotto() -> str:
     rows = []
     for name, (n, edges) in GRAPHS.items():
@@ -358,6 +371,41 @@ def _section_giotto() -> str:
         "(now the default) the representation drives the drawing; it covers every "
         "connected planar graph and falls back safely only for non-planar or "
         "disconnected input.",
+        "".join(rows),
+    )
+
+
+def _section_kandinsky() -> str:
+    rows = []
+    for name, (n, edges) in GRAPHS.items():
+        heur = _kandinsky(n, edges, False)
+        opt = _kandinsky(n, edges, True)
+        hb = _total_bends(heur)
+        ob = _total_bends(opt)
+        rows.append(
+            '<div class="pair">'
+            + _orthogonal_svg(
+                heur,
+                f"{name} - default (hierarchical)",
+                f"{hb} bends (heuristic router)",
+            )
+            + _orthogonal_svg(
+                opt,
+                f"{name} - bend_optimal=True",
+                f"{ob} bends (bend-minimal) | {hb - ob} fewer",
+            )
+            + "</div>"
+        )
+    return _block(
+        "Kandinsky: opt-in bend-optimal drawing (shared realizer)",
+        "KandinskyLayout computed the bend-minimal orthogonal representation but "
+        "then discarded it -- every drawing came from the hierarchical heuristic "
+        "router, which bends far more than necessary. The Topology-Shape-Metrics "
+        "realization that drives GIOTTO was extracted into a shared module and "
+        "wired into Kandinsky behind an opt-in bend_optimal flag. With "
+        "bend_optimal=True the same graph is drawn from the representation with "
+        "the provably minimum number of bends (the default stays the layered "
+        "hierarchical layout). Non-planar input falls back to the heuristic router.",
         "".join(rows),
     )
 
@@ -843,6 +891,7 @@ def main() -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     sections = (
         _section_giotto()
+        + _section_kandinsky()
         + _section_extended_domain()
         + _section_nudging()
         + _section_cola()

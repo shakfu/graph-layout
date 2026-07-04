@@ -911,6 +911,7 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
                 <li><strong>Port Constraints:</strong> User-specified edge exit/entry sides</li>
                 <li><strong>ILP Compaction:</strong> Optimal area minimization (requires scipy)</li>
                 <li><strong>GIOTTO:</strong> Bend-optimal orthogonal (connected planar graphs)</li>
+                <li><strong>Kandinsky bend-optimal:</strong> Opt-in bend-minimal drawing</li>
             </ul>
         </div>
 """
@@ -1401,6 +1402,37 @@ def main() -> None:
                                 border_color="#667eea",
                             )
                         )
+                    except Exception as e:
+                        print(f"      Error: {e}")
+
+                    # Bend-optimal variant: draw from the bend-minimal
+                    # representation (shared Topology-Shape-Metrics realizer).
+                    # Only shown when it applied (planar graphs); it drops the
+                    # heuristic router's bend count to the provable minimum.
+                    try:
+                        print("    + Kandinsky (bend-optimal)...")
+                        bo_layout = KandinskyLayout(
+                            nodes=[{} for _ in nodes],
+                            links=[{"source": l["source"], "target": l["target"]} for l in links],
+                            size=(SVG_WIDTH, SVG_HEIGHT - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM),
+                            bend_optimal=True,
+                            **spec.params,
+                        )
+                        bo_layout.run()
+                        if bo_layout.used_bend_optimal:
+                            n_bends_bo = sum(len(e.bends) for e in bo_layout.orthogonal_edges)
+                            svgs.append(
+                                orthogonal_layout_to_svg(
+                                    bo_layout,
+                                    "Kandinsky (bend-optimal)",
+                                    f"Default: {n_bends_default} bends"
+                                    f"  |  bend_optimal: {n_bends_bo} bends",
+                                    graph_name,
+                                    border_color="#27ae60",
+                                )
+                            )
+                        else:
+                            print("      (fell back to heuristic; not shown)")
                     except Exception as e:
                         print(f"      Error: {e}")
 

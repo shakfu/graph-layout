@@ -10,8 +10,15 @@
 > superset of kitty-corner saturation -- simpler, always correct, at the cost
 > of some extra (undrawn) constraints. Verified 100% clean over 1500 random
 > in-domain graphs across 5 seeds (was ~94.5%); `bend_optimal` is now
-> GIOTTOLayout's default. Kept for the reference material and the definition
-> of the remaining domain extensions (H5, H6a).
+> GIOTTOLayout's default. Kept for the reference material.
+>
+> The domain extensions defined here have since been implemented as well:
+> **H6a** (bridges / cut vertices) via per-corner angles keyed by the incoming
+> dart plus zero-min-length splitting of 360-degree corners
+> (`tests/test_tsm_nonbiconnected.py`), and **H5** (degree > 4) via vertex
+> expansion into rectangle-constrained cages (`orthogonal/expansion.py`,
+> `tests/test_tsm_expansion.py`) rather than the Kandinsky 0-degree-angle flow
+> model. The bend-minimal drawing now covers all connected planar graphs.
 
 ## Goal
 

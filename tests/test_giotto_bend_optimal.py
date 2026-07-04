@@ -106,14 +106,17 @@ def test_bend_optimal_draws_grids():
             assert _all_edges_orthogonal(layout), f"grid {w}x{h}: non-orthogonal"
 
 
-def test_bend_optimal_falls_back_out_of_domain():
-    """A degree-5 vertex is out of the model's domain: fall back, do not crash."""
+def test_bend_optimal_handles_degree_5_via_expansion():
+    """A degree-5 vertex used to force the heuristic fallback; vertex expansion
+    (cages) now keeps it in the bend-optimal domain."""
     edges = [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (2, 3), (3, 4), (4, 1)]  # hub degree 4..5
     edges.append((0, 5))
     edges.append((1, 5))  # push a vertex past degree 4
     n = 6
     layout = _layout(n, edges, bend_optimal=True)
-    assert len(layout.node_boxes) == n  # produced a drawing via fallback
+    assert len(layout.node_boxes) == n
+    assert layout.used_bend_optimal is True
+    assert _all_edges_orthogonal(layout)
 
 
 def test_bend_optimal_falls_back_on_conflicting_drawing():
@@ -149,9 +152,13 @@ def test_used_bend_optimal_signal():
     # Explicitly disabled -> heuristic, not used.
     assert _layout(4, k4, bend_optimal=False).used_bend_optimal is False
 
-    # Out of domain (degree 5) -> silent fallback, not used.
+    # Degree 5 is handled by vertex expansion (cages) since H5.
     deg5 = [(0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (1, 2)]
-    assert _layout(6, deg5, bend_optimal=True).used_bend_optimal is False
+    assert _layout(6, deg5, bend_optimal=True).used_bend_optimal is True
+
+    # Out of domain (non-planar K5) -> silent fallback, not used.
+    k5 = [(i, j) for i in range(5) for j in range(i + 1, 5)]
+    assert _layout(5, k5, bend_optimal=True).used_bend_optimal is False
 
     # In-domain graph whose plain coordinate assignment used to cross:
     # rectangularization now separates the conflicting features, so the

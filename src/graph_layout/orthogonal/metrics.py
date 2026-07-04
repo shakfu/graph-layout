@@ -21,13 +21,16 @@ turns around any bounded face sum to +4 (the outer face to -4).
 This module implements only the shape step. Coordinate assignment and wiring
 into the GIOTTO / Kandinsky layouts build on the ``EdgeShape`` results here.
 
-Scope: the orthogonalization flow model (and hence a realizable shape) is
-defined for biconnected planar graphs of maximum degree 4. Outside that domain
-the representation is not a valid orthogonal shape -- a vertex of degree > 4
-makes the flow infeasible (it needs the Kandinsky 0-degree-angle model), and
-bridges / cut vertices give faces with repeated vertices. In those cases the
-representation's face turns do not sum to +/-4, ``compute_orthogonal_shape``
-returns ``valid=False``, and callers should fall back to a heuristic router.
+Scope: connected planar graphs of maximum degree 4, biconnected or not.
+Bridges and cut vertices are handled by per-corner angles (angles keyed by the
+incoming dart, since a face walk may visit a vertex more than once), and
+degree-1 vertices put 360-degree corners on the walk, which rectangularization
+splits with zero-min-length virtual darts. Vertices of degree > 4 are outside
+this module's model and are handled upstream by vertex expansion into cages
+(see :mod:`.expansion`). When a representation is not a realizable shape (e.g.
+extracted from an infeasible flow, or a disconnected input),
+``compute_orthogonal_shape`` returns ``valid=False`` and callers should fall
+back to a heuristic router.
 """
 
 from __future__ import annotations
@@ -80,9 +83,9 @@ class ShapeResult:
     """Result of the shape computation.
 
     ``valid`` is False when the representation could not be realized as a
-    consistent orthogonal shape (e.g. a degenerate or inconsistent rep, or a
-    cut vertex whose per-corner angles collide in ``vertex_face_angles``); in
-    that case callers should fall back to a heuristic router.
+    consistent orthogonal shape (e.g. a degenerate or inconsistent rep, or
+    angles that do not sum to 360 degrees around every vertex); in that case
+    callers should fall back to a heuristic router.
     """
 
     valid: bool
@@ -122,6 +125,24 @@ def compute_orthogonal_shape(
     if not faces:
         return ShapeResult(valid=False, reason="no faces")
 
+    # Pre-validate the angle assignment: every corner needs an angle in
+    # 1..4 quarter turns, and the angles around each vertex must sum to a
+    # full 360 degrees (4 units). This catches representations extracted
+    # from infeasible flows (e.g. degree > 4) whose face turns can happen
+    # to close up even though the assignment is geometric nonsense.
+    vertex_angle_sum: dict[int, int] = {}
+    for face in faces:
+        for dart in face.edges:
+            angle = rep.corner_angle(dart, face.index)
+            if angle is None or not (1 <= angle <= 4):
+                return ShapeResult(
+                    valid=False, reason=f"missing or out-of-range angle at corner {dart}"
+                )
+            vertex_angle_sum[dart[1]] = vertex_angle_sum.get(dart[1], 0) + angle
+    for v, total in vertex_angle_sum.items():
+        if total != 4:
+            return ShapeResult(valid=False, reason=f"angles at vertex {v} sum to {total} != 4")
+
     dart_face = _face_of_each_dart(faces)
     faces_by_index = {f.index: f for f in faces}
 
@@ -154,8 +175,10 @@ def compute_orthogonal_shape(
             i = (start_idx + step) % k
             cur = darts[i]
             nxt = darts[(i + 1) % k]
-            corner_vertex = cur[1]  # cur = (a, b), nxt = (b, c); corner at b
-            angle = rep.vertex_face_angles.get((corner_vertex, face.index))
+            # cur = (a, b), nxt = (b, c); the corner at b is keyed by the
+            # incoming dart cur (unique even when b borders the face several
+            # times, as at cut vertices / bridges).
+            angle = rep.corner_angle(cur, face.index)
             if angle is None:
                 return False
             arr = arrival_direction(cur)
@@ -239,8 +262,14 @@ _Dart = tuple[_PointKey, _PointKey, int]
 
 
 def _signed_turn(d_in: int, d_out: int) -> int:
-    """Turn at a corner: +1 convex (left), 0 flat, -1 reflex (right), 2 U-turn."""
-    return {0: 0, 1: 1, 3: -1}.get((d_out - d_in) % 4, 2)
+    """Turn at a corner: +1 convex (left), 0 flat, -1 reflex (right), -2 U-turn.
+
+    A direction reversal is ambiguous (+2 or -2) from directions alone, but in
+    this flow model corner angles are always in 1..4 quarter turns (0-degree
+    Kandinsky angles do not occur), so a reversal is always a 360-degree corner
+    -- the face walk turning around a degree-1 vertex -- with turn 2 - 4 = -2.
+    """
+    return {0: 0, 1: 1, 3: -1}.get((d_out - d_in) % 4, -2)
 
 
 def _walk_turns(walk: list[_Dart]) -> list[int]:
@@ -280,8 +309,6 @@ def _build_face_walks(
         if not walk:
             return None
         turns = _walk_turns(walk)
-        if any(t == 2 for t in turns):
-            return None
         total = sum(turns)
         if face.is_outer:
             if total != -4 or outer is not None:
@@ -292,6 +319,45 @@ def _build_face_walks(
                 return None
             bounded.append(walk)
     return bounded, outer
+
+
+def _split_uturn_corners(
+    walk: list[_Dart],
+    counter: "itertools.count[int]",
+    zero_pairs: set[tuple[_PointKey, _PointKey]],
+) -> tuple[list[_Dart], list[_Dart]]:
+    """Replace every 360-degree (U-turn) corner by two reflex corners.
+
+    A face walk turns by -2 around a degree-1 vertex (the two sides of a
+    pendant edge are the same face). Refinement only handles -1 corners, so
+    each -2 corner at point P (incoming direction ``d``) is split by inserting
+    a virtual zero-min-length dart (P, E) in direction ``d - 1``: the turns
+    become d -> d-1 (-1) and d-1 -> d+2 (-1), preserving the walk's turn sum.
+    The dart is emitted as a coordinate constraint of minimum length 0, so E
+    coincides with P on the pendant edge's axis (perpendicular equality) and
+    may only be pushed sideways when the dissection genuinely needs room.
+
+    Returns the rewritten walk and the inserted virtual darts.
+    """
+    turns = _walk_turns(walk)
+    if all(t != -2 for t in turns):
+        return walk, []
+    m = len(walk)
+    new_walk: list[_Dart] = []
+    eps_darts: list[_Dart] = []
+    for i in range(m):
+        if turns[i] == -2:
+            p_pt = walk[i][0]
+            d_in = walk[(i - 1) % m][2]
+            e_pt: _PointKey = ("d", next(counter))
+            eps = (p_pt, e_pt, (d_in + 3) % 4)
+            eps_darts.append(eps)
+            zero_pairs.add((p_pt, e_pt))
+            new_walk.append(eps)
+            new_walk.append((e_pt, walk[i][1], walk[i][2]))
+        else:
+            new_walk.append(walk[i])
+    return new_walk, eps_darts
 
 
 def _enclose_outer(
@@ -353,7 +419,9 @@ def _enclose_outer(
 
 
 def _refine_to_rectangles(
-    walks: list[list[_Dart]], counter: "itertools.count[int]"
+    walks: list[list[_Dart]],
+    counter: "itertools.count[int]",
+    zero_pairs: Optional[set[tuple[_PointKey, _PointKey]]] = None,
 ) -> Optional[list[_Dart]]:
     """Dissect bounded faces until none has a reflex corner.
 
@@ -363,7 +431,13 @@ def _refine_to_rectangles(
     entering P. Every refinement removes one reflex corner and introduces none,
     so this terminates with every face a rectangle. Returns the dummy darts
     (segment constraints), or None on any anomaly.
+
+    ``zero_pairs`` marks darts with minimum length 0 (the virtual U-turn split
+    darts); splitting such a dart propagates the marker to both halves so the
+    dissection never forces a pendant edge apart.
     """
+    if zero_pairs is None:
+        zero_pairs = set()
     extra: list[_Dart] = []
     stack = [w for w in walks]
     guard = sum(len(w) for w in walks) * 8 + 64
@@ -376,8 +450,8 @@ def _refine_to_rectangles(
         if m < 4:
             continue
         turns = _walk_turns(walk)
-        if any(t == 2 for t in turns):
-            return None
+        if any(t == -2 for t in turns):
+            return None  # U-turns must have been split before refinement
         if -1 not in turns:
             continue  # turn-regular (rectangle up to flat corners): done
         k = turns.index(-1)
@@ -398,6 +472,9 @@ def _refine_to_rectangles(
 
         a_pt, b_pt, front_dir = walk[front]
         w_pt: _PointKey = ("d", next(counter))
+        if (a_pt, b_pt) in zero_pairs:
+            zero_pairs.add((a_pt, w_pt))
+            zero_pairs.add((w_pt, b_pt))
         extra.append((a_pt, w_pt, front_dir))
         extra.append((w_pt, b_pt, front_dir))
         extra.append((reflex_point, w_pt, d_in))
@@ -422,19 +499,35 @@ def _rectangularize(
     shape: ShapeResult,
     darts: dict[tuple[int, int], tuple[int, int]],
     edge_chain: dict[tuple[int, int], list[_PointKey]],
-) -> Optional[list[_Dart]]:
+) -> Optional[tuple[list[_Dart], set[tuple[_PointKey, _PointKey]]]]:
     """Compute the dummy separation darts that make every face a rectangle.
 
     Returns the full list of dummy darts (enclosing rectangle + refinement
-    projections) to feed into the axis constraint systems, or None if the input
-    is out of domain -- callers then fall back to the unrefined assignment.
+    projections + virtual U-turn splits) to feed into the axis constraint
+    systems, together with the set of darts that carry minimum length 0 (the
+    U-turn splits), or None if the input is out of domain -- callers then fall
+    back to the unrefined assignment.
     """
     built = _build_face_walks(faces, shape, darts, edge_chain)
     if built is None:
         return None
     bounded, outer = built
     counter = itertools.count()
+    zero_pairs: set[tuple[_PointKey, _PointKey]] = set()
     dummy: list[_Dart] = []
+
+    # Split 360-degree corners (pendant edges) before enclosure / refinement,
+    # which only handle turns in {-1, 0, +1}.
+    split_bounded: list[list[_Dart]] = []
+    for walk in bounded:
+        new_walk, eps_darts = _split_uturn_corners(walk, counter, zero_pairs)
+        dummy.extend(eps_darts)
+        split_bounded.append(new_walk)
+    bounded = split_bounded
+    if outer is not None:
+        outer, eps_darts = _split_uturn_corners(outer, counter, zero_pairs)
+        dummy.extend(eps_darts)
+
     if outer is not None:
         enclosed = _enclose_outer(outer, counter)
         if enclosed is None:
@@ -442,11 +535,11 @@ def _rectangularize(
         annulus, rect_darts = enclosed
         bounded = bounded + annulus
         dummy.extend(rect_darts)
-    refined = _refine_to_rectangles(bounded, counter)
+    refined = _refine_to_rectangles(bounded, counter, zero_pairs)
     if refined is None:
         return None
     dummy.extend(refined)
-    return dummy
+    return dummy, zero_pairs
 
 
 @dataclass
@@ -486,17 +579,20 @@ class _UnionFind:
 
 def _assign_axis(
     n_points: int,
-    segments: list[tuple[int, int, int]],
+    segments: list[tuple[int, int, int, int]],
     horizontal: bool,
     spread: bool = False,
 ) -> Optional[dict[int, int]]:
     """Assign one integer coordinate per point.
 
-    For the x axis (``horizontal=True``): vertical segments (N/S) force equal x
-    on their endpoints; horizontal segments (E/W) order the resulting classes
-    (East increases x). The y axis is symmetric. Returns None on a contradiction
-    (two points forced equal yet ordered) or a cycle (not possible for a valid
-    orthogonal shape).
+    ``segments`` entries are ``(a, b, direction, min_length)``. For the x axis
+    (``horizontal=True``): vertical segments (N/S) force equal x on their
+    endpoints; horizontal segments (E/W) order the resulting classes (East
+    increases x) with the given minimum length -- 1 for real and dissection
+    segments, 0 for the virtual U-turn split darts, which only pin a dummy
+    point to its pendant edge without forcing separation. Returns None on a
+    contradiction (two points forced equal yet strictly ordered) or a cycle
+    (not possible for a valid orthogonal shape).
 
     ``spread=False`` packs coordinates with longest-path (compact). ``spread=True``
     gives every class a distinct coordinate by topological rank, which separates
@@ -508,24 +604,28 @@ def _assign_axis(
     increasing = EAST if horizontal else NORTH
 
     uf = _UnionFind(n_points)
-    for a, b, d in segments:
+    for a, b, d, _w in segments:
         if d in equal_dirs:
             uf.union(a, b)
 
     classes = {uf.find(i) for i in range(n_points)}
-    adj: dict[int, set[int]] = {c: set() for c in classes}
+    adj: dict[int, dict[int, int]] = {c: {} for c in classes}  # lo -> {hi: min_length}
     indeg: dict[int, int] = {c: 0 for c in classes}
-    for a, b, d in segments:
+    for a, b, d, w in segments:
         if d not in order_dirs:
             continue
         ca, cb = uf.find(a), uf.find(b)
         # Edge points from the smaller coordinate to the larger.
         lo, hi = (ca, cb) if d == increasing else (cb, ca)
         if lo == hi:
-            return None  # equal class but ordered -> contradiction
+            if w > 0:
+                return None  # equal class but strictly ordered -> contradiction
+            continue  # zero-min-length within one class: trivially satisfied
         if hi not in adj[lo]:
-            adj[lo].add(hi)
+            adj[lo][hi] = w
             indeg[hi] += 1
+        else:
+            adj[lo][hi] = max(adj[lo][hi], w)
 
     coord = {c: 0 for c in classes}
     queue = deque(sorted(c for c in classes if indeg[c] == 0))
@@ -538,9 +638,9 @@ def _assign_axis(
             # Distinct coordinate per class, in topological order.
             coord[c] = max(coord[c], next_rank)
             next_rank = coord[c] + 1
-        for nb in adj[c]:
-            if coord[nb] < coord[c] + 1:
-                coord[nb] = coord[c] + 1
+        for nb, w in adj[c].items():
+            if coord[nb] < coord[c] + w:
+                coord[nb] = coord[c] + w
             indeg[nb] -= 1
             if indeg[nb] == 0:
                 queue.append(nb)
@@ -592,7 +692,7 @@ def compute_coordinates(
             point_id[pkey] = idx
         return idx
 
-    segments: list[tuple[int, int, int]] = []
+    segments: list[tuple[int, int, int, int]] = []
     edge_chain: dict[tuple[int, int], list[object]] = {}
     vertices: set[int] = set()
 
@@ -607,21 +707,25 @@ def compute_coordinates(
             chain.append(("b", dart, i))
         chain.append(("v", head))
         for i, direction in enumerate(es.segments):
-            segments.append((pid(chain[i]), pid(chain[i + 1]), direction))
+            segments.append((pid(chain[i]), pid(chain[i + 1]), direction, 1))
         edge_chain[ekey] = chain
 
     # Rectangularization: dummy separation constraints that make the per-edge
     # constraint graphs sufficient (see _rectangularize). Dummy points receive
-    # point ids too but are never read back into the drawing.
-    rect_segments: Optional[list[tuple[int, int, int]]] = None
+    # point ids too but are never read back into the drawing. Virtual U-turn
+    # split darts carry minimum length 0.
+    rect_segments: Optional[list[tuple[int, int, int, int]]] = None
     if faces is not None:
-        dummy_darts = _rectangularize(faces, shape, darts, edge_chain)
-        if dummy_darts is not None:
-            rect_segments = [(pid(a), pid(b), d) for a, b, d in dummy_darts]
+        rectangularized = _rectangularize(faces, shape, darts, edge_chain)
+        if rectangularized is not None:
+            dummy_darts, zero_pairs = rectangularized
+            rect_segments = [
+                (pid(a), pid(b), d, 0 if (a, b) in zero_pairs else 1) for a, b, d in dummy_darts
+            ]
 
     n_points = len(point_id)
 
-    attempts: list[tuple[bool, list[tuple[int, int, int]]]] = []
+    attempts: list[tuple[bool, list[tuple[int, int, int, int]]]] = []
     if rect_segments is not None:
         attempts.append((False, segments + rect_segments))
         attempts.append((True, segments + rect_segments))
@@ -719,7 +823,7 @@ def face_turn_sum(face: Face, rep: OrthogonalRepresentation) -> Optional[int]:
     """
     total = 0
     for a, b in face.edges:
-        angle = rep.vertex_face_angles.get((b, face.index))
+        angle = rep.corner_angle((a, b), face.index)
         if angle is None:
             return None
         total += 2 - angle

@@ -766,8 +766,43 @@ def nudge_overlapping_segments(
     # AND their spans on the other axis overlap
     nudge_map: dict[tuple[int, int], float] = {}  # (edge_idx, seg_idx) -> offset
 
-    def _spans_overlap(a_lo: float, a_hi: float, b_lo: float, b_hi: float) -> bool:
-        return a_lo < b_hi and b_lo < a_hi
+    # Obstacle awareness: a nudged segment must not pass through a node box.
+    # Boxes of the segment's own edge endpoints are exempt (segments adjacent
+    # to a port touch their own node's boundary by construction).
+    edge_endpoints = {ei: (edge.source, edge.target) for ei, edge in enumerate(edges)}
+
+    def _nudged_position_clear(
+        seg: tuple[int, int, float, float, float, float, bool], offset: float
+    ) -> bool:
+        ei, _si, x1, y1, x2, y2, is_h = seg
+        if is_h:
+            p1 = (x1, y1 + offset)
+            p2 = (x2, y2 + offset)
+        else:
+            p1 = (x1 + offset, y1)
+            p2 = (x2 + offset, y2)
+        src, tgt = edge_endpoints.get(ei, (None, None))
+        for box in boxes:
+            if box.index == src or box.index == tgt:
+                continue
+            if _segment_intersects_box(p1, p2, box):
+                return False
+        return True
+
+    def _assign_cluster_offsets(
+        cluster: list[tuple[int, int, float, float, float, float, bool]],
+    ) -> None:
+        n_segs = len(cluster)
+        for i, seg in enumerate(cluster):
+            offset = (i - (n_segs - 1) / 2.0) * edge_separation
+            # Prefer the planned offset; if it would push the segment through
+            # a node box, try the mirrored offset, else leave it in place
+            # (coincident edges are preferable to edges through nodes).
+            for candidate in (offset, -offset):
+                if _nudged_position_clear(seg, candidate):
+                    if candidate != 0.0:
+                        nudge_map[(seg[0], seg[1])] = candidate
+                    break
 
     for group_coord, segs in h_groups.items():
         if len(segs) <= 1:
@@ -777,10 +812,7 @@ def nudge_overlapping_segments(
         for cluster in overlapping:
             if len(cluster) <= 1:
                 continue
-            n_segs = len(cluster)
-            for i, seg in enumerate(cluster):
-                offset = (i - (n_segs - 1) / 2.0) * edge_separation
-                nudge_map[(seg[0], seg[1])] = offset
+            _assign_cluster_offsets(cluster)
 
     for group_coord, segs in v_groups.items():
         if len(segs) <= 1:
@@ -789,10 +821,7 @@ def nudge_overlapping_segments(
         for cluster in overlapping:
             if len(cluster) <= 1:
                 continue
-            n_segs = len(cluster)
-            for i, seg in enumerate(cluster):
-                offset = (i - (n_segs - 1) / 2.0) * edge_separation
-                nudge_map[(seg[0], seg[1])] = offset
+            _assign_cluster_offsets(cluster)
 
     if not nudge_map:
         return edges

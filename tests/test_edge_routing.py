@@ -381,6 +381,97 @@ class TestNudgeOverlappingSegments:
         result = nudge_overlapping_segments([], [], edge_separation=15.0)
         assert result == []
 
+    def _all_segments(self, edges, boxes):
+        """Reconstruct all axis-aligned segments of the routed edges."""
+        box_map = {b.index: b for b in boxes}
+        segments = []
+        for e in edges:
+            sp = box_map[e.source].get_port_position(e.source_port.side, e.source_port.position)
+            tp = box_map[e.target].get_port_position(e.target_port.side, e.target_port.position)
+            pts = [sp, *list(e.bends), tp]
+            segments.append((e, list(zip(pts, pts[1:]))))
+        return segments
+
+    def test_nudge_avoids_node_boxes(self) -> None:
+        """Nudging must not push a segment through a node box.
+
+        Two edges share a horizontal segment at y=200. An obstacle node sits
+        just below the shared line so the blind downward nudge (+30 at
+        edge_separation=60) would route straight through it. The obstacle-aware
+        nudge must choose a clear position instead.
+        """
+        boxes = [
+            _make_box(0, 100, 100),
+            _make_box(1, 500, 100),
+            _make_box(2, 100, 300),
+            _make_box(3, 500, 300),
+            _make_box(4, 300, 245),  # spans y in [225, 265]: blocks y=230
+        ]
+        shared = [(100.0, 200.0), (500.0, 200.0)]
+        edges = [
+            OrthogonalEdge(
+                source=0,
+                target=1,
+                source_port=Port(node=0, side=Side.SOUTH, position=0.5),
+                target_port=Port(node=1, side=Side.SOUTH, position=0.5),
+                bends=list(shared),
+            ),
+            OrthogonalEdge(
+                source=2,
+                target=3,
+                source_port=Port(node=2, side=Side.NORTH, position=0.5),
+                target_port=Port(node=3, side=Side.NORTH, position=0.5),
+                bends=list(shared),
+            ),
+        ]
+
+        nudged = nudge_overlapping_segments(edges, boxes, edge_separation=60.0)
+
+        assert len(nudged) == 2
+        obstacle = boxes[4]
+        for edge, segs in self._all_segments(nudged, boxes):
+            for p1, p2 in segs:
+                assert not _segment_intersects_box(p1, p2, obstacle), (
+                    f"edge {edge.source}->{edge.target} segment {p1}->{p2} "
+                    "routed through node box after nudging"
+                )
+
+    def test_nudge_still_separates_when_clear(self) -> None:
+        """With no obstacle in the way, nudging separates as before."""
+        boxes = [
+            _make_box(0, 100, 100),
+            _make_box(1, 500, 100),
+            _make_box(2, 100, 300),
+            _make_box(3, 500, 300),
+        ]
+        shared = [(100.0, 200.0), (500.0, 200.0)]
+        edges = [
+            OrthogonalEdge(
+                source=0,
+                target=1,
+                source_port=Port(node=0, side=Side.SOUTH, position=0.5),
+                target_port=Port(node=1, side=Side.SOUTH, position=0.5),
+                bends=list(shared),
+            ),
+            OrthogonalEdge(
+                source=2,
+                target=3,
+                source_port=Port(node=2, side=Side.NORTH, position=0.5),
+                target_port=Port(node=3, side=Side.NORTH, position=0.5),
+                bends=list(shared),
+            ),
+        ]
+
+        nudged = nudge_overlapping_segments(edges, boxes, edge_separation=30.0)
+
+        # The two shared horizontal runs must end on distinct y coordinates.
+        ys = set()
+        for _edge, segs in self._all_segments(nudged, boxes):
+            for (x1, y1), (x2, y2) in segs:
+                if abs(y1 - y2) < 1e-6 and abs(x2 - x1) > 100:
+                    ys.add(round(y1, 3))
+        assert len(ys) == 2
+
     def test_integration_kandinsky_with_nudging(self) -> None:
         """Kandinsky layout with nudging should produce valid results."""
         from graph_layout import KandinskyLayout

@@ -33,7 +33,16 @@ from ..types import (
 from .compaction import CompactionResult, compact_layout
 from .compaction_flow import compact_layout_flow, compact_layout_longest_path
 from .edge_routing import route_all_edges
-from .orthogonalization import Face, OrthogonalRepresentation, compute_orthogonal_representation
+from .expansion import Expansion, cage_face_indices, expand_high_degree
+from .orthogonalization import (
+    Face,
+    OrthogonalRepresentation,
+    build_flow_network,
+    compute_faces,
+    compute_orthogonal_representation,
+    flow_to_orthogonal_rep,
+    solve_min_cost_flow_simple,
+)
 from .planarization import is_planar_quick_check
 from .types import NodeBox, OrthogonalEdge, Port, Side
 
@@ -45,15 +54,19 @@ def _opp(direction: int) -> int:
 
 class GIOTTOLayout(StaticLayout):
     """
-    GIOTTO orthogonal layout for degree-4 planar graphs.
+    GIOTTO orthogonal layout for planar graphs.
 
     Produces bend-optimal orthogonal drawings where all edges consist of
-    horizontal and vertical segments only. This algorithm is specialized
-    for planar graphs where every node has at most 4 incident edges.
+    horizontal and vertical segments only. The bend-minimal drawing covers
+    connected planar graphs: vertices of degree > 4 are expanded into cage
+    rectangles (Kandinsky-style node boxes with several edges per side), and
+    bridges / cut vertices are handled with per-corner angles.
 
-    For graphs that don't meet these requirements:
+    For graphs outside the strict degree-4 planar contract:
     - If strict=True (default): Raises ValueError
-    - If strict=False: Falls back to Kandinsky-like behavior
+    - If strict=False: degree > 4 planar graphs still draw bend-optimally
+      (via expansion); non-planar graphs fall back to Kandinsky-like
+      heuristic routing
 
     Example:
         # 4x4 grid graph (degree-4 planar)
@@ -122,10 +135,11 @@ class GIOTTOLayout(StaticLayout):
                 - "flow": Flow-based compaction using min-cost flow
                 - "longest_path": Longest-path compaction on constraint DAG
             bend_optimal: Drive the drawing from the bend-minimal orthogonal
-                representation (Topology-Shape-Metrics with rectangularization).
-                Default True; out-of-domain inputs (degree > 4, non-biconnected)
-                silently fall back to the heuristic router -- check
-                ``used_bend_optimal``. Set False to force the heuristic router.
+                representation (Topology-Shape-Metrics with rectangularization;
+                degree > 4 vertices via cage expansion). Default True;
+                out-of-domain inputs (non-planar, disconnected) silently fall
+                back to the heuristic router -- check ``used_bend_optimal``.
+                Set False to force the heuristic router.
         """
         super().__init__(
             nodes=nodes,
@@ -150,19 +164,20 @@ class GIOTTOLayout(StaticLayout):
         # When True (default), drive the drawing from the bend-minimal
         # orthogonal representation (Topology-Shape-Metrics) rather than the
         # geometric routing heuristic, whenever the representation is a
-        # realizable shape (biconnected, max degree 4). With rectangularization
-        # this covers the whole in-scope domain; out-of-domain inputs fall back
-        # to the heuristic.
+        # realizable shape. Rectangularization, per-corner angles (bridges /
+        # cut vertices) and cage expansion (degree > 4) cover all connected
+        # planar graphs; other inputs fall back to the heuristic.
         self._bend_optimal = bool(bend_optimal)
         # Whether the last run actually drew from the bend-minimal representation
         # (True) or fell back to the heuristic router (False). Out-of-domain
-        # inputs (degree > 4, non-biconnected) silently fall back.
+        # inputs (non-planar, disconnected) silently fall back.
         self._used_bend_optimal = False
 
         # Output data
         self._orthogonal_edges: list[OrthogonalEdge] = []
         self._node_boxes: list[NodeBox] = []
         self._orthogonal_rep: Optional[OrthogonalRepresentation] = None
+        self._expansion: Optional[Expansion] = None
         self._faces: list[Face] = []
         self._compaction_result: Optional[CompactionResult] = None
         self._is_valid_input: bool = False
@@ -249,7 +264,7 @@ class GIOTTOLayout(StaticLayout):
 
         Requesting ``bend_optimal=True`` does not guarantee it is used: the
         representation must be a realizable orthogonal shape, so out-of-domain
-        inputs (degree > 4, non-biconnected) fall back to the heuristic router.
+        inputs (non-planar, disconnected) fall back to the heuristic router.
         This flag lets callers detect that silent fallback -- e.g. to warn, or
         to decide whether the drawing is bend-minimal.
         """
@@ -357,6 +372,7 @@ class GIOTTOLayout(StaticLayout):
         """Compute GIOTTO orthogonal layout."""
         # Reset per-run; only set True if the bend-optimal path drives the draw.
         self._used_bend_optimal = False
+        self._expansion = None
         n = len(self._nodes)
         if n == 0:
             self._is_valid_input = True
@@ -364,32 +380,23 @@ class GIOTTOLayout(StaticLayout):
 
         # Validate degree constraint
         is_deg4, offending_node = self._validate_degree_4()
-        if not is_deg4:
-            if self._strict:
-                raise ValueError(
-                    f"GIOTTO requires max degree 4, but node {offending_node} "
-                    f"has degree > 4. Use strict=False to fall back to "
-                    "Kandinsky-like behavior, or use KandinskyLayout instead."
-                )
-            # Fall back to Kandinsky-like behavior
-            self._is_valid_input = False
-            self._compute_fallback()
-            return
+        if not is_deg4 and self._strict:
+            raise ValueError(
+                f"GIOTTO requires max degree 4, but node {offending_node} "
+                f"has degree > 4. Use strict=False to fall back to "
+                "Kandinsky-like behavior, or use KandinskyLayout instead."
+            )
 
         # Validate planarity (linear-time LR-planarity test)
-        if not self._validate_planar():
-            if self._strict:
-                raise ValueError(
-                    f"GIOTTO requires a planar graph. The graph with {n} nodes "
-                    f"and {len(self._links)} edges is non-planar. "
-                    "Use strict=False to fall back to Kandinsky-like behavior."
-                )
-            self._is_valid_input = False
-            self._compute_fallback()
-            return
+        is_planar = self._validate_planar()
+        if not is_planar and self._strict:
+            raise ValueError(
+                f"GIOTTO requires a planar graph. The graph with {n} nodes "
+                f"and {len(self._links)} edges is non-planar. "
+                "Use strict=False to fall back to Kandinsky-like behavior."
+            )
 
-        # Input is valid for GIOTTO
-        self._is_valid_input = True
+        self._is_valid_input = is_deg4 and is_planar
 
         # Phase 1: Assign layers (simple topological ordering)
         layers = self._assign_layers()
@@ -397,13 +404,20 @@ class GIOTTOLayout(StaticLayout):
         # Phase 2: Position nodes on grid
         self._position_nodes(layers)
 
-        # Phase 3: Compute orthogonal representation (bend-optimal for planar)
-        self._compute_orthogonal_rep()
+        # Phase 3+4: For planar inputs, compute the bend-minimal orthogonal
+        # representation (expanding degree > 4 vertices into cages when
+        # necessary) and, if requested and realizable, draw directly from it.
+        # Degree > 4 without bend_optimal skips the representation entirely
+        # (the plain flow model is infeasible there).
+        if is_planar and (is_deg4 or self._bend_optimal):
+            self._compute_orthogonal_rep()
+            self._used_bend_optimal = (
+                bool(self._bend_optimal) and self._apply_bend_optimal_drawing()
+            )
 
-        # Phase 4: If requested and the representation is a realizable shape,
-        # draw directly from it (bend-minimal). Otherwise route heuristically.
-        self._used_bend_optimal = bool(self._bend_optimal) and self._apply_bend_optimal_drawing()
         if not self._used_bend_optimal:
+            # Heuristic router: the path for non-planar graphs, disabled
+            # bend_optimal, and representations that turn out not realizable.
             self._route_edges()
             self._apply_compaction()
 
@@ -418,10 +432,11 @@ class GIOTTOLayout(StaticLayout):
 
         Computes the shape (compass direction of every segment) and integer
         coordinates, then scales them onto the canvas, rebuilding ``node_boxes``
-        (centered on the grid points) and ``orthogonal_edges`` (ports on box
+        (centered on the grid points; expanded degree > 4 vertices become boxes
+        spanning their cage rectangle) and ``orthogonal_edges`` (ports on box
         sides, bends from the route). Returns False -- leaving the heuristic
-        pipeline to run -- when the representation is not a realizable shape
-        (degree > 4, non-biconnected) so the drawing never regresses.
+        pipeline to run -- when the representation is not a realizable shape,
+        so the drawing never regresses.
         """
         from .metrics import (
             EAST,
@@ -436,6 +451,8 @@ class GIOTTOLayout(StaticLayout):
         if not self._orthogonal_rep or not self._faces or n == 0:
             return False
 
+        expansion = self._expansion
+
         edges: list[tuple[int, int]] = []
         for link in self._links:
             src = self._get_source_index(link)
@@ -446,8 +463,18 @@ class GIOTTOLayout(StaticLayout):
         shape = compute_orthogonal_shape(self._faces, self._orthogonal_rep)
         if not shape.valid:
             return False
-        drawing = compute_coordinates(shape, edges, faces=self._faces)
-        if not drawing.valid or len(drawing.vertex_positions) != n:
+        coord_edges = expansion.edges if expansion is not None else edges
+        drawing = compute_coordinates(shape, coord_edges, faces=self._faces)
+        if not drawing.valid:
+            return False
+        # Every drawn vertex needs a position: all originals (minus the ones
+        # replaced by cages) plus every cage vertex.
+        needed: set[int] = set(range(n))
+        if expansion is not None:
+            needed -= set(expansion.cages.keys())
+            for ids in expansion.cages.values():
+                needed.update(ids)
+        if not needed.issubset(drawing.vertex_positions.keys()):
             return False
 
         # --- Scale the integer grid onto the canvas ------------------------
@@ -472,77 +499,97 @@ class GIOTTOLayout(StaticLayout):
 
         dir_to_side = {EAST: Side.EAST, WEST: Side.WEST, NORTH: Side.NORTH, SOUTH: Side.SOUTH}
 
-        # --- Rebuild node boxes centered on grid points --------------------
+        # Canonical dart per undirected edge, mirroring compute_coordinates:
+        # the stored route runs along the orientation the edge has in
+        # coord_edges, which need not match the link orientation.
+        canonical_dart: dict[tuple[int, int], tuple[int, int]] = {}
+        for u, v in coord_edges:
+            ckey = (min(u, v), max(u, v))
+            if (u, v) in shape.edge_shapes:
+                canonical_dart[ckey] = (u, v)
+            elif (v, u) in shape.edge_shapes:
+                canonical_dart[ckey] = (v, u)
+
+        # --- Rebuild node boxes -------------------------------------------
+        # Plain vertices are boxes centered on their grid point; expanded
+        # vertices become boxes spanning their cage rectangle (inflated by the
+        # base node size so ports stay on the box boundary).
         self._node_boxes = []
         for i in range(n):
-            gx, gy = drawing.vertex_positions[i]
-            cx, cy = to_canvas(gx, gy)
             node = self._nodes[i]
-            width = getattr(node, "width", None) or self._node_width
-            height = getattr(node, "height", None) or self._node_height
-            self._node_boxes.append(
-                NodeBox(index=i, x=cx, y=cy, width=float(width), height=float(height))
-            )
+            width = float(getattr(node, "width", None) or self._node_width)
+            height = float(getattr(node, "height", None) or self._node_height)
+            if expansion is not None and i in expansion.cages:
+                pts = [drawing.vertex_positions[c] for c in expansion.cages[i]]
+                gx_min, gx_max = min(p[0] for p in pts), max(p[0] for p in pts)
+                gy_min, gy_max = min(p[1] for p in pts), max(p[1] for p in pts)
+                cx, cy = to_canvas((gx_min + gx_max) / 2.0, (gy_min + gy_max) / 2.0)
+                width += (gx_max - gx_min) * cell
+                height += (gy_max - gy_min) * cell
+            else:
+                gx, gy = drawing.vertex_positions[i]
+                cx, cy = to_canvas(gx, gy)
+            self._node_boxes.append(NodeBox(index=i, x=cx, y=cy, width=width, height=height))
+
+        def port_fraction(box: NodeBox, side: Side, point: tuple[float, float]) -> float:
+            """Fraction along ``side`` of ``box`` where the port sits."""
+            if side in (Side.NORTH, Side.SOUTH):
+                span = box.width
+                frac = (point[0] - box.left) / span if span > 0 else 0.5
+            else:
+                span = box.height
+                frac = (point[1] - box.top) / span if span > 0 else 0.5
+            return min(1.0, max(0.0, frac))
 
         # --- Build orthogonal edges from the routes ------------------------
+        # Cage cycle edges are not drawn (they are the box boundary).
         self._orthogonal_edges = []
         for edge_idx, link in enumerate(self._links):
             src = self._get_source_index(link)
             tgt = self._get_target_index(link)
             if not (0 <= src < n and 0 <= tgt < n) or src == tgt:
                 continue
-            key = (min(src, tgt), max(src, tgt))
+            # Endpoints in the drawn (possibly expanded) graph.
+            if expansion is not None:
+                mapped = expansion.dart_map.get((src, tgt))
+                if mapped is None:
+                    continue
+                dsrc, dtgt = mapped
+            else:
+                dsrc, dtgt = src, tgt
+            key = (min(dsrc, dtgt), max(dsrc, dtgt))
             edge_route = drawing.edge_routes.get(key)
-            dart = (src, tgt) if (src, tgt) in shape.edge_shapes else (tgt, src)
-            es = shape.edge_shapes.get(dart)
-            if edge_route is None or es is None:
+            dart = canonical_dart.get(key)
+            es = shape.edge_shapes.get(dart) if dart is not None else None
+            if edge_route is None or es is None or dart is None:
                 continue
 
             # The canonical route runs dart.tail -> dart.head; orient it so it
             # goes src -> tgt for this link.
             pts = list(edge_route)
-            if dart[0] != src:
+            if dart[0] != dsrc:
                 pts = pts[::-1]
-            src_side = dir_to_side[es.start_direction if dart[0] == src else _opp(es.end_direction)]
-            tgt_side = dir_to_side[_opp(es.end_direction) if dart[1] == tgt else es.start_direction]
+            src_side = dir_to_side[
+                es.start_direction if dart[0] == dsrc else _opp(es.end_direction)
+            ]
+            tgt_side = dir_to_side[
+                _opp(es.end_direction) if dart[1] == dtgt else es.start_direction
+            ]
+
+            src_frac = port_fraction(self._node_boxes[src], src_side, to_canvas(*pts[0]))
+            tgt_frac = port_fraction(self._node_boxes[tgt], tgt_side, to_canvas(*pts[-1]))
 
             interior = [to_canvas(gx, gy) for gx, gy in pts[1:-1]]
             self._orthogonal_edges.append(
                 OrthogonalEdge(
                     source=src,
                     target=tgt,
-                    source_port=Port(node=src, side=src_side, position=0.5, edge=edge_idx),
-                    target_port=Port(node=tgt, side=tgt_side, position=0.5, edge=edge_idx),
+                    source_port=Port(node=src, side=src_side, position=src_frac, edge=edge_idx),
+                    target_port=Port(node=tgt, side=tgt_side, position=tgt_frac, edge=edge_idx),
                     bends=interior,
                 )
             )
         return True
-
-    def _compute_fallback(self) -> None:
-        """
-        Compute layout using Kandinsky-like approach for invalid inputs.
-
-        This is used when strict=False and the graph doesn't meet
-        GIOTTO requirements.
-        """
-        # Use the same layering and positioning as GIOTTO
-        layers = self._assign_layers()
-        self._position_nodes(layers)
-
-        # Skip orthogonal representation optimization
-        # (it assumes planar input)
-
-        # Route edges with simple heuristic
-        self._route_edges()
-
-        # Apply compaction
-        self._apply_compaction()
-
-        # Update node positions
-        for i, box in enumerate(self._node_boxes):
-            if i < len(self._nodes):
-                self._nodes[i].x = box.x
-                self._nodes[i].y = box.y
 
     def _compute_orthogonal_rep(self) -> None:
         """
@@ -550,7 +597,10 @@ class GIOTTOLayout(StaticLayout):
 
         Uses the configured embedder to obtain a combinatorial planar
         embedding, then runs min-cost flow bend minimization on the
-        resulting face structure.
+        resulting face structure. Vertices of degree > 4 are first expanded
+        into cage cycles (see :mod:`.expansion`); the representation and faces
+        then describe the expanded graph and ``self._expansion`` holds the
+        mapping back to original vertices.
         """
         n = len(self._nodes)
         if n == 0 or not self._node_boxes:
@@ -570,21 +620,45 @@ class GIOTTOLayout(StaticLayout):
         except (ValueError, AttributeError):
             pass
 
-        if embedding is not None:
+        if embedding is None:
+            # Fallback: use position-based face computation
+            positions = [(box.x, box.y) for box in self._node_boxes]
+            self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
+            self._faces = compute_faces(n, edges, positions)
+            return
+
+        expansion = expand_high_degree(n, embedding) if self._bend_optimal else None
+        if expansion is None:
             self._orthogonal_rep = compute_orthogonal_representation(n, edges, embedding=embedding)
             # Retain the faces (from the same embedding) so the shape stage can
             # realize the representation without recomputing a possibly different
             # face set.
-            from .orthogonalization import compute_faces
-
             self._faces = compute_faces(n, edges, embedding=embedding)
-        else:
-            # Fallback: use position-based face computation
-            positions = [(box.x, box.y) for box in self._node_boxes]
-            self._orthogonal_rep = compute_orthogonal_representation(n, edges, positions)
-            from .orthogonalization import compute_faces
+            return
 
-            self._faces = compute_faces(n, edges, positions)
+        # Degree > 4: run the pipeline on the expanded graph, with cage faces
+        # forced rectangular and cage cycle edges kept straight (box sides).
+        faces = compute_faces(expansion.num_nodes, expansion.edges, embedding=expansion.embedding)
+        cage_faces = cage_face_indices(expansion, faces)
+        if cage_faces is None:
+            # Inconsistent expansion: leave the rep unset so drawing falls back.
+            self._orthogonal_rep = None
+            self._faces = []
+            return
+        network = build_flow_network(
+            expansion.num_nodes,
+            expansion.edges,
+            faces,
+            cage_faces=cage_faces,
+            rigid_edges=expansion.cage_edges,
+        )
+        if not solve_min_cost_flow_simple(network):
+            self._orthogonal_rep = None
+            self._faces = []
+            return
+        self._expansion = expansion
+        self._orthogonal_rep = flow_to_orthogonal_rep(network, expansion.edges)
+        self._faces = faces
 
     def _assign_layers(self) -> list[list[int]]:
         """

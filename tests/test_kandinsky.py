@@ -1285,7 +1285,9 @@ class TestGIOTTOLayout:
             layout.run()
 
     def test_strict_false_fallback_degree_5(self):
-        """Degree > 4 should fall back to Kandinsky-like in non-strict mode."""
+        """Degree > 4 in non-strict mode still draws (now bend-optimally via
+        vertex expansion); the input is reported as outside the strict
+        degree-4 contract."""
         nodes = [{} for _ in range(6)]
         links = [
             {"source": 0, "target": 1},

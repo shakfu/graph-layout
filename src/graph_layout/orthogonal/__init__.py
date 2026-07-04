@@ -40,6 +40,7 @@ from .edge_routing import (
     route_edge,
     route_self_loop,
 )
+from .expansion import Expansion, cage_face_indices, expand_high_degree
 from .giotto import GIOTTOLayout
 from .kandinsky import KandinskyLayout
 from .orthogonalization import (
@@ -106,6 +107,10 @@ __all__ = [
     "solve_min_cost_flow_simple",
     "flow_to_orthogonal_rep",
     "compute_orthogonal_representation",
+    # Vertex expansion (degree > 4 cages)
+    "Expansion",
+    "expand_high_degree",
+    "cage_face_indices",
     # Planarization
     "CrossingVertex",
     "PlanarizedGraph",

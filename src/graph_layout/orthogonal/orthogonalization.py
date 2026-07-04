@@ -44,11 +44,31 @@ class OrthogonalRepresentation:
 
     # For each (vertex, face) pair: angle in units of 90°
     # angle = 1 means 90°, angle = 2 means 180°, etc.
+    # Only filled for corners whose vertex borders the face exactly once;
+    # see ``corner_angles`` for the general (per-corner) storage.
     vertex_face_angles: dict[tuple[int, int], int] = field(default_factory=dict)
+
+    # Per-corner angles keyed by the *incoming dart*: the corner following
+    # directed edge (a, b) in its face walk sits at vertex b, and every dart
+    # appears in exactly one face walk, so the key is unique. This is what
+    # supports bridges / cut vertices, where a vertex borders the same face
+    # at several corners and a (vertex, face) key would collide.
+    corner_angles: dict[tuple[int, int], int] = field(default_factory=dict)
 
     # For each directed edge (u, v): list of bend directions
     # +1 = left turn (counter-clockwise), -1 = right turn (clockwise)
     edge_bends: dict[tuple[int, int], list[int]] = field(default_factory=dict)
+
+    def corner_angle(self, dart: tuple[int, int], face_index: int) -> Optional[int]:
+        """Angle (in 90° units) at the corner following ``dart`` in its face.
+
+        Prefers the per-corner storage; falls back to the legacy
+        (vertex, face) keyed dict for representations built by hand.
+        """
+        angle = self.corner_angles.get(dart)
+        if angle is not None:
+            return angle
+        return self.vertex_face_angles.get((dart[1], face_index))
 
     # Total number of bends
     @property
@@ -311,6 +331,9 @@ def build_flow_network(
     num_nodes: int,
     edges: list[tuple[int, int]],
     faces: list[Face],
+    *,
+    cage_faces: Optional[set[int]] = None,
+    rigid_edges: Optional[set[tuple[int, int]]] = None,
 ) -> FlowNetwork:
     """
     Build the min-cost flow network for orthogonalization.
@@ -328,6 +351,11 @@ def build_flow_network(
         num_nodes: Number of graph vertices
         edges: Graph edges
         faces: Computed faces
+        cage_faces: Face indices that must be drawn as rectangles (the cage
+            faces of expanded degree > 4 vertices): their corner angles are
+            capped at 180 degrees.
+        rigid_edges: Canonical (min, max) edges that must stay straight (cage
+            cycle edges -- a node box side cannot bend): no bend arcs.
 
     Returns:
         FlowNetwork ready for solving
@@ -378,14 +406,22 @@ def build_flow_network(
             edge_faces[(edge[1], edge[0])].append(face.index)
 
     # Arcs from vertices to faces (angle assignments)
-    # Capacity = 3 (angle can be 90 degrees, 180 degrees, or 270 degrees = 1, 2, or 3 units)
+    # Capacity = 3 per corner (angle can be up to 360 degrees = flow 3 above the
+    # 90-degree minimum), times the number of corners the vertex has on the
+    # face. A vertex borders a face more than once at cut vertices / bridges;
+    # the arc then carries the total over those corners and the extraction
+    # distributes it per corner.
     # Cost = 0 (angles don't cost anything)
+    # Corners of cage faces (expanded degree > 4 vertices) are capped at 180
+    # degrees (flow 1) so the cage is drawn as a rectangle.
     for face in faces:
         face_node = num_nodes + face.index
+        per_corner = 1 if cage_faces and face.index in cage_faces else 3
+        multiplicity: dict[int, int] = defaultdict(int)
         for v in face.vertices:
-            arc = (v, face_node)
-            if arc not in network.arcs:
-                network.arcs[arc] = (3, 0)  # capacity=3, cost=0
+            multiplicity[v] += 1
+        for v, k in multiplicity.items():
+            network.arcs[(v, face_node)] = (per_corner * k, 0)
 
     # Bend arcs (one bend variable *per edge*, not per face-pair).
     #
@@ -428,6 +464,9 @@ def build_flow_network(
         if len(face_list) < 2 or face_list[0] == face_list[1]:
             # Bridge (same face on both sides) or boundary edge: not bendable
             # in the flow model.
+            continue
+        if rigid_edges and key in rigid_edges:
+            # Cage cycle edge: a node box side must stay straight.
             continue
         f1, f2 = face_list[0], face_list[1]
         dart_f1 = edge_first_dart[key]
@@ -613,15 +652,30 @@ def flow_to_orthogonal_rep(
 
     num_nodes = network.num_vertices
 
-    # Extract vertex-face angles from flow
+    # Extract per-corner angles from flow. The corner following dart (a, b) in
+    # the face walk sits at vertex b. A vertex may border the same face at
+    # several corners (cut vertices / bridges); the arc's flow is then the
+    # total over those corners and is distributed greedily in walk order --
+    # any distribution with each angle in [1, 4] yields a valid representation
+    # with the same bend count, because face turn sums and per-vertex angle
+    # sums depend only on the totals.
     for face in network.faces:
         face_node = num_nodes + face.index
-        for v in face.vertices:
-            arc = (v, face_node)
-            flow_amount = network.flow.get(arc, 0)
-            # Angle = 1 + flow (minimum angle is 90° = 1 unit)
-            angle = 1 + flow_amount
-            ortho_rep.vertex_face_angles[(v, face.index)] = angle
+        corners_by_vertex: dict[int, list[tuple[int, int]]] = defaultdict(list)
+        for dart in face.edges:
+            corners_by_vertex[dart[1]].append(dart)
+        for v, corner_darts in corners_by_vertex.items():
+            remaining = network.flow.get((v, face_node), 0)
+            for dart in corner_darts:
+                extra = min(3, remaining)
+                remaining -= extra
+                # Angle = 1 + flow (minimum angle is 90° = 1 unit)
+                ortho_rep.corner_angles[dart] = 1 + extra
+            if len(corner_darts) == 1:
+                # Legacy (vertex, face) key -- unambiguous only for single corners
+                ortho_rep.vertex_face_angles[(v, face.index)] = ortho_rep.corner_angles[
+                    corner_darts[0]
+                ]
 
     # Extract bends per edge from its own intermediate-node flow. Each edge has
     # its own pair of bend arcs, so two edges shared by the same face pair no

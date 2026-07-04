@@ -6,30 +6,41 @@ ref: Open Graph Drawing Framework <https://github.com/ogdf/ogdf>
 
 ### Orthogonal Layout Improvements
 
-Remaining items for closing the gap with [OGDF](https://github.com/ogdf/ogdf)'s orthogonal drawing capabilities.
+Items for closing the gap with [OGDF](https://github.com/ogdf/ogdf)'s
+orthogonal drawing capabilities. The previously-listed high-priority items are
+done:
 
-#### Advanced Edge Routing
+- [x] **Obstacle-aware segment nudging**: `nudge_overlapping_segments()` now
+  checks every nudged segment position against the node boxes and picks a
+  clear offset (planned, then mirrored, then unmoved), so separating parallel
+  segments can no longer push an edge through a node
+  (`edge_routing.py`, tests in `tests/test_edge_routing.py`).
+- [x] **Non-biconnected graphs** (H6a): angles are stored per corner (keyed by
+  the incoming dart) so face walks that visit a cut vertex or bridge more than
+  once no longer collide; the flow network scales angle-arc capacities by
+  corner multiplicity, and rectangularization splits the 360-degree corners of
+  degree-1 vertices with zero-min-length virtual darts. The bend-optimal
+  drawing now covers trees, pendant edges, bridges, and cut vertices
+  (`tests/test_tsm_nonbiconnected.py`).
+- [x] **Degree > 4** (H5): vertices of degree > 4 are expanded into cage
+  cycles in rotation order (the classical GIOTTO / OGDF approach, chosen over
+  the Kandinsky 0-degree-angle flow model whose exact form is NP-hard); the
+  cage face is constrained to a rectangle (corner angles <= 180 degrees, no
+  bends on cycle edges) and drawn as the node box, with edges attaching along
+  the box sides at distinct ports (`orthogonal/expansion.py`,
+  `tests/test_tsm_expansion.py`).
 
-Visibility graph routing and segment nudging are implemented; obstacle-aware
-nudging remains.
+Together with rectangularization (`orthogonal/metrics.py:_rectangularize`),
+`GIOTTOLayout` draws from the bend-minimal orthogonal representation by
+default for **all connected planar graphs**; non-planar or disconnected inputs
+fall back to the heuristic router (`used_bend_optimal` reports which path
+ran).
 
-- [ ] **Obstacle-aware segment nudging**: Current nudging blindly offsets segments without checking node-box collisions, causing edges to route through nodes. Fix requires: (1) checking nudged positions against node boxes, (2) re-routing segments that collide with obstacles after nudging, or (3) integrating nudging into the routing phase so obstacle avoidance is preserved. See `edge_routing.py:nudge_overlapping_segments()`.
+Possible follow-ups (not planned):
 
-#### Topology-Shape-Metrics bend-optimal drawing
-
-`GIOTTOLayout` now draws from the bend-minimal orthogonal representation **by
-default** for its whole in-scope domain (biconnected planar graphs of maximum
-degree 4): rectangularization (classical turn-regularization -- reflex-corner
-projection dissects every bounded face into rectangles, and an enclosing dummy
-rectangle handles the outer face) makes the per-edge constraint graphs provably
-sufficient, verified at 100% over thousands of random in-domain graphs
-(`orthogonal/metrics.py:_rectangularize`, tests in
-`tests/test_rectangularization.py`). Out-of-domain inputs still fall back to
-the heuristic router (`used_bend_optimal` reports which path ran). Remaining
-work extends the *domain*:
-
-- [ ] **Kandinsky degree > 4** (H5): 0-degree-angle flow model for vertices of degree > 4 (out of the current TSM domain)
-- [ ] **Non-biconnected graphs** (H6a): per-corner angles for bridges / cut vertices
+- [ ] True Kandinsky 0-degree-angle flow model (bend-minimal in the Kandinsky
+  metric proper, rather than over the expanded graph)
+- [ ] Disconnected graphs: per-component TSM drawing + component packing
 
 ---
 

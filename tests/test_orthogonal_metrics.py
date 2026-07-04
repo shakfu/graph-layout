@@ -127,11 +127,11 @@ def _grid(w: int, h: int) -> tuple[int, list[tuple[int, int]]]:
 def test_all_faces_turn_pm4_for_biconnected_maxdeg4_grids():
     """The flow model emits valid representations across the model's domain.
 
-    Standard orthogonalization is defined for biconnected planar graphs of max
-    degree <= 4; grids are a clean deterministic family of them. Every face must
-    turn +/-4 and the shape must be realizable. (Cut vertices / bridges and
-    degree > 4 are separate known limitations -- see
-    docs/rectangularization-plan.md.)
+    Standard orthogonalization is defined for planar graphs of max degree <= 4;
+    grids are a clean deterministic family of them. Every face must turn +/-4
+    and the shape must be realizable. (Cut vertices / bridges are covered by
+    per-corner angles -- see tests/test_tsm_nonbiconnected.py -- and degree > 4
+    by vertex expansion -- see tests/test_tsm_expansion.py.)
     """
     for w in range(2, 6):
         for h in range(2, 6):
@@ -157,10 +157,10 @@ def test_inconsistent_representation_is_detected():
     faces, rep, shape = _shape_of(4, [(0, 1), (1, 2), (2, 3), (3, 0)])
     assert shape.valid  # sanity: valid before corruption
 
-    # Break one corner angle so the inner face no longer turns +4.
+    # Break one corner angle so the inner face no longer turns +4. Corner
+    # angles are keyed by their incoming dart (per-corner storage).
     inner = next(f for f in faces if not f.is_outer)
-    corner = inner.edges[0][1]
-    rep.vertex_face_angles[(corner, inner.index)] = 3  # was 1
+    rep.corner_angles[inner.edges[0]] = 3  # was 1
 
     corrupted = compute_orthogonal_shape(faces, rep)
     assert not corrupted.valid

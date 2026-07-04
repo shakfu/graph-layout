@@ -1117,17 +1117,24 @@ def orthogonal_layout_to_svg(
         f' stroke="{border_color}" stroke-width="2"/>',
     ]
 
-    # Use configured node dimensions (uniform for all nodes)
+    # Use each box's true extent (expanded degree > 4 cage boxes are larger
+    # than the default node size; drawing them uniformly detaches edges from
+    # their ports).
     nw = getattr(layout, "_node_width", 30)
     nh = getattr(layout, "_node_height", 20)
-    rx = min(nw, nh) * 0.3  # rounded corners
+    box_by_index = {b.index: b for b in boxes}
+
+    def _box_wh(i: int) -> tuple[float, float]:
+        b = box_by_index.get(i)
+        return (b.width, b.height) if b is not None else (nw, nh)
 
     # Collect bounding box of all rendered geometry (nodes + edges)
     all_x: list[float] = []
     all_y: list[float] = []
-    for node in nodes:
-        all_x.extend([node.x - nw / 2, node.x + nw / 2])
-        all_y.extend([node.y - nh / 2, node.y + nh / 2])
+    for i, node in enumerate(nodes):
+        bw, bh = _box_wh(i)
+        all_x.extend([node.x - bw / 2, node.x + bw / 2])
+        all_y.extend([node.y - bh / 2, node.y + bh / 2])
     for edge in layout.orthogonal_edges:
         if edge.source < len(boxes) and edge.target < len(boxes):
             sp = boxes[edge.source].get_port_position(
@@ -1157,11 +1164,13 @@ def orthogonal_layout_to_svg(
             continue
         svg.append(f'<path d="{path_d}" stroke="#888" stroke-width="1.5" fill="none"/>')
 
-    # Draw nodes as uniform rounded rectangles matching configured dimensions
+    # Draw each node box at its true size (cage boxes are larger).
     for i, node in enumerate(nodes):
+        bw, bh = _box_wh(i)
+        rx = min(bw, bh) * 0.3
         svg.append(
-            f'<rect x="{node.x - nw / 2:.1f}" y="{node.y - nh / 2:.1f}" '
-            f'width="{nw}" height="{nh}" rx="{rx:.1f}" '
+            f'<rect x="{node.x - bw / 2:.1f}" y="{node.y - bh / 2:.1f}" '
+            f'width="{bw:.1f}" height="{bh:.1f}" rx="{rx:.1f}" '
             f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
         )
         svg.append(

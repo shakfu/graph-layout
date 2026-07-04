@@ -6,7 +6,9 @@ Renders side-by-side SVG comparisons that make the changes visible:
   * GIOTTO ``bend_optimal`` (Topology-Shape-Metrics) vs the routing heuristic --
     the bend-minimal orthogonal representation now drives the drawing.
   * Kandinsky ``bend_optimal`` -- the same shared realizer, opt-in, drops the
-    heuristic router's bend count to the provable minimum on planar graphs.
+    heuristic router's bend count to the provable minimum on planar graphs, and
+    draws non-planar graphs through their planarization with clean orthogonal
+    crossings.
   * GIOTTO bend-optimal beyond the original biconnected max-degree-4 domain:
     bridges / cut vertices (per-corner angles, H6a) and degree > 4 vertices
     (cage expansion, H5) now draw bend-optimally too.
@@ -405,8 +407,64 @@ def _section_kandinsky() -> str:
         "wired into Kandinsky behind an opt-in bend_optimal flag. With "
         "bend_optimal=True the same graph is drawn from the representation with "
         "the provably minimum number of bends (the default stays the layered "
-        "hierarchical layout). Non-planar input falls back to the heuristic router.",
+        "hierarchical layout).",
         "".join(rows),
+    )
+
+
+_NONPLANAR_GRAPHS = [
+    ("K5", 5, [(i, j) for i in range(5) for j in range(i + 1, 5)]),
+    ("K3,3", 6, [(i, 3 + j) for i in range(3) for j in range(3)]),
+    (
+        "Petersen",
+        10,
+        [
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 0),
+            (0, 5),
+            (1, 6),
+            (2, 7),
+            (3, 8),
+            (4, 9),
+            (5, 7),
+            (7, 9),
+            (9, 6),
+            (6, 8),
+            (8, 5),
+        ],
+    ),
+]
+
+
+def _section_kandinsky_crossings() -> str:
+    cards = []
+    for name, n, edges in _NONPLANAR_GRAPHS:
+        opt = _kandinsky(n, edges, True)
+        flag = "used_bend_optimal" if opt.used_bend_optimal else "fell back"
+        cards.append(
+            _orthogonal_svg(
+                opt,
+                f"{name} - bend_optimal=True",
+                f"{opt.num_crossings} crossing(s), drawn as orthogonal X | {flag}",
+            )
+        )
+    body = '<div class="pair">' + "".join(cards) + "</div>"
+    return _block(
+        "Kandinsky: non-planar graphs through crossings",
+        "Non-planar graphs used to fall back to the heuristic router. The "
+        "bend-optimal path now realizes the planarized graph: crossings become "
+        "degree-4 dummy vertices, the whole thing is drawn by Topology-Shape-"
+        "Metrics, and each original edge is reassembled through its crossing "
+        "points -- so the two edges of a crossing pass through one shared point, "
+        "a clean orthogonal X. A degree-4 dummy has flow supply zero, forcing "
+        "90-degree corners, so the crossing is straight-through by construction. "
+        "(For non-planar graphs the value is the clean crossing, not a lower bend "
+        "count.) Scope: maximum degree 4; higher degree plus crossings still "
+        "falls back.",
+        body,
     )
 
 
@@ -892,6 +950,7 @@ def main() -> None:
     sections = (
         _section_giotto()
         + _section_kandinsky()
+        + _section_kandinsky_crossings()
         + _section_extended_domain()
         + _section_nudging()
         + _section_cola()

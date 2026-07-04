@@ -36,16 +36,25 @@ default for **all connected planar graphs**; non-planar or disconnected inputs
 fall back to the heuristic router (`used_bend_optimal` reports which path
 ran). The realization stage is shared (`orthogonal/realization.py`) and also
 drives `KandinskyLayout(bend_optimal=True)` (opt-in; default stays the layered
-hierarchical layout).
+hierarchical layout). Kandinsky's bend-optimal path additionally covers
+**non-planar** graphs of maximum degree 4 by realizing the *planarized* graph
+(`realize_planarized_drawing`): each crossing is drawn as a clean orthogonal
+crossing point, straight-through by construction.
 
 Possible follow-ups (not planned):
 
-- [ ] **Kandinsky bend-optimal through crossings**: realize the *planarized*
-  graph so non-planar `KandinskyLayout(bend_optimal=True)` inputs also draw
-  bend-optimally. Needs the crossing-dummy gadget (degree-4 vertices whose two
-  original edges pass straight through) and reassembling each original edge's
-  polyline through its crossing points; today crossings fall back to the
-  heuristic router.
+- [ ] **Crossings + degree > 4 together**: the crossing realizer requires
+  original max-degree <= 4 (cage expansion and crossing gadgets are not yet
+  combined), so a non-planar graph with a degree > 4 vertex still falls back.
+- [ ] **Compact cages (area vs bends)**: an expanded degree > 4 vertex becomes a
+  cage box whose width/height is the grid span of its cage vertices. That span is
+  *bend-forced* -- each spoke leaves its cage vertex straight, so the cage must be
+  wide enough to align with spread-out neighbours; verified that Kandinsky's
+  `bend_optimal` output is exactly bend-minimal (matches GIOTTO) over 137 random
+  degree > 4 planar graphs, so shrinking a cage necessarily adds a bend. A
+  smaller-cage look would need either a separate mode that trades bends for area,
+  or embedding-level neighbour-ordering optimisation (group nearby neighbours on
+  the same cage side). Not a bug in the current bend-minimal drawing.
 - [ ] True Kandinsky 0-degree-angle flow model (bend-minimal in the Kandinsky
   metric proper, rather than over the expanded graph)
 - [ ] Disconnected graphs: per-component TSM drawing + component packing

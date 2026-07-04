@@ -55,7 +55,11 @@ from .planarization import (
     PlanarizedGraph,
     planarize_graph,
 )
-from .realization import bend_optimal_representation, realize_bend_optimal_drawing
+from .realization import (
+    bend_optimal_representation,
+    realize_bend_optimal_drawing,
+    realize_planarized_drawing,
+)
 from .types import (
     NodeBox,
     OrthogonalEdge,
@@ -161,11 +165,14 @@ class KandinskyLayout(StaticLayout):
                 representation (Topology-Shape-Metrics) instead of the
                 hierarchical heuristic router -- a compact orthogonal drawing
                 with the provably minimum number of bends. Covers connected
-                planar graphs, including degree > 4 (drawn as cage boxes) and
-                bridges / cut vertices. Falls back to the heuristic router for
-                non-planar input (edge crossings) or when the representation is
-                not realizable; ``used_bend_optimal`` reports which path ran.
-                Default False preserves the layered hierarchical layout.
+                graphs of maximum degree 4 (planar or not: non-planar graphs are
+                drawn from their planarization, with each crossing a clean
+                orthogonal crossing point), plus planar graphs of higher degree
+                (drawn as cage boxes) and bridges / cut vertices. Falls back to
+                the heuristic router only outside that scope (non-planar *and*
+                degree > 4) or when the representation is not realizable;
+                ``used_bend_optimal`` reports which path ran. Default False
+                preserves the layered hierarchical layout.
             compact: If True, apply compaction to reduce the total area of the
                 layout while maintaining node separation and edge routing.
             compaction_method: Method to use for compaction. Options:
@@ -335,10 +342,11 @@ class KandinskyLayout(StaticLayout):
         """Whether the last :meth:`run` drew from the bend-minimal representation
         (True) rather than the hierarchical heuristic router.
 
-        Requesting ``bend_optimal=True`` does not guarantee it: the drawing must
-        be planar (no crossing dummies) and the representation must be a
-        realizable shape, so non-planar or non-realizable inputs fall back to the
-        heuristic router. This flag exposes that otherwise-silent fallback.
+        Requesting ``bend_optimal=True`` does not guarantee it: the
+        representation must be a realizable shape and the input in scope
+        (max degree 4 when non-planar), so out-of-scope or non-realizable inputs
+        fall back to the heuristic router. This flag exposes that
+        otherwise-silent fallback.
         """
         return self._used_bend_optimal
 
@@ -509,20 +517,17 @@ class KandinskyLayout(StaticLayout):
                 self._nodes[i].y = box.y
 
     def _apply_bend_optimal_drawing(self) -> bool:
-        """Draw from the orthogonal representation via the shared realizer.
+        """Draw from the bend-minimal representation via the shared realizer.
 
-        Only attempted for planar drawings (no crossing dummy vertices); the
-        non-planar case stays on the heuristic router, which routes through the
-        crossing vertices. Returns False -- leaving the heuristic pipeline to
-        run -- when there are crossings or the representation is not a
-        realizable shape, so the drawing never regresses.
+        Planar drawings realize the representation directly. Non-planar drawings
+        (crossing dummy vertices present) realize the *planarized* graph and
+        reassemble each original edge through its crossing points instead.
+        Returns False -- leaving the heuristic pipeline to run -- when the
+        representation is not a realizable shape or the crossing case is out of
+        scope, so the drawing never regresses.
         """
         n = len(self._nodes)
         if n == 0:
-            return False
-        # Crossing dummies mean the drawing is non-planar; the realizer needs a
-        # planar shape, so fall back to the heuristic router in that case.
-        if self._planarized_graph is not None and self._planarized_graph.crossings:
             return False
 
         link_endpoints = [
@@ -537,16 +542,28 @@ class KandinskyLayout(StaticLayout):
         ]
         cell = max(self._node_width, self._node_height) + self._node_separation
 
-        result = realize_bend_optimal_drawing(
-            num_nodes=n,
-            link_endpoints=link_endpoints,
-            node_sizes=node_sizes,
-            orthogonal_rep=self._orthogonal_rep,
-            faces=self._faces,
-            expansion=self._expansion,
-            canvas_size=self._canvas_size,
-            cell=cell,
-        )
+        if self._planarized_graph is not None and self._planarized_graph.crossings:
+            # Non-planar: realize the planarized graph, mapping crossings to
+            # shared bend points on the original edges.
+            result = realize_planarized_drawing(
+                planarized=self._planarized_graph,
+                link_endpoints=link_endpoints,
+                node_sizes=node_sizes,
+                embedder=self._embedder,
+                canvas_size=self._canvas_size,
+                cell=cell,
+            )
+        else:
+            result = realize_bend_optimal_drawing(
+                num_nodes=n,
+                link_endpoints=link_endpoints,
+                node_sizes=node_sizes,
+                orthogonal_rep=self._orthogonal_rep,
+                faces=self._faces,
+                expansion=self._expansion,
+                canvas_size=self._canvas_size,
+                cell=cell,
+            )
         if result is None:
             return False
         self._node_boxes, self._orthogonal_edges = result

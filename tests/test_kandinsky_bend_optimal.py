@@ -165,13 +165,22 @@ class TestBendOptimalExtendedDomain:
 
 
 class TestBendOptimalFallback:
-    def test_non_planar_falls_back(self):
-        """K5 is non-planar: with handle_crossings the drawing has crossing
-        dummies, so realization is skipped and the heuristic router runs."""
-        k5 = [(i, j) for i in range(5) for j in range(i + 1, 5)]
-        layout = _layout(5, k5, bend_optimal=True)
+    def test_non_planar_degree_over_4_falls_back(self):
+        """Non-planar AND some original vertex of degree > 4 is out of scope for
+        the crossings realizer (it would need cage expansion too), so it falls
+        back to the heuristic router but still draws."""
+        k6 = [(i, j) for i in range(6) for j in range(i + 1, 6)]  # every vertex degree 5
+        layout = _layout(6, k6, bend_optimal=True)
         assert layout.used_bend_optimal is False
-        assert len(layout.node_boxes) >= 5  # produced a drawing via fallback
+        assert len(layout.node_boxes) >= 6  # produced a drawing via fallback
+
+    def test_handle_crossings_off_non_planar_falls_back(self):
+        """Without planarization a non-planar graph has no planar shape, so
+        realization is skipped and the heuristic router runs."""
+        k5 = [(i, j) for i in range(5) for j in range(i + 1, 5)]
+        layout = _layout(5, k5, bend_optimal=True, handle_crossings=False)
+        assert layout.used_bend_optimal is False
+        assert len(layout.node_boxes) == 5
 
     def test_bend_optimal_setter(self):
         layout = KandinskyLayout(nodes=[{}], links=[])
@@ -185,6 +194,175 @@ class TestBendOptimalFallback:
         assert layout.used_bend_optimal is False
 
 
+def _crossing_points(layout):
+    """Canvas points where a horizontal segment of one edge meets a vertical
+    segment of a *different* edge -- the orthogonal crossings of the drawing."""
+    boxes = layout.node_boxes
+    polys = []
+    for e in layout.orthogonal_edges:
+        sp = boxes[e.source].get_port_position(e.source_port.side, e.source_port.position)
+        tp = boxes[e.target].get_port_position(e.target_port.side, e.target_port.position)
+        polys.append(([sp, *list(e.bends), tp], e.source, e.target))
+
+    def segs(p):
+        return list(zip(p, p[1:]))
+
+    points = set()
+    for i in range(len(polys)):
+        for j in range(i + 1, len(polys)):
+            for (ax1, ay1), (ax2, ay2) in segs(polys[i][0]):
+                for (bx1, by1), (bx2, by2) in segs(polys[j][0]):
+                    ah = abs(ay1 - ay2) < 1e-6
+                    bh = abs(by1 - by2) < 1e-6
+                    if ah == bh:
+                        continue
+                    (hx1, hy), (hx2, _) = (
+                        ((ax1, ay1), (ax2, ay2)) if ah else ((bx1, by1), (bx2, by2))
+                    )
+                    (vx, vy1), (_, vy2) = (
+                        ((bx1, by1), (bx2, by2)) if ah else ((ax1, ay1), (ax2, ay2))
+                    )
+                    lo, hi = min(hx1, hx2), max(hx1, hx2)
+                    vlo, vhi = min(vy1, vy2), max(vy1, vy2)
+                    if lo - 1e-6 <= vx <= hi + 1e-6 and vlo - 1e-6 <= hy <= vhi + 1e-6:
+                        points.add((round(vx, 3), round(hy, 3)))
+    return points
+
+
+def _edge_through_box(layout) -> bool:
+    boxes = layout.node_boxes
+    for e in layout.orthogonal_edges:
+        sp = boxes[e.source].get_port_position(e.source_port.side, e.source_port.position)
+        tp = boxes[e.target].get_port_position(e.target_port.side, e.target_port.position)
+        pts = [sp, *list(e.bends), tp]
+        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+            for b in boxes:
+                if b.index in (e.source, e.target):
+                    continue
+                if abs(y1 - y2) < 1e-6:
+                    lo, hi = min(x1, x2), max(x1, x2)
+                    if (
+                        (b.top + 1e-6 < y1 < b.bottom - 1e-6)
+                        and lo < b.right - 1e-6
+                        and (hi > b.left + 1e-6)
+                    ):
+                        return True
+                elif abs(x1 - x2) < 1e-6:
+                    lo, hi = min(y1, y2), max(y1, y2)
+                    if (
+                        (b.left + 1e-6 < x1 < b.right - 1e-6)
+                        and lo < b.bottom - 1e-6
+                        and (hi > b.top + 1e-6)
+                    ):
+                        return True
+    return False
+
+
+class TestBendOptimalThroughCrossings:
+    """Non-planar graphs draw bend-optimally by realizing the planarized graph;
+    each planarizer crossing becomes a clean orthogonal crossing point."""
+
+    CASES = [
+        ("K5", 5, [(i, j) for i in range(5) for j in range(i + 1, 5)]),
+        ("K3,3", 6, [(i, 3 + j) for i in range(3) for j in range(3)]),
+        (
+            "Petersen",
+            10,
+            [
+                (0, 1),
+                (1, 2),
+                (2, 3),
+                (3, 4),
+                (4, 0),
+                (0, 5),
+                (1, 6),
+                (2, 7),
+                (3, 8),
+                (4, 9),
+                (5, 7),
+                (7, 9),
+                (9, 6),
+                (6, 8),
+                (8, 5),
+            ],
+        ),
+    ]
+
+    def test_non_planar_graphs_realize(self):
+        for name, n, edges in self.CASES:
+            layout = _layout(n, edges, bend_optimal=True)
+            assert layout.used_bend_optimal is True, name
+            assert len(layout.node_boxes) == n, name  # dummies are not boxes
+            assert len(layout.orthogonal_edges) == len(edges), name
+            assert not _boxes_overlap(layout.node_boxes), f"{name}: overlapping boxes"
+            assert _all_edges_orthogonal(layout), f"{name}: non-orthogonal edge"
+            assert not _edge_through_box(layout), f"{name}: edge through a node box"
+
+    def test_crossing_count_matches_planarizer(self):
+        for name, n, edges in self.CASES:
+            layout = _layout(n, edges, bend_optimal=True)
+            assert layout.used_bend_optimal is True, name
+            # Every drawn crossing corresponds to a planarizer crossing.
+            assert len(_crossing_points(layout)) == layout.num_crossings, name
+
+    def test_k5_has_exactly_one_crossing(self):
+        n, edges = 5, [(i, j) for i in range(5) for j in range(i + 1, 5)]
+        layout = _layout(n, edges, bend_optimal=True)
+        assert len(_crossing_points(layout)) == 1
+
+    def test_random_non_planar_graphs_draw_cleanly(self):
+        """Random non-planar max-degree-4 graphs draw from the planarized
+        representation with crossings matching the planarizer and clean
+        geometry (no box overlaps, no edges through boxes)."""
+        import random
+
+        from graph_layout import check_planarity
+
+        rng = random.Random(31415)
+        drawn = 0
+        attempts = 0
+        while drawn < 25 and attempts < 4000:
+            attempts += 1
+            n = rng.randint(5, 10)
+            edges = set()
+            # random graph, then cap degree at 4
+            deg = [0] * n
+            order = [(u, v) for u in range(n) for v in range(u + 1, n)]
+            rng.shuffle(order)
+            for u, v in order:
+                if deg[u] < 4 and deg[v] < 4 and rng.random() < 0.7:
+                    edges.add((u, v))
+                    deg[u] += 1
+                    deg[v] += 1
+            edge_list = sorted(edges)
+            if len(edge_list) < n or check_planarity(n, edge_list).is_planar:
+                continue  # want a non-planar, connected-ish sample
+            # require connectivity
+            adj = {i: set() for i in range(n)}
+            for u, v in edge_list:
+                adj[u].add(v)
+                adj[v].add(u)
+            seen = {0}
+            stack = [0]
+            while stack:
+                x = stack.pop()
+                for y in adj[x]:
+                    if y not in seen:
+                        seen.add(y)
+                        stack.append(y)
+            if len(seen) != n:
+                continue
+            drawn += 1
+            layout = _layout(n, edge_list, bend_optimal=True)
+            if not layout.used_bend_optimal:
+                continue  # a few may hit a non-alternating gadget and fall back
+            assert not _boxes_overlap(layout.node_boxes), edge_list
+            assert _all_edges_orthogonal(layout), edge_list
+            assert not _edge_through_box(layout), edge_list
+            assert len(_crossing_points(layout)) == layout.num_crossings, edge_list
+        assert drawn >= 20
+
+
 class TestSvgSmoke:
     def test_bend_optimal_svg_renders(self):
         n, edges = _grid(3, 3)
@@ -192,6 +370,13 @@ class TestSvgSmoke:
         svg = layout.to_svg()
         assert svg.startswith("<svg") or "<svg" in svg
         assert "polyline" in svg or "path" in svg
+
+    def test_non_planar_bend_optimal_svg_renders(self):
+        k5 = [(i, j) for i in range(5) for j in range(i + 1, 5)]
+        layout = _layout(5, k5, bend_optimal=True)
+        assert layout.used_bend_optimal is True
+        svg = layout.to_svg()
+        assert "<svg" in svg
 
 
 if __name__ == "__main__":  # pragma: no cover

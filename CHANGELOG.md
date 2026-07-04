@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [unreleased]
+
+## [0.3.2]
+
+### Added
+
+- **`KandinskyLayout(bend_optimal=True)` draws non-planar graphs bend-optimally through their crossings** (`orthogonal/realization.py`, `orthogonal/kandinsky.py`): the opt-in bend-optimal path previously fell back to the heuristic router whenever the graph was non-planar (crossing dummies present) -- exactly Kandinsky's distinguishing case. It now realizes the *planarized* graph directly: the augmented graph (crossings replaced by degree-4 dummy vertices) is planar, so the Topology-Shape-Metrics pipeline draws it, and each original edge's polyline is reassembled by walking its augmented segments through the crossing dummies, whose grid points become the edge's bend points. Both edges of a crossing therefore pass through one shared point -- a clean orthogonal crossing. The crossing is straight-through for free: a degree-4 dummy has flow supply `4-4=0`, forcing all four corners to exactly 90 degrees, so an alternating rotation (which the embedder produces, verified on K5/K6/K7/K4,4/Petersen) makes each edge pass straight; a per-dummy alternation check guards the rare exception. New `realize_planarized_drawing` returns `None` (safe fallback) outside scope -- a non-planar graph that *also* has an original vertex of degree > 4 (would additionally need cage expansion). Non-planar graphs like K5, K3,3 and the Petersen graph now draw with the minimum bends and each crossing rendered as an orthogonal X (`tests/test_kandinsky_bend_optimal.py::TestBendOptimalThroughCrossings`).
+
+### Fixed
+
+- **Showcase cross-cut renderer detached edges from expanded cage boxes** (`tests/demos/showcase.py`): `orthogonal_layout_to_svg` (the renderer for the Kandinsky OptimalFlex / nudging / bend-optimal cards) drew every node box at a single uniform size, but a bend-optimal drawing with a degree > 4 vertex has a large cage box. Edges attach to ports on the true (large) cage boundary, so drawing the box small left the edges floating in empty space -- a valid, connected drawing looked broken. It now draws each box at its actual width/height (matching the earlier fix to the main `layout_to_svg`), so cage-bearing bend-optimal cards render as coherent connected drawings. Not a layout change: the wide cages themselves are the bend-minimal result (each spoke leaves its cage vertex straight, so the cage must span its spread-out neighbours; verified bend-count-identical to GIOTTO over 137 random degree > 4 planar graphs) -- see the area-vs-bends note in `TODO.md`.
+
 ## [0.3.1]
 
 ### Added

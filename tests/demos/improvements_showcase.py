@@ -5,6 +5,11 @@ Renders side-by-side SVG comparisons that make the changes visible:
 
   * GIOTTO ``bend_optimal`` (Topology-Shape-Metrics) vs the routing heuristic --
     the bend-minimal orthogonal representation now drives the drawing.
+  * GIOTTO bend-optimal beyond the original biconnected max-degree-4 domain:
+    bridges / cut vertices (per-corner angles, H6a) and degree > 4 vertices
+    (cage expansion, H5) now draw bend-optimally too.
+  * Obstacle-aware segment nudging -- separating coincident parallel edges no
+    longer pushes a segment through a node box.
   * Cola constraint enforcement (C1) -- overlap avoidance and separation
     constraints, which were previously inert stubs.
   * Cola nested-group containment (C1) -- group bounding rectangles now keep
@@ -29,7 +34,9 @@ from pathlib import Path
 
 from graph_layout import GIOTTOLayout, Group, Link, Node, SugiyamaLayout
 from graph_layout.cola import Layout as ColaLayout
+from graph_layout.orthogonal.edge_routing import nudge_overlapping_segments
 from graph_layout.orthogonal.planarization import planarize_graph
+from graph_layout.orthogonal.types import NodeBox, OrthogonalEdge, Port, Side
 
 BUILD_DIR = Path(__file__).parent.parent.parent / "build"
 W, H = 360, 300
@@ -82,14 +89,17 @@ def _orthogonal_svg(layout, title: str, subtitle: str) -> str:
     for line in polylines:
         d = " ".join(f"{tf(x, y)[0]:.1f},{tf(x, y)[1]:.1f}" for x, y in line)
         parts.append(f'<polyline points="{d}" fill="none" stroke="#888" stroke-width="1.6"/>')
-    # boxes
-    box_w = 18.0
-    box_h = 14.0
+    # Boxes at their true (transformed) extents, so expanded degree > 4 cage
+    # boxes show up larger than plain single-vertex boxes.
     for i, b in enumerate(boxes):
+        x0, y0 = tf(b.left, b.top)
+        x1, y1 = tf(b.right, b.bottom)
+        bw = max(x1 - x0, 8.0)
+        bh = max(y1 - y0, 8.0)
         cx, cy = tf(b.x, b.y)
         parts.append(
-            f'<rect x="{cx - box_w / 2:.1f}" y="{cy - box_h / 2:.1f}" '
-            f'width="{box_w}" height="{box_h}" rx="2" '
+            f'<rect x="{cx - bw / 2:.1f}" y="{cy - bh / 2:.1f}" '
+            f'width="{bw:.1f}" height="{bh:.1f}" rx="2" '
             f'fill="#4a90d9" stroke="#2c5aa0" stroke-width="1.5"/>'
         )
         parts.append(
@@ -345,9 +355,202 @@ def _section_giotto() -> str:
         "GIOTTO: bend-optimal drawing now reaches the output",
         "The orthogonalization computes a bend-minimal representation. Before, it "
         "was discarded and edges were routed heuristically. With bend_optimal=True "
-        "the representation drives the drawing (falls back safely when out of the "
-        "biconnected / max-degree-4 domain).",
+        "(now the default) the representation drives the drawing; it covers every "
+        "connected planar graph and falls back safely only for non-planar or "
+        "disconnected input.",
         "".join(rows),
+    )
+
+
+_EXTENDED_GRAPHS = [
+    (
+        "Binary tree",
+        7,
+        [(0, 1), (0, 2), (1, 3), (1, 4), (2, 5), (2, 6)],
+        "H6a: leaves / pendant edges",
+    ),
+    (
+        "Two squares + bridge",
+        8,
+        [(0, 1), (1, 2), (2, 3), (3, 0), (3, 4), (4, 5), (5, 6), (6, 7), (7, 4)],
+        "H6a: bridge + cut vertex",
+    ),
+    (
+        "Star K1,5",
+        6,
+        [(0, i) for i in range(1, 6)],
+        "H5: degree-5 hub -> cage box",
+    ),
+    (
+        "Wheel W6",
+        7,
+        [(0, i) for i in range(1, 7)] + [(i, i % 6 + 1) for i in range(1, 7)],
+        "H5: degree-6 hub -> cage box",
+    ),
+]
+
+
+def _section_extended_domain() -> str:
+    """Bend-optimal drawings for graphs outside the original TSM domain."""
+    cards = []
+    for name, n, edges, note in _EXTENDED_GRAPHS:
+        layout = _giotto(n, edges, True)
+        flag = "used_bend_optimal" if layout.used_bend_optimal else "fell back"
+        cards.append(
+            _orthogonal_svg(
+                layout,
+                f"{name} - {note}",
+                f"{_total_bends(layout)} bends | {flag}",
+            )
+        )
+    body = '<div class="pair">' + "".join(cards) + "</div>"
+    return _block(
+        "GIOTTO: bend-optimal beyond biconnected max-degree-4",
+        "The bend-minimal path used to cover only biconnected planar graphs of "
+        "maximum degree 4; everything else fell back to the heuristic router. Two "
+        "extensions close the domain to all connected planar graphs: angles are "
+        "now stored per corner (keyed by the incoming dart), so bridges and cut "
+        "vertices -- whose face walks revisit a vertex -- are handled (H6a); and "
+        "vertices of degree > 4 are expanded into a cage cycle drawn as a "
+        "rectangular node box, with edges attaching along its sides at distinct "
+        "ports (H5). Each drawing below comes from the bend-minimal representation "
+        "(the larger boxes are expanded high-degree cages).",
+        body,
+    )
+
+
+def _seg_hits_box(p1: tuple[float, float], p2: tuple[float, float], box: NodeBox) -> bool:
+    """Whether the axis-aligned segment p1->p2 passes through a box interior."""
+    x1, y1 = p1
+    x2, y2 = p2
+    if abs(y1 - y2) < 1e-6:  # horizontal
+        lo, hi = sorted((x1, x2))
+        return box.top < y1 < box.bottom and lo < box.right and hi > box.left
+    lo, hi = sorted((y1, y2))
+    return box.left < x1 < box.right and lo < box.bottom and hi > box.top
+
+
+def _nudge_scene_svg(
+    boxes: list[NodeBox],
+    edges: list[OrthogonalEdge],
+    obstacle_idx: int,
+    title: str,
+    subtitle: str,
+) -> str:
+    """Render an orthogonal scene, highlighting the obstacle box and any edge
+    segment that passes through it (red)."""
+    obstacle = boxes[obstacle_idx]
+    polylines: list[list[tuple[float, float]]] = []
+    pts: list[tuple[float, float]] = []
+    for e in edges:
+        sp = boxes[e.source].get_port_position(e.source_port.side, e.source_port.position)
+        tp = boxes[e.target].get_port_position(e.target_port.side, e.target_port.position)
+        line = [sp, *list(e.bends), tp]
+        polylines.append(line)
+        pts.extend(line)
+    for b in boxes:
+        pts.append((b.left, b.top))
+        pts.append((b.right, b.bottom))
+    tf = _fit(pts, W, H, PAD)
+
+    parts = [f'<svg width="{W}" height="{H}" viewBox="0 0 {W} {H}">']
+    parts.append(f'<rect width="{W}" height="{H}" fill="#fbfbfd"/>')
+    hits = 0
+    for line in polylines:
+        bad = any(_seg_hits_box(line[i], line[i + 1], obstacle) for i in range(len(line) - 1))
+        hits += 1 if bad else 0
+        color = "#d64545" if bad else "#888"
+        width = 2.4 if bad else 1.6
+        d = " ".join(f"{tf(x, y)[0]:.1f},{tf(x, y)[1]:.1f}" for x, y in line)
+        parts.append(
+            f'<polyline points="{d}" fill="none" stroke="{color}" stroke-width="{width}"/>'
+        )
+    for i, b in enumerate(boxes):
+        x0, y0 = tf(b.left, b.top)
+        x1, y1 = tf(b.right, b.bottom)
+        is_obstacle = i == obstacle_idx
+        fill = "#e0a63a" if is_obstacle else "#4a90d9"
+        stroke = "#a5741a" if is_obstacle else "#2c5aa0"
+        cx, cy = tf(b.x, b.y)
+        parts.append(
+            f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" height="{y1 - y0:.1f}" '
+            f'rx="2" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>'
+        )
+        label = "obstacle" if is_obstacle else str(i)
+        parts.append(
+            f'<text x="{cx:.1f}" y="{cy + 3:.1f}" text-anchor="middle" '
+            f'font-size="8" fill="#fff" font-family="sans-serif">{label}</text>'
+        )
+    parts.append("</svg>")
+    full_subtitle = f"{subtitle} | {hits} segment(s) through the node box"
+    return _card(title, full_subtitle, "".join(parts))
+
+
+def _section_nudging() -> str:
+    """Obstacle-aware segment nudging vs the old blind offset."""
+    # Two edges share a horizontal run at y=200; an obstacle box sits just below
+    # it. The blind centered offset pushes one segment down onto the obstacle;
+    # the obstacle-aware version keeps every segment clear of node boxes.
+    boxes = [
+        NodeBox(0, 100, 100, 60, 40),
+        NodeBox(1, 500, 100, 60, 40),
+        NodeBox(2, 100, 300, 60, 40),
+        NodeBox(3, 500, 300, 60, 40),
+        NodeBox(4, 300, 245, 80, 40),  # obstacle: spans y[225,265]
+    ]
+    shared = [(100.0, 200.0), (500.0, 200.0)]
+    edges = [
+        OrthogonalEdge(
+            0, 1, Port(0, Side.SOUTH, 0.5), Port(1, Side.SOUTH, 0.5), bends=list(shared)
+        ),
+        OrthogonalEdge(
+            2, 3, Port(2, Side.NORTH, 0.5), Port(3, Side.NORTH, 0.5), bends=list(shared)
+        ),
+    ]
+
+    # Blind nudge: centered offsets applied without checking node boxes. For the
+    # two-edge cluster the offsets are -/+ edge_separation/2 (here 30), pushing
+    # the second edge's shared run down onto the obstacle.
+    def _shift(edge: OrthogonalEdge, dy: float) -> OrthogonalEdge:
+        return OrthogonalEdge(
+            edge.source,
+            edge.target,
+            edge.source_port,
+            edge.target_port,
+            bends=[(x, y + dy) for x, y in edge.bends],
+        )
+
+    blind = [_shift(edges[0], -30.0), _shift(edges[1], +30.0)]
+    aware = nudge_overlapping_segments(edges, boxes, edge_separation=60.0)
+
+    cards = (
+        '<div class="pair">'
+        + _nudge_scene_svg(
+            boxes,
+            blind,
+            4,
+            "blind nudge (before)",
+            "centered offset ignores the box",
+        )
+        + _nudge_scene_svg(
+            boxes,
+            aware,
+            4,
+            "obstacle-aware nudge (now)",
+            "offset chosen clear of node boxes",
+        )
+        + "</div>"
+    )
+    return _block(
+        "Orthogonal routing: obstacle-aware segment nudging",
+        "Nudging spreads coincident parallel edge segments apart so they are "
+        "distinguishable. The old version applied the centered offsets blindly, "
+        "which could push a segment straight through a node box. It now checks "
+        "each candidate offset against the node boxes (excluding the segment's own "
+        "endpoints) and picks a clear one -- the planned offset, else its mirror, "
+        "else leaving the segment in place (a shared lane is preferable to routing "
+        "through a node).",
+        cards,
     )
 
 
@@ -640,6 +843,8 @@ def main() -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     sections = (
         _section_giotto()
+        + _section_extended_domain()
+        + _section_nudging()
         + _section_cola()
         + _section_groups()
         + _section_brandes_koepf()

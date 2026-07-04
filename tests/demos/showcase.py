@@ -194,8 +194,12 @@ LAYOUTS: list[LayoutSpec] = [
             "node_height": 20,
             "node_separation": 40,
             "bend_optimal": True,
+            # Non-strict so the showcase can include graphs outside the strict
+            # degree-4 contract (degree > 4, bridges); they still draw
+            # bend-optimally via cage expansion / per-corner angles.
+            "strict": False,
         },
-        description="Bend-optimal for degree-4 planar graphs",
+        description="Bend-optimal orthogonal (all connected planar graphs)",
         suitable_for=("degree4_planar",),
     ),
     # Cola (constraint-based)
@@ -396,6 +400,42 @@ def generate_ladder_graph() -> tuple[list[dict], list[dict]]:
             links.append({"source": left, "target": left + 2})
             links.append({"source": right, "target": right + 2})
 
+    return nodes, links
+
+
+def generate_high_degree_hub_graph() -> tuple[list[dict], list[dict]]:
+    """Generate a wheel W6: a degree-6 hub inside a 6-cycle.
+
+    The hub has degree 6, outside the classic degree-4 GIOTTO domain. It draws
+    bend-optimally via vertex expansion (the hub becomes a rectangular cage box
+    with the six spokes attaching along its sides).
+    """
+    n = 7
+    nodes = [{} for _ in range(n)]
+    links = [{"source": 0, "target": i} for i in range(1, 7)]
+    links += [{"source": i, "target": i % 6 + 1} for i in range(1, 7)]
+    return nodes, links
+
+
+def generate_bridged_graph() -> tuple[list[dict], list[dict]]:
+    """Generate two 4-cycles joined by a bridge (a non-biconnected graph).
+
+    The bridge endpoints are cut vertices, outside the biconnected domain the
+    bend-optimal path originally required. Per-corner angles (H6a) now draw it
+    from the bend-minimal representation.
+    """
+    nodes = [{} for _ in range(8)]
+    links = [
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 3},
+        {"source": 3, "target": 0},
+        {"source": 3, "target": 4},  # bridge
+        {"source": 4, "target": 5},
+        {"source": 5, "target": 6},
+        {"source": 6, "target": 7},
+        {"source": 7, "target": 4},
+    ]
     return nodes, links
 
 
@@ -616,10 +656,16 @@ def layout_to_svg(
     if show_orthogonal and hasattr(layout, "_node_width") and hasattr(layout, "node_boxes"):
         nw = layout._node_width
         nh = layout._node_height
-        for n in nodes:
-            all_x.extend([n.x - nw / 2, n.x + nw / 2])
-            all_y.extend([n.y - nh / 2, n.y + nh / 2])
         boxes = layout.node_boxes
+        # Use each box's true extent (expanded degree > 4 cage boxes are larger
+        # than the default node size).
+        box_by_index = {b.index: b for b in boxes}
+        for i, n in enumerate(nodes):
+            b = box_by_index.get(i)
+            bw = b.width if b is not None else nw
+            bh = b.height if b is not None else nh
+            all_x.extend([n.x - bw / 2, n.x + bw / 2])
+            all_y.extend([n.y - bh / 2, n.y + bh / 2])
         for edge in layout.orthogonal_edges:
             if edge.source < len(boxes) and edge.target < len(boxes):
                 sp = boxes[edge.source].get_port_position(
@@ -680,11 +726,19 @@ def layout_to_svg(
     if show_orthogonal and hasattr(layout, "_node_width"):
         nw = layout._node_width
         nh = layout._node_height
-        rx = min(nw, nh) * 0.3
+        # Draw each box at its true size so expanded degree > 4 cage boxes show
+        # up larger than the default single-vertex boxes.
+        box_by_index = {}
+        if hasattr(layout, "node_boxes"):
+            box_by_index = {b.index: b for b in layout.node_boxes}
         for i, node in enumerate(nodes):
+            b = box_by_index.get(i)
+            bw = b.width if b is not None else nw
+            bh = b.height if b is not None else nh
+            rx = min(bw, bh) * 0.3
             svg_parts.append(
-                f'<rect x="{node.x - nw / 2:.1f}" y="{node.y - nh / 2:.1f}" '
-                f'width="{nw}" height="{nh}" rx="{rx:.1f}" '
+                f'<rect x="{node.x - bw / 2:.1f}" y="{node.y - bh / 2:.1f}" '
+                f'width="{bw}" height="{bh}" rx="{rx:.1f}" '
                 f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
             )
             svg_parts.append(
@@ -853,10 +907,10 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
                 <li><strong>Kuratowski Witness:</strong> K5/K3,3 subgraph extraction</li>
                 <li><strong>OptimalFlexEmbedder:</strong> LP-based bend minimization</li>
                 <li><strong>Visibility Routing:</strong> Obstacle-aware edge routing</li>
-                <li><strong>Segment Nudging:</strong> Overlap separation</li>
+                <li><strong>Segment Nudging:</strong> Obstacle-aware overlap separation</li>
                 <li><strong>Port Constraints:</strong> User-specified edge exit/entry sides</li>
                 <li><strong>ILP Compaction:</strong> Optimal area minimization (requires scipy)</li>
-                <li><strong>GIOTTO:</strong> Bend-optimal for degree-4 planar graphs</li>
+                <li><strong>GIOTTO:</strong> Bend-optimal orthogonal (connected planar graphs)</li>
             </ul>
         </div>
 """
@@ -1142,6 +1196,26 @@ def orthogonal_layout_to_svg(
     return "\n".join(svg)
 
 
+def _edge_through_any_box(edge: Any, boxes: list[Any]) -> bool:
+    """Whether any segment of an orthogonal edge crosses a non-endpoint box."""
+    sp = boxes[edge.source].get_port_position(edge.source_port.side, edge.source_port.position)
+    tp = boxes[edge.target].get_port_position(edge.target_port.side, edge.target_port.position)
+    pts = [sp, *list(edge.bends), tp]
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        for b in boxes:
+            if b.index in (edge.source, edge.target):
+                continue
+            if abs(y1 - y2) < 1e-6:  # horizontal
+                lo, hi = sorted((x1, x2))
+                if b.top < y1 < b.bottom and lo < b.right and hi > b.left:
+                    return True
+            elif abs(x1 - x2) < 1e-6:  # vertical
+                lo, hi = sorted((y1, y2))
+                if b.left < x1 < b.right and lo < b.bottom and hi > b.top:
+                    return True
+    return False
+
+
 def nudged_layout_to_svg(
     layout: Any,
     title: str,
@@ -1149,17 +1223,55 @@ def nudged_layout_to_svg(
 ) -> str:
     """Render a Kandinsky/GIOTTO layout after applying segment nudging.
 
-    Draws the nudged orthogonal edges using the layout's node boxes.
+    Draws the nudged orthogonal edges over the layout's node boxes, with the
+    same fit transform as the other orthogonal renderers. Segment nudging is
+    now obstacle-aware, so it reports how many edges cross a node box (0).
     """
-    nodes = layout.nodes
     boxes = layout.node_boxes
-    nudged = nudge_overlapping_segments(layout.orthogonal_edges, boxes, edge_separation=15.0)
+    original = layout.orthogonal_edges
+    nudged = nudge_overlapping_segments(original, boxes, edge_separation=15.0)
+    # Obstacle-aware nudging never *introduces* a node crossing; report the
+    # count before and after (any crossings present before come from the base
+    # heuristic router, which nudging cannot remove but must not worsen).
+    crossings_before = sum(1 for e in original if _edge_through_any_box(e, boxes))
+    crossings_after = sum(1 for e in nudged if _edge_through_any_box(e, boxes))
+
+    nw = getattr(layout, "_node_width", 30)
+    nh = getattr(layout, "_node_height", 20)
+    rx = min(nw, nh) * 0.3
 
     w, h = SVG_WIDTH, SVG_HEIGHT
     svg = [
         f'<svg width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">',
         '<rect width="100%" height="100%" fill="#fafafa" stroke="#27ae60" stroke-width="2"/>',
     ]
+
+    # Fit over node boxes and nudged edge geometry.
+    all_x: list[float] = []
+    all_y: list[float] = []
+    for node in layout.nodes:
+        all_x.extend([node.x - nw / 2, node.x + nw / 2])
+        all_y.extend([node.y - nh / 2, node.y + nh / 2])
+    for edge in nudged:
+        if edge.source < len(boxes) and edge.target < len(boxes):
+            sp = boxes[edge.source].get_port_position(
+                edge.source_port.side, edge.source_port.position
+            )
+            tp = boxes[edge.target].get_port_position(
+                edge.target_port.side, edge.target_port.position
+            )
+            all_x.extend([sp[0], tp[0]])
+            all_y.extend([sp[1], tp[1]])
+            for bx, by in edge.bends:
+                all_x.append(bx)
+                all_y.append(by)
+
+    content_h = float(h) - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM
+    fit = _fit_transform(all_x, all_y, float(w), content_h)
+    inner_transform = f"translate(0,{SVG_MARGIN_TOP})"
+    if fit:
+        inner_transform += f" {fit}"
+    svg.append(f'<g transform="{inner_transform}">')
 
     # Draw nudged edges using port positions
     for edge in nudged:
@@ -1168,10 +1280,11 @@ def nudged_layout_to_svg(
             continue
         svg.append(f'<path d="{path_d}" stroke="#27ae60" stroke-width="1.5" fill="none"/>')
 
-    # Draw nodes
-    for i, node in enumerate(nodes):
+    # Draw node boxes (orthogonal layouts use rectangular nodes)
+    for i, node in enumerate(layout.nodes):
         svg.append(
-            f'<circle cx="{node.x:.1f}" cy="{node.y:.1f}" r="8" '
+            f'<rect x="{node.x - nw / 2:.1f}" y="{node.y - nh / 2:.1f}" '
+            f'width="{nw}" height="{nh}" rx="{rx:.1f}" '
             f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
         )
         svg.append(
@@ -1179,6 +1292,8 @@ def nudged_layout_to_svg(
             f'text-anchor="middle" fill="#fff" font-size="8"'
             f' font-family="sans-serif">{i}</text>'
         )
+
+    svg.append("</g>")
 
     # Title
     svg.append(
@@ -1189,7 +1304,9 @@ def nudged_layout_to_svg(
     svg.append(
         f'<text x="{w // 2}" y="35" text-anchor="middle" '
         f'fill="#27ae60" font-size="10"'
-        f' font-family="sans-serif">After segment nudging</text>'
+        f' font-family="sans-serif">'
+        f"Obstacle-aware nudging (node crossings {crossings_before}"
+        f"&#8594;{crossings_after})</text>"
     )
 
     n_bends = sum(len(e.bends) for e in nudged)
@@ -1218,6 +1335,8 @@ def main() -> None:
         "Port Constraints Demo": generate_port_constraints_graph(),
         "3x3 Grid (GIOTTO)": generate_degree4_planar_graph(),
         "Ladder Graph (GIOTTO)": generate_ladder_graph(),
+        "Wheel W6 hub, deg 6 (GIOTTO)": generate_high_degree_hub_graph(),
+        "Two squares + bridge (GIOTTO)": generate_bridged_graph(),
     }
 
     # Which layouts to use for which graph types
@@ -1230,6 +1349,8 @@ def main() -> None:
         "Port Constraints Demo": ("port_constraints",),
         "3x3 Grid (GIOTTO)": ("degree4_planar",),
         "Ladder Graph (GIOTTO)": ("degree4_planar",),
+        "Wheel W6 hub, deg 6 (GIOTTO)": ("degree4_planar",),
+        "Two squares + bridge (GIOTTO)": ("degree4_planar",),
     }
 
     sections = []
@@ -1283,9 +1404,20 @@ def main() -> None:
                     except Exception as e:
                         print(f"      Error: {e}")
 
-                    # Segment nudging disabled -- current implementation moves
-                    # segments without obstacle-aware re-routing, causing edges
-                    # to pass through node boxes.  See TODO.md.
+                    # Segment nudging variant: separates coincident parallel
+                    # segments. Now obstacle-aware -- it will not push a segment
+                    # through a node box (reported as "0 edges through nodes").
+                    try:
+                        print("    + Kandinsky (segment nudging)...")
+                        svgs.append(
+                            nudged_layout_to_svg(
+                                layout,
+                                "Kandinsky (segment nudging)",
+                                graph_name,
+                            )
+                        )
+                    except Exception as e:
+                        print(f"      Error: {e}")
 
             except Exception as e:
                 print(f"    Error: {e}")

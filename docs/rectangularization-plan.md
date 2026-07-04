@@ -1,5 +1,18 @@
 # Design plan: turn-regularization for orthogonal compaction
 
+> **Status: IMPLEMENTED** (`orthogonal/metrics.py:_rectangularize`, tests in
+> `tests/test_rectangularization.py`). The implementation uses the classical
+> full rectangular refinement (Tamassia; Di Battista et al. ch. 5) rather than
+> Bridgeman et al.'s minimal kitty-corner saturation: every reflex corner of
+> every bounded face is projected onto its front wall, and the outer face is
+> enclosed in a dummy rectangle via four connector rays chosen at the first
+> downward crossings of the boundary's lifted rotation. Full refinement is a
+> superset of kitty-corner saturation -- simpler, always correct, at the cost
+> of some extra (undrawn) constraints. Verified 100% clean over 1500 random
+> in-domain graphs across 5 seeds (was ~94.5%); `bend_optimal` is now
+> GIOTTOLayout's default. Kept for the reference material and the definition
+> of the remaining domain extensions (H5, H6a).
+
 ## Goal
 
 Make `GIOTTOLayout(bend_optimal=True)` produce a clean, planar orthogonal drawing for **100%** of its domain (biconnected planar graphs of maximum degree 4), so it can become the default rather than an opt-in with fallback.

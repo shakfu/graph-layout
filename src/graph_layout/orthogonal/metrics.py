@@ -32,9 +32,10 @@ returns ``valid=False``, and callers should fall back to a heuristic router.
 
 from __future__ import annotations
 
+import itertools
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from .orthogonalization import Face, OrthogonalRepresentation
 
@@ -211,6 +212,243 @@ def compute_orthogonal_shape(
     return ShapeResult(valid=True, edge_shapes=edge_shapes)
 
 
+# =============================================================================
+# Rectangularization (turn-regularization for compaction)
+# =============================================================================
+#
+# The coordinate assignment below solves two independent 1-D constraint systems
+# built from the edges' own segments. That is provably sufficient only when
+# every face is a rectangle: then any two segments needing separation are
+# directly connected by boundary edges. For non-rectangular faces the classical
+# fix (Tamassia; Di Battista et al., "Graph Drawing", ch. 5) is *refinement*:
+# project every reflex corner of every bounded face onto the edge it faces,
+# adding a dummy vertex and a dummy axis-parallel edge, until all faces are
+# rectangles. The dummy edges are pure separation constraints (never drawn).
+#
+# The outer face needs the same treatment but cannot be refined directly (an
+# unbounded region always keeps four excess reflex corners). It is handled by
+# the classical enclosing rectangle: four dummy connector rays from boundary
+# corners covering all four compass directions attach the boundary to a dummy
+# surrounding rectangle, splitting the outer region into four bounded annulus
+# faces, which are then refined like any other face.
+
+# A point in the drawing: ("v", vertex), ("b", dart, i) for bends, or a dummy
+# ("d", counter) introduced by rectangularization.
+_PointKey = Any
+_Dart = tuple[_PointKey, _PointKey, int]
+
+
+def _signed_turn(d_in: int, d_out: int) -> int:
+    """Turn at a corner: +1 convex (left), 0 flat, -1 reflex (right), 2 U-turn."""
+    return {0: 0, 1: 1, 3: -1}.get((d_out - d_in) % 4, 2)
+
+
+def _walk_turns(walk: list[_Dart]) -> list[int]:
+    m = len(walk)
+    return [_signed_turn(walk[(i - 1) % m][2], walk[i][2]) for i in range(m)]
+
+
+def _build_face_walks(
+    faces: list[Face],
+    shape: ShapeResult,
+    darts: dict[tuple[int, int], tuple[int, int]],
+    edge_chain: dict[tuple[int, int], list[_PointKey]],
+) -> Optional[tuple[list[list[_Dart]], Optional[list[_Dart]]]]:
+    """Express every face as a cyclic walk of point-level darts.
+
+    Each face dart (u, v) expands into its chain of vertex/bend points with the
+    direction of every straight segment. Returns ``(bounded_walks, outer_walk)``
+    or None if any walk violates the turn invariant (bounded +4, outer -4),
+    which signals an out-of-domain input.
+    """
+    bounded: list[list[_Dart]] = []
+    outer: Optional[list[_Dart]] = None
+    for face in faces:
+        walk: list[_Dart] = []
+        for u, v in face.edges:
+            key = (min(u, v), max(u, v))
+            if key not in darts or (u, v) not in shape.edge_shapes:
+                return None
+            chain = edge_chain[key]
+            if darts[key] != (u, v):
+                chain = list(reversed(chain))
+            seg_dirs = shape.edge_shapes[(u, v)].segments
+            if len(seg_dirs) != len(chain) - 1:
+                return None
+            for i, d in enumerate(seg_dirs):
+                walk.append((chain[i], chain[i + 1], d))
+        if not walk:
+            return None
+        turns = _walk_turns(walk)
+        if any(t == 2 for t in turns):
+            return None
+        total = sum(turns)
+        if face.is_outer:
+            if total != -4 or outer is not None:
+                return None
+            outer = walk
+        else:
+            if total != 4:
+                return None
+            bounded.append(walk)
+    return bounded, outer
+
+
+def _enclose_outer(
+    outer_walk: list[_Dart], counter: "itertools.count[int]"
+) -> Optional[tuple[list[list[_Dart]], list[_Dart]]]:
+    """Surround the outer boundary with a dummy rectangle.
+
+    Chooses four reflex corners of the outer walk at the first arrival times of
+    the lifted rotation at -1..-4; their in-directions cover the four compass
+    directions in clockwise order. From each, a dummy connector ray runs outward
+    to an attachment point on the rectangle. Returns the four bounded annulus
+    face walks and the dummy darts (connectors + rectangle sides), or None if
+    the construction fails.
+    """
+    m = len(outer_walk)
+    turns = _walk_turns(outer_walk)
+    # First arrival of the lifted rotation at -1, -2, -3, -4 (each necessarily
+    # reached via a -1 corner).
+    t_idx: list[int] = []
+    r = 0
+    target = -1
+    for i in range(m):
+        r += turns[i]
+        if r == target:
+            t_idx.append(i)
+            target -= 1
+            if target < -4:
+                break
+    if len(t_idx) != 4:
+        return None
+    corners = [outer_walk[t][0] for t in t_idx]
+    dirs = [outer_walk[(t - 1) % m][2] for t in t_idx]  # in-directions, clockwise
+    if len(set(dirs)) != 4 or len(set(corners)) != 4:
+        return None
+
+    attach: list[_PointKey] = [("d", next(counter)) for _ in range(4)]
+    rect: list[_PointKey] = [("d", next(counter)) for _ in range(4)]
+    dummy: list[_Dart] = []
+    for i in range(4):
+        dummy.append((corners[i], attach[i], dirs[i]))  # connector ray
+        dummy.append((attach[(i + 1) % 4], rect[i], dirs[i]))  # rectangle side
+        dummy.append((rect[i], attach[i], (dirs[i] + 1) % 4))  # rectangle side
+
+    annulus: list[list[_Dart]] = []
+    for i in range(4):
+        j = (i + 1) % 4
+        walk: list[_Dart] = [(attach[i], corners[i], (dirs[i] + 2) % 4)]
+        k = t_idx[i]
+        while k != t_idx[j]:
+            walk.append(outer_walk[k])
+            k = (k + 1) % m
+        walk.append((corners[j], attach[j], dirs[j]))
+        walk.append((attach[j], rect[i], dirs[i]))
+        walk.append((rect[i], attach[i], (dirs[i] + 1) % 4))
+        if sum(_walk_turns(walk)) != 4:
+            return None
+        annulus.append(walk)
+    return annulus, dummy
+
+
+def _refine_to_rectangles(
+    walks: list[list[_Dart]], counter: "itertools.count[int]"
+) -> Optional[list[_Dart]]:
+    """Dissect bounded faces until none has a reflex corner.
+
+    Each reflex corner P is projected onto its *front* dart -- the first dart
+    after P where the cumulative turn reaches +2 -- splitting that dart at a new
+    dummy point W and adding the dummy dart (P, W) in the direction of the edge
+    entering P. Every refinement removes one reflex corner and introduces none,
+    so this terminates with every face a rectangle. Returns the dummy darts
+    (segment constraints), or None on any anomaly.
+    """
+    extra: list[_Dart] = []
+    stack = [w for w in walks]
+    guard = sum(len(w) for w in walks) * 8 + 64
+    while stack:
+        guard -= 1
+        if guard < 0:
+            return None
+        walk = stack.pop()
+        m = len(walk)
+        if m < 4:
+            continue
+        turns = _walk_turns(walk)
+        if any(t == 2 for t in turns):
+            return None
+        if -1 not in turns:
+            continue  # turn-regular (rectangle up to flat corners): done
+        k = turns.index(-1)
+        reflex_point = walk[k][0]
+        d_in = walk[(k - 1) % m][2]
+
+        # Front dart: first dart after the corner with cumulative turn +2.
+        r = 0
+        front = None
+        for step in range(1, m):
+            j = (k + step) % m
+            r += turns[j]
+            if r == 2:
+                front = j
+                break
+        if front is None or front == k or front == (k - 1) % m:
+            return None
+
+        a_pt, b_pt, front_dir = walk[front]
+        w_pt: _PointKey = ("d", next(counter))
+        extra.append((a_pt, w_pt, front_dir))
+        extra.append((w_pt, b_pt, front_dir))
+        extra.append((reflex_point, w_pt, d_in))
+
+        def _cyc(lo: int, hi: int) -> list[_Dart]:
+            out: list[_Dart] = []
+            i = lo
+            while i != hi:
+                out.append(walk[i])
+                i = (i + 1) % m
+            return out
+
+        first = [(reflex_point, w_pt, d_in), (w_pt, b_pt, front_dir)]
+        second = [(a_pt, w_pt, front_dir), (w_pt, reflex_point, (d_in + 2) % 4)]
+        stack.append(first + _cyc((front + 1) % m, k))
+        stack.append(_cyc(k, front) + second)
+    return extra
+
+
+def _rectangularize(
+    faces: list[Face],
+    shape: ShapeResult,
+    darts: dict[tuple[int, int], tuple[int, int]],
+    edge_chain: dict[tuple[int, int], list[_PointKey]],
+) -> Optional[list[_Dart]]:
+    """Compute the dummy separation darts that make every face a rectangle.
+
+    Returns the full list of dummy darts (enclosing rectangle + refinement
+    projections) to feed into the axis constraint systems, or None if the input
+    is out of domain -- callers then fall back to the unrefined assignment.
+    """
+    built = _build_face_walks(faces, shape, darts, edge_chain)
+    if built is None:
+        return None
+    bounded, outer = built
+    counter = itertools.count()
+    dummy: list[_Dart] = []
+    if outer is not None:
+        enclosed = _enclose_outer(outer, counter)
+        if enclosed is None:
+            return None
+        annulus, rect_darts = enclosed
+        bounded = bounded + annulus
+        dummy.extend(rect_darts)
+    refined = _refine_to_rectangles(bounded, counter)
+    if refined is None:
+        return None
+    dummy.extend(refined)
+    return dummy
+
+
 @dataclass
 class DrawingResult:
     """Integer coordinates realizing a shape.
@@ -311,7 +549,11 @@ def _assign_axis(
     return {i: coord[uf.find(i)] for i in range(n_points)}
 
 
-def compute_coordinates(shape: ShapeResult, edges: list[tuple[int, int]]) -> DrawingResult:
+def compute_coordinates(
+    shape: ShapeResult,
+    edges: list[tuple[int, int]],
+    faces: Optional[list[Face]] = None,
+) -> DrawingResult:
     """Assign integer coordinates realizing ``shape``.
 
     Builds a point per vertex and per bend, records each segment's direction,
@@ -320,13 +562,14 @@ def compute_coordinates(shape: ShapeResult, edges: list[tuple[int, int]]) -> Dra
     orthogonal drawing in which every segment is axis-aligned in its shape
     direction.
 
-    Two coordinate assignments are tried and the first clean one is returned:
-    compact longest-path (smallest drawing), then a "spread" assignment that
-    gives every coordinate class a distinct value (separating independent
-    features that longest-path collapses). If neither is clean -- overlaps,
-    crossings, or an edge through a vertex remain, which full face
-    rectangularization would resolve -- the result is invalid so callers fall
-    back to the heuristic router.
+    When ``faces`` is provided, the faces are first *rectangularized* (classical
+    turn-regularization): every bounded face is dissected into rectangles and
+    the outer face is enclosed in a dummy rectangle, yielding dummy separation
+    constraints under which the per-edge constraint graphs are provably
+    sufficient for a planar drawing. Assignments are tried in order --
+    rectangularized compact, rectangularized spread, then the unrefined compact
+    and spread fallbacks -- and the first clean one is returned. If none is
+    clean the result is invalid so callers fall back to the heuristic router.
     """
     if not shape.valid:
         return DrawingResult(valid=False, reason="invalid shape")
@@ -367,12 +610,28 @@ def compute_coordinates(shape: ShapeResult, edges: list[tuple[int, int]]) -> Dra
             segments.append((pid(chain[i]), pid(chain[i + 1]), direction))
         edge_chain[ekey] = chain
 
+    # Rectangularization: dummy separation constraints that make the per-edge
+    # constraint graphs sufficient (see _rectangularize). Dummy points receive
+    # point ids too but are never read back into the drawing.
+    rect_segments: Optional[list[tuple[int, int, int]]] = None
+    if faces is not None:
+        dummy_darts = _rectangularize(faces, shape, darts, edge_chain)
+        if dummy_darts is not None:
+            rect_segments = [(pid(a), pid(b), d) for a, b, d in dummy_darts]
+
     n_points = len(point_id)
 
+    attempts: list[tuple[bool, list[tuple[int, int, int]]]] = []
+    if rect_segments is not None:
+        attempts.append((False, segments + rect_segments))
+        attempts.append((True, segments + rect_segments))
+    attempts.append((False, segments))
+    attempts.append((True, segments))
+
     last_reason = "contradictory coordinate constraints"
-    for spread in (False, True):
-        xs = _assign_axis(n_points, segments, horizontal=True, spread=spread)
-        ys = _assign_axis(n_points, segments, horizontal=False, spread=spread)
+    for spread, segs in attempts:
+        xs = _assign_axis(n_points, segs, horizontal=True, spread=spread)
+        ys = _assign_axis(n_points, segs, horizontal=False, spread=spread)
         if xs is None or ys is None:
             continue
 

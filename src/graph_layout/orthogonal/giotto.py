@@ -95,7 +95,7 @@ class GIOTTOLayout(StaticLayout):
         strict: bool = True,
         embedder: Optional[PlanarEmbedder] = None,
         compaction_method: str = "greedy",
-        bend_optimal: bool = False,
+        bend_optimal: bool = True,
     ) -> None:
         """
         Initialize GIOTTO layout.
@@ -121,6 +121,11 @@ class GIOTTOLayout(StaticLayout):
                 - "greedy": Greedy constraint-based compaction (default)
                 - "flow": Flow-based compaction using min-cost flow
                 - "longest_path": Longest-path compaction on constraint DAG
+            bend_optimal: Drive the drawing from the bend-minimal orthogonal
+                representation (Topology-Shape-Metrics with rectangularization).
+                Default True; out-of-domain inputs (degree > 4, non-biconnected)
+                silently fall back to the heuristic router -- check
+                ``used_bend_optimal``. Set False to force the heuristic router.
         """
         super().__init__(
             nodes=nodes,
@@ -142,16 +147,16 @@ class GIOTTOLayout(StaticLayout):
         self._strict = bool(strict)
         self._embedder: PlanarEmbedder = embedder or MaxFaceEmbedder()
         self._compaction_method = compaction_method
-        # When True, drive the drawing from the bend-minimal orthogonal
-        # representation (Topology-Shape-Metrics) rather than the geometric
-        # routing heuristic, whenever the representation is a realizable shape
-        # (biconnected, max degree 4). Falls back to the heuristic otherwise.
+        # When True (default), drive the drawing from the bend-minimal
+        # orthogonal representation (Topology-Shape-Metrics) rather than the
+        # geometric routing heuristic, whenever the representation is a
+        # realizable shape (biconnected, max degree 4). With rectangularization
+        # this covers the whole in-scope domain; out-of-domain inputs fall back
+        # to the heuristic.
         self._bend_optimal = bool(bend_optimal)
         # Whether the last run actually drew from the bend-minimal representation
-        # (True) or fell back to the heuristic router (False). The bend-optimal
-        # path is not always usable even when requested -- out-of-domain inputs
-        # (degree > 4, non-biconnected) and the ~11% of biconnected max-degree-4
-        # graphs whose coordinate assignment would cross both fall back.
+        # (True) or fell back to the heuristic router (False). Out-of-domain
+        # inputs (degree > 4, non-biconnected) silently fall back.
         self._used_bend_optimal = False
 
         # Output data
@@ -243,11 +248,10 @@ class GIOTTOLayout(StaticLayout):
         representation (True) rather than falling back to the heuristic router.
 
         Requesting ``bend_optimal=True`` does not guarantee it is used: the
-        representation must be a realizable orthogonal shape. Out-of-domain
-        inputs (degree > 4, non-biconnected) and the minority of biconnected
-        max-degree-4 graphs whose coordinate assignment would cross both fall
-        back. This flag lets callers detect that silent fallback -- e.g. to warn,
-        or to decide whether the drawing is bend-minimal.
+        representation must be a realizable orthogonal shape, so out-of-domain
+        inputs (degree > 4, non-biconnected) fall back to the heuristic router.
+        This flag lets callers detect that silent fallback -- e.g. to warn, or
+        to decide whether the drawing is bend-minimal.
         """
         return self._used_bend_optimal
 
@@ -442,7 +446,7 @@ class GIOTTOLayout(StaticLayout):
         shape = compute_orthogonal_shape(self._faces, self._orthogonal_rep)
         if not shape.valid:
             return False
-        drawing = compute_coordinates(shape, edges)
+        drawing = compute_coordinates(shape, edges, faces=self._faces)
         if not drawing.valid or len(drawing.vertex_positions) != n:
             return False
 

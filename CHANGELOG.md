@@ -17,6 +17,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Added
+
+- **Rectangularization (turn-regularization) for orthogonal compaction** (`orthogonal/metrics.py`): the bend-optimal coordinate assignment previously produced crossing drawings for ~5-11% of in-scope graphs, because its per-edge constraint graphs lack the separation constraints that keep the two sides of a non-rectangular face apart. `compute_coordinates` now rectangularizes first (classical Tamassia refinement, Di Battista et al. ch. 5): every reflex corner of every bounded face is projected onto the wall it faces (dummy point + dummy axis-parallel separation edge) until all faces are rectangles, and the outer face is enclosed in a dummy rectangle via four connector rays so the region outside the boundary is refined the same way. For a fully rectangular subdivision the per-edge constraint graphs are provably sufficient, so the drawing is planar by construction. Verified 100% clean over 1500 random biconnected max-degree-4 planar graphs across 5 seeds (previously 94.5% on the same harness); the `_drawing_conflict` oracle remains as a belt-and-suspenders gate with fallback.
+
+### Changed
+
+- **`GIOTTOLayout` draws bend-optimally by default** (`orthogonal/giotto.py`): with rectangularization covering the whole in-scope domain, `bend_optimal` now defaults to True -- drawings come from the bend-minimal Topology-Shape-Metrics representation instead of the geometric routing heuristic. Out-of-domain inputs (degree > 4, non-biconnected) silently fall back to the heuristic router; `used_bend_optimal` reports which path ran, and `bend_optimal=False` forces the heuristic.
+
 ## [0.3.0]
 
 ### Fixed

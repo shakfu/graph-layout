@@ -8,73 +8,28 @@ ref: Open Graph Drawing Framework <https://github.com/ogdf/ogdf>
 
 Remaining items for closing the gap with [OGDF](https://github.com/ogdf/ogdf)'s orthogonal drawing capabilities.
 
-#### ~~Planarity: Kuratowski Subgraph Extraction~~ (Done)
+#### Advanced Edge Routing
 
-~~Extract Kuratowski subgraph (K5 or K3,3 minor) as proof of non-planarity.~~ Implemented: `check_planarity()` now returns `kuratowski_edges` and `kuratowski_type` ("K5" or "K3,3") for non-planar graphs (up to 50 vertices). Uses edge-deletion to find minimal non-planar subgraph, then identifies the K5/K3,3 subdivision structure.
+Visibility graph routing and segment nudging are implemented; obstacle-aware
+nudging remains.
 
-#### ~~EmbedderOptimalFlexDraw~~ (Done)
-
-~~Optimal flexibility embedding for orthogonal drawing.~~ Implemented as `OptimalFlexEmbedder`: LP-based bend minimization over candidate outer faces using `scipy.optimize.linprog`. Falls back to `MaxFaceEmbedder` when scipy is unavailable.
-
-#### Advanced Edge Routing (Partial)
-
-Visibility graph routing is implemented. Segment nudging needs rework.
-
-- [x] Visibility graph routing: builds orthogonal visibility graph from obstacle corners, finds shortest path via BFS
-- [x] Segment nudging: `nudge_overlapping_segments()` post-processing separates coincident parallel edge segments
 - [ ] **Obstacle-aware segment nudging**: Current nudging blindly offsets segments without checking node-box collisions, causing edges to route through nodes. Fix requires: (1) checking nudged positions against node boxes, (2) re-routing segments that collide with obstacles after nudging, or (3) integrating nudging into the routing phase so obstacle avoidance is preserved. See `edge_routing.py:nudge_overlapping_segments()`.
 
-#### Topology-Shape-Metrics bend-optimal drawing (Partial)
+#### Topology-Shape-Metrics bend-optimal drawing
 
-The orthogonalization's bend-minimal representation now drives the GIOTTO drawing (previously it was computed and discarded). `orthogonal/metrics.py` implements the shape stage (compass direction per segment) and coordinate assignment, wired into `GIOTTOLayout(bend_optimal=True)` with a `used_bend_optimal` signal and safe fallback to the heuristic router.
+`GIOTTOLayout` now draws from the bend-minimal orthogonal representation **by
+default** for its whole in-scope domain (biconnected planar graphs of maximum
+degree 4): rectangularization (classical turn-regularization -- reflex-corner
+projection dissects every bounded face into rectangles, and an enclosing dummy
+rectangle handles the outer face) makes the per-edge constraint graphs provably
+sufficient, verified at 100% over thousands of random in-domain graphs
+(`orthogonal/metrics.py:_rectangularize`, tests in
+`tests/test_rectangularization.py`). Out-of-domain inputs still fall back to
+the heuristic router (`used_bend_optimal` reports which path ran). Remaining
+work extends the *domain*:
 
-- [x] Flow model emits valid orthogonal representations (every face turns +/-4) for biconnected max-degree-4 planar graphs
-- [x] Shape + integer-coordinate assignment (two-tier compact/spread); conflict detection so nothing broken is emitted
-- [x] `GIOTTOLayout(bend_optimal=...)` opt-in, `used_bend_optimal` signal
-- [ ] **Turn-regularization for compaction**: ~11% of in-scope graphs still fall back (non-planar coordinate assignment / crossings). Add kitty-corner-based separation constraints so every face is rectangular, taking coverage to ~100% and enabling `bend_optimal` by default. Full design, reference algorithm (Bridgeman et al. 2000), and verification oracle in [`docs/rectangularization-plan.md`](docs/rectangularization-plan.md).
 - [ ] **Kandinsky degree > 4** (H5): 0-degree-angle flow model for vertices of degree > 4 (out of the current TSM domain)
 - [ ] **Non-biconnected graphs** (H6a): per-corner angles for bridges / cut vertices
-
----
-
-## Known Correctness Issues
-
-Verified open defects in shipped, documented capabilities (distinct from the new-algorithm wish list below). Each was confirmed by direct code inspection. Ordered by severity. IDs (C_/H_) are retained from the algorithm review for traceability.
-
-### High severity
-
-- [x] **C1 - Cola group containment** (Done): `Projection` now generates the full non-overlap + containment constraint set over the whole group hierarchy via `_generate_group_constraints` (faithful port of WebCola's recursive `generateGroupConstraints`, incl. the border-variable and constraint-redirection tail); the group `min_var`/`max_var` border variables enter the VPSC solve, so group boxes contain their members and sibling groups stay disjoint. Also fixed the latent `AttributeError` on the missing optional `stiffness` attribute that crashed the avoid_overlaps + groups path. Regression tests in `tests/test_layout.py` (`TestLayoutWithGroups`) assert group-box disjointness under inter-group attraction and confirm the recursive nested-group path. This completes the WebCola projection port (node-variable projection, separation/alignment/non-overlap were completed in 0.2.0).
-- [x] **H7 - Planarization is geometric, not topological** (Done): `planarize_graph` (`orthogonal/planarization.py`) now performs topological planarization -- a greedy maximal planar subgraph is embedded (via `check_planarity`), then the remaining edges are reinserted one at a time along a minimum-crossing path through the embedding's faces (dual-graph BFS), each crossing becoming a degree-four dummy vertex. Crossings depend only on topology, not on any drawing: a genuinely planar graph gains no crossings regardless of node positions (positions are used only to give dummies an approximate coordinate), and the augmented graph is always planar. Recovers the known crossing numbers (K5=1, K3,3=1, Petersen=2). The old geometric `find_edge_crossings`/`segments_intersect` helpers are retained (used elsewhere). Regression tests in `tests/test_planarization.py` (planar->0 crossings, augmented-always-planar over 300 random graphs, degree-4 dummies, segment-path connectivity); two Kandinsky tests that asserted the old position-dependent behavior were corrected.
-- [x] **H8 - Greedy compaction does not compact** (Done): `CompactionSolver.solve` now performs longest-path compaction -- each element is pulled to its leftmost/topmost feasible position (max over incoming constraints, else the base), closing interior slack instead of only pushing right. `compact_horizontal`/`compact_vertical` now constrain every overlapping pair (not just consecutive ones) so the tighter packing stays overlap-free. This is the default orthogonal path when scipy is unavailable. Direct tests in `tests/test_compaction.py` (width reduced, no collapsed overlaps).
-- [x] **Sugiyama coordinate assignment is index-based** (Done): replaced the independent per-layer centering with Brandes-Köpf horizontal coordinate assignment (`hierarchical/_brandes_koepf.py`) -- four vertical-alignment runs (align up/down x median left/right) with type-1 conflict marking, packed left/right respectively and balanced per vertex (left runs aligned by min, right runs by max, onto the smallest-width run). Each vertex aligns with the median of its neighbours, so edges (especially long-edge dummy chains) are straightened, and the layout is symmetric (a parent is centred over its children). The paper's O(n) shift-class compaction is replaced with a longest-path block compaction that computes the identical tightest packing but guarantees the within-layer ordering / min-separation invariant by construction (verified 0 pre-clamp violations over thousands of random graphs; the final clamp is a defensive safety net that does not fire in practice). Regression tests: `tests/test_brandes_koepf.py` (invariant, straightening, symmetry) and a Sugiyama-level assertion that a long edge's bends are vertically collinear.
-- [x] **`preprocessing.count_crossings` wrong for long edges** (Done): replaced the `(l1, l2)` layer-pair bucketing with a geometric proper-crossing test over edge segments in `(position, layer)` space, so a long edge is now counted against the shorter edges in every layer gap it passes through (edges sharing a node are excluded). Regression test covers a long-edge crossing that the old bucketing missed.
-
-### Medium severity
-
-- [x] **FA2 regular vs strong gravity swapped** (Done): regular gravity is now distance-independent and strong gravity distance-scaled, matching Gephi/Jacomy et al. (verified numerically: regular net pull constant across distances, strong scales linearly). Fixed in both `force/force_atlas2.py` and the Cython kernel `_speedups.pyx` (rebuilt). Note: this exposed a pre-existing flaky test (`test_linlog_mode_tighter_clusters`) that asserted LinLog produces *smaller* intra-cluster diameters -- not actually a LinLog property (its weaker log attraction spreads small clusters; the assertion only held because the buggy distance-scaled gravity compressed the layout). Replaced it with a robust, spec-derived assertion (LinLog's weaker attraction => longer mean edge length).
-- [x] **FA2 global-speed update lacks max-rise / jitter damping** (Done): the global speed now tracks `tolerance * traction / swing` but rises by at most 50% per iteration (falls freely), matching Jacomy et al.; jumping straight to the target caused jitter (`force/force_atlas2.py`). Regression asserts the per-tick speed rise is damped.
-- [x] **Yifan Hu ignores fixed nodes during optimization** (Done): `_layout_level` now takes a `fixed_mask` and skips displacing pinned vertices (they still exert forces on others); the finest-level refinement pins fixed nodes at their true positions so they no longer drift and perturb the free nodes (`force/yifan_hu.py`). Coarser levels are unchanged (super-vertices don't map 1:1). Unit regression asserts a masked vertex stays put while a free one moves.
-- [x] **Pure-Python quadtree infinite recursion on coincident points** (Done): added a `MAX_DEPTH = 50` cap to `_insert_into`/`_insert_into_child` (`spatial/quadtree.py`) mirroring the Cython kernel -- at max depth bodies merge in place (weighted-average position, summed mass) instead of recursing forever. Regression test inserts 200 coincident bodies.
-- [x] **Cola grid-snap modulo sign mismatch** (Done): `cola/descent.py` now uses `math.fmod` (sign of the dividend) instead of Python `%` (sign of the divisor), matching WebCola's JS `%`, so negative coordinates snap toward the correct grid line. Regression asserts a node at a negative coordinate receives a snap force (previously none).
-- [x] **Cola groups initial-layout KeyError** (Done): the grouped unconstrained warm-up now reads positions from `flat_layout.nodes()` (the laid-out Node objects) instead of the never-populated input dicts (`cola/layout.py`). Regression test runs a grouped layout with `initial_unconstrained_iterations > 0`.
-- [x] **Spectral disconnected graphs pick zero-eigenvalue eigenvectors** (Done): `_compute` now skips *all* near-zero eigenvalues (start at the first strictly-positive one) rather than only index 0, so disconnected components no longer collapse to a point. Regression test asserts within-component spread on two disjoint triangles.
-- [x] **Spectral normalized Laplacian missing `D^-1/2` back-transform** (Done): when `normalized`, the selected eigenvectors are now scaled by `D^-1/2` (Koren degree-weighted layout); `_compute_laplacian` returns the raw degree vector for this. Both fixes landed together in `spectral/spectral.py`.
-- [x] **Edge-crossing metric misses collinear / T-junction cases** (Done): `metrics._segments_intersect` now uses the canonical orientation + on-segment test (CLRS), counting collinear overlaps and endpoint-on-interior (T-junction) touches in addition to proper crossings. Regression tests cover collinear-overlap, T-junction, and collinear-disjoint (non-crossing).
-- [x] **`compact_flow_1d` can be looser than longest-path** (Done): the flow result now falls back to the longest-path positions whenever it would widen the span (longest-path is the provably minimum 1D span), so it is never looser; the misleading "tighter layouts" docstring was corrected (`orthogonal/compaction_flow.py`). Regression asserts the flow span never exceeds the longest-path span.
-- [x] **Shell layout IndexError on out-of-range link indices** (Done): `_compute_degrees` (`circular/shell.py`) now guards `0 <= src < n and 0 <= tgt < n` before incrementing, mirroring `base._build_adjacency`. Regression test runs auto-shells with an out-of-range link.
-
-### Low severity
-
-- [x] **Kandinsky mode setter rejects its own documented modes** (Done): `compaction_method` setter (`orthogonal/kandinsky.py`) now accepts all five dispatched methods (`auto`/`greedy`/`ilp`/`flow`/`longest_path`), not just three.
-- [x] **Spring docstring/behavior mismatch** (Done): `force/spring.py` docstring now describes the inverse-square Coulomb repulsion it actually implements.
-- [x] **RandomLayout seeds the global `random` module** (Done): `basic/random.py` now uses a local `random.Random(seed)` instance, so seeding no longer mutates process-wide RNG state. Regression asserts the global RNG is untouched.
-- [x] **Recursion-depth limits** (Done): `preprocessing.detect_cycle` is now an iterative DFS (explicit stack), so it handles arbitrarily deep graphs. The recursive tree walks in `reingold_tilford.py` and `radial_tree.py` run via `base.run_deep_recursive`, which executes them in a worker thread with a large stack (and a matching recursion limit) so deep (chain-like) trees are laid out safely on every platform -- simply raising `sys.setrecursionlimit` crashed Windows (native stack ~1 MB) with a stack-buffer overrun. Regression tests lay out deep node chains without error.
-- [x] **Inconsistent `node.fixed` semantics** (Done): Circular, Shell, and Bipartite layouts now skip repositioning fixed nodes (guard mirroring `RandomLayout`), so pinned nodes keep their positions. Regression tests per layout.
-- [x] **Unpositioned nodes left unvalidated** (Done): nodes omitted from user-supplied bipartite sets go to the bottom row (`bipartite.py`) and nodes omitted from explicit shells go into an extra outer shell (`circular/shell.py`), so every node is positioned. Regression tests per layout.
-- [x] **Radial tree wedge allocation by node count, not leaf count** (Done): angular wedges are now sized by subtree *leaf* count, so a deep narrow subtree no longer hogs the same span as a bushy one (`hierarchical/radial_tree.py`). Regression asserts leaf-count-driven weights.
-- [x] **Cola `_alpha is None` fragility in `tick()`** (Done): `tick()` guarded against `_alpha` being None (ticking before `start()` raised `TypeError`); it now returns converged. Regression added. (`offset_dir` is retained -- it is exercised by a test and represents the still-omitted coincident-node perturbation feature, not removable dead code; the `cola/shortestpaths` docstrings are accurate.)
-- [x] **Metrics reporting nits** (Done): `metrics._compute_ideal_distances` now uses weighted shortest paths honoring each link's length (Dijkstra) instead of an unweighted hop count; `angular_resolution` excludes self-loops and parallel edges so they no longer register spurious 0-degree angles. Regression tests for both.
-- [x] **Dead / unused code** (Done): removed the no-op `directed` parameter from `preprocessing.connected_components` (it always computed undirected / weakly-connected components). (`nudge_overlapping_segments` is tracked as the Advanced Edge Routing feature above; the finite bend capacity is intrinsic to the min-cost-flow bend model.)
 
 ---
 

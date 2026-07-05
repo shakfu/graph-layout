@@ -84,40 +84,73 @@ converges more reliably. Reference:
 
 Fast MDS approximation using pivot nodes. `O(k*n) where k << n`. Very fast initial layout for large graphs, useful when spectral layout is too slow.
 
-### Planar Straight-Line Drawing Algorithms (New Category)
+### Planar Straight-Line Drawing Algorithms (New Category) -- DONE
 
-The realizer, shift, and barycentric methods are now implemented
-(`graph_layout/planar/`), sharing one substrate: a combinatorial embedding from
-the LR-planarity test, ear-based triangulation to a maximal planar graph, and a
-de Fraysseix-Pach-Pollack canonical ordering (`planar/_shared.py`). Each layout
-draws any connected planar simple graph (>= 3 vertices) crossing-free, then
-scales onto the canvas; non-planar or disconnected inputs fall back to a
-deterministic circular placement (`used_schnyder` / `used_fpp` / `used_tutte`
-report which path ran). Correctness is pinned by a brute-force crossing-free
-oracle over grids, wheels, trees, and random triangulations, plus Hypothesis
-fuzzing (`tests/test_planar_straightline.py`).
+All five algorithms are implemented (`graph_layout/planar/`), sharing one
+substrate (`planar/_shared.py`): a combinatorial embedding from the LR-planarity
+test, ear-based triangulation to a maximal planar graph, a de
+Fraysseix-Pach-Pollack canonical ordering (which doubles as an st-numbering and a
+realizer), and a dual longest-path numbering. Each layout draws any connected
+planar simple graph (>= 3 vertices) crossing-free, then scales onto the canvas;
+out-of-domain inputs fall back to a deterministic circular placement, and a
+`used_*` flag on each layout (`used_schnyder` / `used_fpp` / `used_tutte` /
+`used_mixed_model` / `used_planarization`) reports which path ran. Planarization
+additionally covers *non-planar* graphs (crossings become dummy vertices), so the
+category spans both planar and non-planar input. Correctness is pinned by a
+brute-force crossing-free oracle (and, for the mixed model, a visibility-validity
+oracle) over grids, wheels, trees, and random triangulations, plus Hypothesis
+fuzzing (`tests/test_planar_straightline.py`); all are exported at top level and
+demoed in the showcase.
 
 | Algorithm | Description | Reference |
 |-----------|-------------|-----------|
-| [x] **SchnyderLayout** | Realizer-based drawing; face-count barycentric coordinates on the `2n-5` grid | Schnyder 1990 |
+| [x] **SchnyderLayout** | Realizer-based drawing; vertex-count barycentric coordinates on the `(n-1) x (n-1)` grid | Schnyder 1990 |
 | [x] **FPPLayout** | de Fraysseix-Pach-Pollack shift method on the `(2n-4) x (n-2)` grid | de Fraysseix et al. 1990 |
 | [x] **TutteLayout** | Barycentric spring embedding with convex faces for 3-connected planar graphs | Tutte 1963 |
-| [ ] **MixedModelLayout** | Combines visibility representation with barycentric refinement | Kant 1996 |
-| [ ] **PlanarizationLayout** | Layout for non-planar graphs via planarization (insert dummy crossings) | Batini et al. 1986 |
+| [x] **MixedModelLayout** | Visibility representation (bar-vertices, bendless port-attached edges) via canonical st-ordering + dual longest-path | Kant 1996 / Tamassia-Tollis 1986 |
+| [x] **PlanarizationLayout** | Non-planar graphs via topological planarization; crossings drawn as explicit dummy-vertex points | Batini et al. 1986 |
 
-Possible refinement (not planned): Schnyder currently uses the face-count
-variant (grid side `2n-5`); the vertex-count variant reaches the tighter
-`(n-2) x (n-2)` grid but needs the clockwise-inclusive boundary convention for
-region counting. The crossing-free oracle already in place would validate a
-swap.
+Schnyder uses vertex-count barycentric coordinates (`r1 + r2 + r3 = n - 1`,
+placed at `(r1, r2)`), landing on the `(n-1) x (n-1)` grid -- roughly half the
+`2n-5` of the earlier face-count formulation. Schnyder's classical optimum is
+one unit tighter (`(n-2) x (n-2)`), but reaching it requires a boundary
+tie-breaking that permits controlled collinearity at the outer edges (for K4 the
+sole interior grid point on the `2 x 2` grid lies on an outer edge); the `n-1`
+placement is strictly non-degenerate. Not planned to chase the last unit.
+
+`PlanarizationLayout` reuses the existing topological planarizer
+(`orthogonal/planarization.py`): it embeds a maximal planar subgraph, reinserts
+the remaining edges along minimum-crossing paths (each crossing a degree-4 dummy
+vertex), draws the resulting planar graph with FPP or Schnyder, and renders each
+original edge as the polyline through its crossing points -- so a non-planar
+graph draws with edges meeting only at explicit crossing dots. It exposes
+`crossings`, `crossing_count`, and `edge_routes`; a genuinely planar input adds
+no dummies and draws straight-line.
+
+`MixedModelLayout` draws the *visibility* half of Kant's mixed model (the repo's
+intended "visibility representation + refinement" design): a Tamassia-Tollis
+visibility representation where the canonical order supplies the vertex st-numbers
+(`y` = longest path from the source) and a dual longest-path over the st-oriented
+faces supplies edge/bar `x`-coordinates. Vertices draw as horizontal bars, edges
+as bendless vertical segments at distinct ports, giving high angular resolution
+for high-degree vertices; a barycentric refinement centres each node point over
+its ports. It exposes `vertex_bars` and `edge_routes`. The remaining refinement
+(shrinking bars to boxes with <=2-bend diagonal edges, Kant's area-optimal port
+shift) is not planned. Note the Tamassia-Tollis visibility core also unlocks a
+future `VisibilityLayout` in the Upward-drawing category.
 
 ### Upward Drawing Algorithms (New Category)
 
-Entire category missing. Important for DAG visualization where edge direction matters.
+Entire category missing. Important for DAG visualization where edge direction
+matters. The natural next front: `MixedModelLayout` already builds a
+Tamassia-Tollis visibility representation (`planar/mixed_model.py:visibility_representation`),
+so `VisibilityLayout` is largely a matter of exposing that core directly (and
+generalising the st-numbering to a caller-supplied source/sink for true st-planar
+digraphs rather than the canonical-order poles).
 
 | Algorithm | Description | Use Case |
 |-----------|-------------|----------|
-| **VisibilityLayout** | Nodes as horizontal segments, edges as vertical segments | DAGs, st-planar digraphs |
+| **VisibilityLayout** | Nodes as horizontal segments, edges as vertical segments (visibility core exists) | DAGs, st-planar digraphs |
 | **DominanceLayout** | x/y coordinates encode dominance relationships | st-planar digraphs |
 | **UpwardPlanarizationLayout** | All edges point upward via upward planarization | General DAGs |
 
@@ -160,10 +193,12 @@ Generate API reference documentation using Sphinx or MkDocs.
 
 ### Property-Based Tests
 
-Add Hypothesis tests for robustness:
+Hypothesis is now a dev dependency and drives invariant tests for the orthogonal
+layouts (`tests/test_orthogonal_properties.py`) and the whole planar category
+(`tests/test_planar_straightline.py` -- crossing-free / grid-bound / visibility
+validity over generated trees, grids, and triangulations). Remaining:
 
-- Fuzz testing for input validation
-- Property-based tests for layout invariants
+- Extend property coverage to the force-directed and hierarchical layouts
 - Edge case testing (very large/small inputs)
 
 ---

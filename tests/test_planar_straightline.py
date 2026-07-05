@@ -16,8 +16,16 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from graph_layout import FPPLayout, SchnyderLayout, TutteLayout
+from graph_layout import (
+    FPPLayout,
+    MixedModelLayout,
+    PlanarizationLayout,
+    SchnyderLayout,
+    TutteLayout,
+)
+from graph_layout.orthogonal.planarization import planarize_graph
 from graph_layout.planar.fpp import fpp_coordinates
+from graph_layout.planar.mixed_model import visibility_representation
 from graph_layout.planar.schnyder import schnyder_coordinates
 from graph_layout.planar.tutte import tutte_coordinates
 
@@ -34,9 +42,7 @@ def _orient(a: Point, b: Point, c: Point) -> float:
 
 
 def _on_seg(a: Point, b: Point, p: Point) -> bool:
-    return min(a[0], b[0]) <= p[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= p[
-        1
-    ] <= max(a[1], b[1])
+    return min(a[0], b[0]) <= p[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= p[1] <= max(a[1], b[1])
 
 
 def _proper_intersect(p1: Point, p2: Point, p3: Point, p4: Point) -> bool:
@@ -68,9 +74,9 @@ def assert_crossing_free(
 
     # All vertices at distinct positions.
     for a, b in itertools.combinations(range(n), 2):
-        assert not (
-            abs(pts[a][0] - pts[b][0]) < tol and abs(pts[a][1] - pts[b][1]) < tol
-        ), f"coincident vertices {a} and {b}"
+        assert not (abs(pts[a][0] - pts[b][0]) < tol and abs(pts[a][1] - pts[b][1]) < tol), (
+            f"coincident vertices {a} and {b}"
+        )
 
     uedges = list({(min(u, v), max(u, v)) for u, v in edges if u != v})
     for (a, b), (c, d) in itertools.combinations(uedges, 2):
@@ -81,15 +87,13 @@ def assert_crossing_free(
             p1, p2, p3, p4 = pts[a], pts[b], pts[c], pts[d]
             if abs(_orient(p1, p2, p3)) < tol and abs(_orient(p1, p2, p4)) < tol:
                 sv = next(iter(shared))
-                for x in ({a, b} - shared):
+                for x in {a, b} - shared:
                     if _on_seg(pts[c], pts[d], pts[x]) and x != sv:
-                        raise AssertionError(
-                            f"overlapping adjacent edges ({a},{b}) & ({c},{d})"
-                        )
+                        raise AssertionError(f"overlapping adjacent edges ({a},{b}) & ({c},{d})")
             continue
-        assert not _proper_intersect(
-            pts[a], pts[b], pts[c], pts[d]
-        ), f"edge ({a},{b}) crosses ({c},{d})"
+        assert not _proper_intersect(pts[a], pts[b], pts[c], pts[d]), (
+            f"edge ({a},{b}) crosses ({c},{d})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -143,15 +147,35 @@ PRISM = (6, [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3), (0, 3), (1, 4), (2,
 CUBE = (
     8,
     [
-        (0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4),
-        (0, 4), (1, 5), (2, 6), (3, 7),
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
     ],
 )
 OCTAHEDRON = (
     6,
     [
-        (0, 1), (0, 2), (0, 3), (0, 4), (5, 1), (5, 2), (5, 3), (5, 4),
-        (1, 2), (2, 3), (3, 4), (4, 1),
+        (0, 1),
+        (0, 2),
+        (0, 3),
+        (0, 4),
+        (5, 1),
+        (5, 2),
+        (5, 3),
+        (5, 4),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 1),
     ],
 )
 K4 = (4, [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
@@ -194,11 +218,13 @@ def test_schnyder_crossing_free(n, edges):
 def test_schnyder_grid_bound(n, edges):
     coords = schnyder_coordinates(n, edges)
     assert coords is not None
-    # Face-count barycentric coordinates live on the (2n-5) grid.
-    bound = 2 * n - 5
+    # Vertex-count barycentric coordinates live on the (n-1) grid.
+    bound = n - 1
     for x, y in coords.values():
         assert isinstance(x, int) and isinstance(y, int)
         assert 0 <= x <= bound and 0 <= y <= bound
+    # Region counts partition the other n-1 vertices, so the corners hit n-1.
+    assert max(max(x, y) for x, y in coords.values()) == bound
 
 
 def test_schnyder_non_planar_returns_none():
@@ -283,11 +309,14 @@ def _links(edges):
     return [{"source": u, "target": v} for u, v in edges]
 
 
-@pytest.mark.parametrize("cls,flag", [
-    (SchnyderLayout, "used_schnyder"),
-    (FPPLayout, "used_fpp"),
-    (TutteLayout, "used_tutte"),
-])
+@pytest.mark.parametrize(
+    "cls,flag",
+    [
+        (SchnyderLayout, "used_schnyder"),
+        (FPPLayout, "used_fpp"),
+        (TutteLayout, "used_tutte"),
+    ],
+)
 def test_layout_runs_and_places(cls, flag):
     n, edges = CUBE if cls is TutteLayout else grid_graph(4, 4)
     layout = cls(nodes=_nodes(n), links=_links(edges), size=(800.0, 600.0))
@@ -298,11 +327,14 @@ def test_layout_runs_and_places(cls, flag):
         assert 0.0 <= node.y <= 600.0
 
 
-@pytest.mark.parametrize("cls,flag", [
-    (SchnyderLayout, "used_schnyder"),
-    (FPPLayout, "used_fpp"),
-    (TutteLayout, "used_tutte"),
-])
+@pytest.mark.parametrize(
+    "cls,flag",
+    [
+        (SchnyderLayout, "used_schnyder"),
+        (FPPLayout, "used_fpp"),
+        (TutteLayout, "used_tutte"),
+    ],
+)
 def test_layout_falls_back_on_nonplanar(cls, flag):
     n = 5
     edges = [(i, j) for i in range(5) for j in range(i + 1, 5)]  # K5
@@ -369,3 +401,205 @@ def test_tutte_property_crossing_free(seed, n):
     coords = tutte_coordinates(n, edges)
     assert coords is not None
     assert_crossing_free(n, edges, coords)
+
+
+# ---------------------------------------------------------------------------
+# Planarization (non-planar graphs)
+# ---------------------------------------------------------------------------
+
+
+def complete_graph(n):
+    return n, [(i, j) for i in range(n) for j in range(i + 1, n)]
+
+
+def complete_bipartite(a, b):
+    return a + b, [(i, a + j) for i in range(a) for j in range(b)]
+
+
+def petersen_graph():
+    outer = [(i, (i + 1) % 5) for i in range(5)]
+    spokes = [(i, 5 + i) for i in range(5)]
+    inner = [(5 + i, 5 + (i + 2) % 5) for i in range(5)]
+    return 10, outer + spokes + inner
+
+
+NONPLANAR_CASES = [
+    complete_graph(5),
+    complete_graph(6),
+    complete_graph(7),
+    complete_bipartite(3, 3),
+    complete_bipartite(4, 4),
+    petersen_graph(),
+]
+
+
+@pytest.mark.parametrize("n,edges", NONPLANAR_CASES + [complete_graph(4), CUBE])
+def test_planarization_augmented_drawing_crossing_free(n, edges):
+    # The core guarantee: the planarized graph (crossings replaced by dummy
+    # vertices) is drawn crossing-free, so original edges meet only at crossings.
+    pg = planarize_graph(n, edges)
+    coords = fpp_coordinates(pg.num_total_nodes, pg.edges)
+    assert coords is not None
+    assert_crossing_free(pg.num_total_nodes, pg.edges, coords)
+
+
+@pytest.mark.parametrize("n,edges", NONPLANAR_CASES)
+def test_planarization_layout_routes_and_crossings(n, edges):
+    layout = PlanarizationLayout(nodes=_nodes(n), links=_links(edges), size=(800.0, 600.0))
+    layout.run()
+    assert layout.used_planarization is True
+    assert layout.crossing_count > 0  # these are all non-planar
+
+    pg = planarize_graph(n, edges)
+    assert layout.crossing_count == len(pg.crossings)
+
+    for orig, (u, v) in enumerate(edges):
+        route = layout.edge_routes[orig]
+        assert len(route) >= 2
+        # Polyline starts at u's position and ends at v's position.
+        assert route[0] == pytest.approx((layout.nodes[u].x, layout.nodes[u].y))
+        assert route[-1] == pytest.approx((layout.nodes[v].x, layout.nodes[v].y))
+        # Interior points are crossings.
+        assert len(route) - 2 >= 0
+
+    for node in layout.nodes:
+        assert 0.0 <= node.x <= 800.0
+        assert 0.0 <= node.y <= 600.0
+
+
+@pytest.mark.parametrize("n,edges", [complete_graph(4), CUBE, grid_graph(3, 3)])
+def test_planarization_planar_input_no_crossings(n, edges):
+    layout = PlanarizationLayout(nodes=_nodes(n), links=_links(edges), size=(800.0, 600.0))
+    layout.run()
+    assert layout.used_planarization is True
+    assert layout.crossing_count == 0
+    # With no crossings every route is a straight segment (two points).
+    for route in layout.edge_routes.values():
+        assert len(route) == 2
+
+
+def test_planarization_schnyder_backend():
+    n, edges = complete_graph(5)
+    layout = PlanarizationLayout(
+        nodes=_nodes(n), links=_links(edges), size=(600.0, 600.0), method="schnyder"
+    )
+    layout.run()
+    assert layout.used_planarization is True
+    assert layout.method == "schnyder"
+    assert layout.crossing_count > 0
+
+
+def test_planarization_rejects_bad_method():
+    with pytest.raises(ValueError):
+        PlanarizationLayout(nodes=_nodes(3), links=_links([(0, 1)]), method="nope")
+
+
+# ---------------------------------------------------------------------------
+# Mixed model (visibility representation)
+# ---------------------------------------------------------------------------
+
+
+def assert_visibility_valid(n, edges, vis):
+    """A visibility representation is valid iff bars and vertical edges never
+    improperly intersect: edges stay within their bars, no edge pierces a
+    non-incident bar, no two independent edges overlap, and bars on the same row
+    do not overlap."""
+    bars = vis["bars"]
+    routes = vis["routes"]
+    idx_edge = {i: (u, v) for i, (u, v) in enumerate(edges) if u != v}
+
+    for oi, (xe, ylo, yhi) in routes.items():
+        u, v = idx_edge[oi]
+        for z in (u, v):
+            xl, xr, _yb = bars[z]
+            assert xl <= xe <= xr
+        assert {bars[u][2], bars[v][2]} == {ylo, yhi}
+
+    # Distinct ports among edges leaving upward / entering downward at a vertex.
+    up = {v: [] for v in range(n)}
+    down = {v: [] for v in range(n)}
+    for oi, (xe, ylo, yhi) in routes.items():
+        u, v = idx_edge[oi]
+        lo, hi = (u, v) if bars[u][2] < bars[v][2] else (v, u)
+        up[lo].append(xe)
+        down[hi].append(xe)
+    for v in range(n):
+        assert len(up[v]) == len(set(up[v]))
+        assert len(down[v]) == len(set(down[v]))
+
+    # No edge pierces a non-incident bar.
+    for oi, (xe, ylo, yhi) in routes.items():
+        u, v = idx_edge[oi]
+        for w in range(n):
+            if w in (u, v):
+                continue
+            xl, xr, yw = bars[w]
+            assert not (ylo < yw < yhi and xl <= xe <= xr)
+
+    # No two independent edges overlap.
+    items = list(routes.items())
+    for i in range(len(items)):
+        oi, (xa, a1, a2) = items[i]
+        ui, vi = idx_edge[oi]
+        for j in range(i + 1, len(items)):
+            oj, (xb, b1, b2) = items[j]
+            uj, vj = idx_edge[oj]
+            if xa != xb or ({ui, vi} & {uj, vj}):
+                continue
+            assert not (max(a1, b1) < min(a2, b2))
+
+    # Bars on the same row do not overlap.
+    by_row = {}
+    for v in range(n):
+        by_row.setdefault(bars[v][2], []).append(v)
+    for row in by_row.values():
+        for a, b in itertools.combinations(row, 2):
+            assert max(bars[a][0], bars[b][0]) > min(bars[a][1], bars[b][1])
+
+
+MIXED_CASES = GRID_CASES + [
+    (4, [(0, 1), (1, 2), (2, 3), (3, 0)]),  # square (biconnected, non-triangulated)
+]
+
+
+@pytest.mark.parametrize("n,edges", MIXED_CASES)
+def test_mixed_model_visibility_valid(n, edges):
+    vis = visibility_representation(n, edges)
+    assert vis is not None
+    assert_visibility_valid(n, edges, vis)
+
+
+@settings(max_examples=120, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(graph=_planar_graph())
+def test_mixed_model_property_valid(graph):
+    n, edges = graph
+    vis = visibility_representation(n, edges)
+    assert vis is not None
+    assert_visibility_valid(n, edges, vis)
+
+
+def test_mixed_model_layout_runs_and_places():
+    n, edges = wheel_graph(8)
+    layout = MixedModelLayout(nodes=_nodes(n), links=_links(edges), size=(800.0, 600.0))
+    layout.run()
+    assert layout.used_mixed_model is True
+    for node in layout.nodes:
+        assert 0.0 <= node.x <= 800.0
+        assert 0.0 <= node.y <= 600.0
+    # Every edge is drawn as a vertical (bendless) segment.
+    for route in layout.edge_routes.values():
+        assert len(route) == 2
+        assert route[0][0] == pytest.approx(route[1][0])
+    # Node points sit inside their bars.
+    for v, (xl, xr, _yb) in layout.vertex_bars.items():
+        assert xl - 1e-6 <= layout.nodes[v].x <= xr + 1e-6
+
+
+def test_mixed_model_falls_back_on_nonplanar():
+    n = 5
+    edges = [(i, j) for i in range(5) for j in range(i + 1, 5)]  # K5
+    layout = MixedModelLayout(nodes=_nodes(n), links=_links(edges), size=(400.0, 400.0))
+    layout.run()
+    assert layout.used_mixed_model is False
+    for node in layout.nodes:
+        assert math.isfinite(node.x) and math.isfinite(node.y)

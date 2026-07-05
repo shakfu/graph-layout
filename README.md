@@ -23,6 +23,11 @@ A collection of graph layout algorithms in Python.
 | **Spectral** | `SpectralLayout` | Laplacian eigenvector embedding |
 | **Orthogonal** | `KandinskyLayout` | Edges use only horizontal/vertical segments |
 | | `GIOTTOLayout` | Orthogonal drawing for degree-4 planar graphs (opt-in bend-minimal via `bend_optimal`) |
+| **Planar** | `SchnyderLayout` | Straight-line drawing via Schnyder's realizer on the `(n-1) x (n-1)` grid |
+| | `FPPLayout` | de Fraysseix-Pach-Pollack shift method on the `(2n-4) x (n-2)` grid |
+| | `TutteLayout` | Barycentric (spring) embedding with convex faces for 3-connected planar graphs |
+| | `MixedModelLayout` | Visibility representation: bar-vertices with bendless port-attached edges |
+| | `PlanarizationLayout` | Draws non-planar graphs; crossings become explicit dummy-vertex points |
 
 ## Installation
 
@@ -359,6 +364,44 @@ if not layout.used_bend_optimal:
 
 It is opt-in (default off) while the compaction is completed; see `docs/rectangularization-plan.md` for the remaining work to make it the default.
 
+### Planar Straight-Line Layouts
+
+Five algorithms draw a connected planar graph with straight-line edges and no crossings on a compact grid (and one, `PlanarizationLayout`, extends this to non-planar graphs). They share one substrate — a planar embedding from the LR-planarity test, triangulation to a maximal planar graph, and a canonical ordering — and each falls back to a deterministic circular placement for out-of-domain input, reporting which path ran via a `used_*` flag.
+
+```python
+from graph_layout import SchnyderLayout, FPPLayout, TutteLayout
+
+# A planar graph (square with a diagonal)
+nodes = [{} for _ in range(4)]
+links = [
+    {"source": 0, "target": 1}, {"source": 1, "target": 2},
+    {"source": 2, "target": 3}, {"source": 3, "target": 0},
+    {"source": 0, "target": 2},
+]
+
+layout = SchnyderLayout(nodes=nodes, links=links, size=(800, 600))
+layout.run()
+print(f"Drew via Schnyder: {layout.used_schnyder}")
+```
+
+- **`SchnyderLayout`** — realizer-based drawing; vertex-count barycentric coordinates on the `(n-1) x (n-1)` grid (Schnyder 1990).
+- **`FPPLayout`** — de Fraysseix-Pach-Pollack shift method (slope-±1 "tent" over the contour) on the `(2n-4) x (n-2)` grid.
+- **`TutteLayout`** — barycentric spring embedding; provably convex faces for 3-connected planar graphs (Tutte 1963).
+- **`MixedModelLayout`** — Tamassia-Tollis visibility representation: vertices are horizontal bars, edges bendless vertical segments at distinct ports (high angular resolution for high-degree vertices). Exposes `vertex_bars` and `edge_routes`.
+- **`PlanarizationLayout`** — draws *non-planar* graphs by replacing crossings with dummy vertices, then routing each edge as a polyline through its crossing points. Exposes `crossings`, `crossing_count`, and `edge_routes`.
+
+```python
+from graph_layout import PlanarizationLayout
+
+# K5 is non-planar
+nodes = [{} for _ in range(5)]
+links = [{"source": i, "target": j} for i in range(5) for j in range(i + 1, 5)]
+
+layout = PlanarizationLayout(nodes=nodes, links=links, size=(800, 600))
+layout.run()
+print(f"Crossings: {layout.crossing_count}")  # 1 for K5
+```
+
 ## Visualization
 
 Generate visualization images for all algorithms:
@@ -388,6 +431,11 @@ This creates images in `./build/` showing each algorithm's output.
 | **Spectral** | Clustering visualization | O(n^3) eigendecomp | Reveals structure |
 | **Kandinsky** | UML, flowcharts, ER diagrams | O(m²) | Orthogonal edges, bend minimization, compaction, port constraints |
 | **GIOTTO** | Degree-4 planar graphs | O(m²) | Bend-optimal orthogonal, validates planarity |
+| **Schnyder** | Compact planar straight-line | O(n²) | Realizer, crossing-free, `(n-1)²` grid |
+| **FPP** | Planar straight-line | O(n²) | Shift method, crossing-free, `(2n-4)x(n-2)` grid |
+| **Tutte** | 3-connected planar graphs | O(n³) solve | Convex faces, barycentric |
+| **Mixed-Model** | High-degree planar graphs | O(n²) | Visibility bars, bendless edges, high angular resolution |
+| **Planarization** | Non-planar graphs | O((n+c)²) | Crossings as explicit dummy vertices |
 
 ## Advanced Features
 

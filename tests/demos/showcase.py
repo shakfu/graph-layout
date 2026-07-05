@@ -30,8 +30,10 @@ from graph_layout import (
     GIOTTOLayout,
     KamadaKawaiLayout,
     KandinskyLayout,
+    MixedModelLayout,
     OptimalFlexEmbedder,
     PlanarityResult,
+    PlanarizationLayout,
     RadialTreeLayout,
     ReingoldTilfordLayout,
     SchnyderLayout,
@@ -218,7 +220,7 @@ LAYOUTS: list[LayoutSpec] = [
         name="Schnyder",
         cls=SchnyderLayout,
         params={},
-        description="Realizer-based straight-line drawing on the 2n-5 grid",
+        description="Realizer-based straight-line drawing on the (n-1)x(n-1) grid",
         suitable_for=("planar",),
     ),
     LayoutSpec(
@@ -233,6 +235,20 @@ LAYOUTS: list[LayoutSpec] = [
         cls=TutteLayout,
         params={},
         description="Spring embedding with convex faces (3-connected planar)",
+        suitable_for=("planar",),
+    ),
+    LayoutSpec(
+        name="Planarization",
+        cls=PlanarizationLayout,
+        params={},
+        description="Non-planar drawing: crossings replaced by dummy vertices",
+        suitable_for=("nonplanar",),
+    ),
+    LayoutSpec(
+        name="Mixed-Model",
+        cls=MixedModelLayout,
+        params={},
+        description="Visibility representation: bar-vertices, bendless port edges",
         suitable_for=("planar",),
     ),
     # Cola (constraint-based)
@@ -516,6 +532,37 @@ def generate_triangulated_planar_graph() -> tuple[list[dict], list[dict]]:
         links.append({"source": v, "target": equator[(i + 1) % 5]})
         links.append({"source": top, "target": v})
         links.append({"source": bottom, "target": v})
+    return nodes, links
+
+
+def generate_k5_graph() -> tuple[list[dict], list[dict]]:
+    """Generate K5, the smallest non-planar complete graph (1 crossing)."""
+    nodes = [{} for _ in range(5)]
+    links = [{"source": i, "target": j} for i in range(5) for j in range(i + 1, 5)]
+    return nodes, links
+
+
+def generate_k33_graph() -> tuple[list[dict], list[dict]]:
+    """Generate K3,3, the smallest non-planar bipartite graph (1 crossing)."""
+    nodes = [{} for _ in range(6)]
+    links = [{"source": i, "target": 3 + j} for i in range(3) for j in range(3)]
+    return nodes, links
+
+
+def generate_wheel_graph(rim: int = 9) -> tuple[list[dict], list[dict]]:
+    """Generate a wheel: a high-degree hub (node 0) inside a rim cycle.
+
+    A 3-connected planar graph whose hub has degree ``rim``. It stresses angular
+    resolution -- the mixed model spreads the hub's spokes across a wide bar,
+    while the straight-line methods must cram them around a single point.
+    """
+    n = rim + 1
+    nodes = [{} for _ in range(n)]
+    ring = list(range(1, n))
+    links = []
+    for i, v in enumerate(ring):
+        links.append({"source": v, "target": ring[(i + 1) % len(ring)]})
+        links.append({"source": 0, "target": v})
     return nodes, links
 
 
@@ -864,6 +911,149 @@ def layout_to_svg(
     return "\n".join(svg_parts)
 
 
+def planarization_layout_to_svg(layout: Any, spec: LayoutSpec, graph_name: str) -> str:
+    """Render a PlanarizationLayout: polyline edges with crossings marked.
+
+    Each original edge is drawn as the polyline through its crossing points, and
+    every crossing is marked with a distinct dot -- the whole point of the
+    method is that edges meet only at those explicit points.
+    """
+    nodes = layout.nodes
+    routes = layout.edge_routes
+    crossings = layout.crossings
+
+    all_x = [n.x for n in nodes] + [p[0] for r in routes.values() for p in r]
+    all_y = [n.y for n in nodes] + [p[1] for r in routes.values() for p in r]
+    content_h = SVG_HEIGHT - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM
+    fit = _fit_transform(all_x, all_y, float(SVG_WIDTH), content_h)
+    inner_transform = f"translate(0,{SVG_MARGIN_TOP})"
+    if fit:
+        inner_transform += f" {fit}"
+
+    svg_parts = [
+        f'<svg width="{SVG_WIDTH}" height="{SVG_HEIGHT}" xmlns="http://www.w3.org/2000/svg">',
+        '<rect width="100%" height="100%" fill="#fafafa"/>',
+        f'<g transform="{inner_transform}">',
+    ]
+
+    # Edges as polylines through crossing points.
+    for route in routes.values():
+        pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in route)
+        svg_parts.append(
+            f'<polyline points="{pts}" fill="none" stroke="#888" stroke-width="1.5" opacity="0.7"/>'
+        )
+
+    # Crossing points (dummy vertices) marked as orange diamonds.
+    for cx, cy in crossings:
+        svg_parts.append(
+            f'<rect x="{cx - 3.5:.1f}" y="{cy - 3.5:.1f}" width="7" height="7" '
+            f'transform="rotate(45 {cx:.1f} {cy:.1f})" '
+            f'fill="#e67e22" stroke="#fff" stroke-width="1"/>'
+        )
+
+    # Original nodes.
+    for i, node in enumerate(nodes):
+        svg_parts.append(
+            f'<circle cx="{node.x:.1f}" cy="{node.y:.1f}" r="8" '
+            f'fill="#4a90d9" stroke="#fff" stroke-width="1.5"/>'
+        )
+        svg_parts.append(
+            f'<text x="{node.x:.1f}" y="{node.y + 3:.1f}" text-anchor="middle" '
+            f'fill="#fff" font-size="8" font-family="sans-serif">{i}</text>'
+        )
+
+    svg_parts.append("</g>")
+
+    svg_parts.append(
+        f'<text x="{SVG_WIDTH // 2}" y="20" text-anchor="middle" fill="#333" '
+        f'font-size="12" font-weight="bold" font-family="sans-serif">'
+        f"{escape(spec.name)}</text>"
+    )
+    subtitle = f"{layout.crossing_count} crossings (orange) -- edges meet only there"
+    svg_parts.append(
+        f'<text x="{SVG_WIDTH // 2}" y="35" text-anchor="middle" fill="#666" '
+        f'font-size="9" font-family="sans-serif">{escape(subtitle)}</text>'
+    )
+    svg_parts.append(
+        f'<text x="{SVG_WIDTH // 2}" y="{SVG_HEIGHT - 10}" text-anchor="middle" '
+        f'fill="#999" font-size="9" font-family="sans-serif">'
+        f"Graph: {escape(graph_name)}</text>"
+    )
+    svg_parts.append("</svg>")
+    return "\n".join(svg_parts)
+
+
+def mixed_model_layout_to_svg(layout: Any, spec: LayoutSpec, graph_name: str) -> str:
+    """Render a MixedModelLayout: vertex bars with bendless vertical edges.
+
+    Each vertex is a horizontal bar and each edge a vertical segment attaching at
+    a distinct port -- the visibility representation that gives the mixed model
+    its high angular resolution.
+    """
+    nodes = layout.nodes
+    bars = layout.vertex_bars
+    routes = layout.edge_routes
+
+    all_x = [b[0] for b in bars.values()] + [b[1] for b in bars.values()]
+    all_y = [n.y for n in nodes] + [b[2] for b in bars.values()]
+    content_h = SVG_HEIGHT - SVG_MARGIN_TOP - SVG_MARGIN_BOTTOM
+    fit = _fit_transform(all_x, all_y, float(SVG_WIDTH), content_h)
+    inner_transform = f"translate(0,{SVG_MARGIN_TOP})"
+    if fit:
+        inner_transform += f" {fit}"
+
+    svg_parts = [
+        f'<svg width="{SVG_WIDTH}" height="{SVG_HEIGHT}" xmlns="http://www.w3.org/2000/svg">',
+        '<rect width="100%" height="100%" fill="#fafafa"/>',
+        f'<g transform="{inner_transform}">',
+    ]
+
+    # Edges as vertical segments.
+    for route in routes.values():
+        (x1, y1), (x2, y2) = route
+        svg_parts.append(
+            f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'stroke="#888" stroke-width="1.5" opacity="0.7"/>'
+        )
+
+    # Vertex bars.
+    for xl, xr, yb in bars.values():
+        svg_parts.append(
+            f'<line x1="{xl:.1f}" y1="{yb:.1f}" x2="{xr:.1f}" y2="{yb:.1f}" '
+            f'stroke="#4a90d9" stroke-width="5" stroke-linecap="round"/>'
+        )
+
+    # Node markers at the barycentre point.
+    for i, node in enumerate(nodes):
+        svg_parts.append(
+            f'<circle cx="{node.x:.1f}" cy="{node.y:.1f}" r="6" '
+            f'fill="#2c3e70" stroke="#fff" stroke-width="1.5"/>'
+        )
+        svg_parts.append(
+            f'<text x="{node.x:.1f}" y="{node.y + 2.5:.1f}" text-anchor="middle" '
+            f'fill="#fff" font-size="7" font-family="sans-serif">{i}</text>'
+        )
+
+    svg_parts.append("</g>")
+
+    svg_parts.append(
+        f'<text x="{SVG_WIDTH // 2}" y="20" text-anchor="middle" fill="#333" '
+        f'font-size="12" font-weight="bold" font-family="sans-serif">'
+        f"{escape(spec.name)}</text>"
+    )
+    svg_parts.append(
+        f'<text x="{SVG_WIDTH // 2}" y="35" text-anchor="middle" fill="#666" '
+        f'font-size="9" font-family="sans-serif">{escape(spec.description)}</text>'
+    )
+    svg_parts.append(
+        f'<text x="{SVG_WIDTH // 2}" y="{SVG_HEIGHT - 10}" text-anchor="middle" '
+        f'fill="#999" font-size="9" font-family="sans-serif">'
+        f"Graph: {escape(graph_name)}</text>"
+    )
+    svg_parts.append("</svg>")
+    return "\n".join(svg_parts)
+
+
 def generate_html(sections: list[tuple[str, list[str]]]) -> str:
     """Generate the HTML page."""
     html_parts = [
@@ -979,7 +1169,8 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
                 <li><strong>Spectral:</strong> Laplacian eigenvector</li>
                 <li><strong>Hierarchical:</strong> Sugiyama, Reingold-Tilford, Radial</li>
                 <li><strong>Orthogonal:</strong> Kandinsky, Kandinsky (ILP), GIOTTO</li>
-                <li><strong>Planar straight-line:</strong> Schnyder, FPP, Tutte</li>
+                <li><strong>Planar straight-line:</strong> Schnyder, FPP, Tutte,
+                    Planarization, Mixed-Model</li>
                 <li><strong>Constraint-based:</strong> Cola</li>
             </ul>
             <h3 style="margin-top: 1rem;">New Features</h3>
@@ -1430,6 +1621,9 @@ def main() -> None:
         "Two squares + bridge (GIOTTO)": generate_bridged_graph(),
         "Cube Q3 (planar straight-line)": generate_cube_graph(),
         "Pentagonal bipyramid (planar straight-line)": generate_triangulated_planar_graph(),
+        "Wheel W9 (planar, degree-9 hub)": generate_wheel_graph(9),
+        "K5 (planarization)": generate_k5_graph(),
+        "K3,3 (planarization)": generate_k33_graph(),
     }
 
     # Which layouts to use for which graph types
@@ -1446,6 +1640,9 @@ def main() -> None:
         "Two squares + bridge (GIOTTO)": ("degree4_planar",),
         "Cube Q3 (planar straight-line)": ("planar",),
         "Pentagonal bipyramid (planar straight-line)": ("planar",),
+        "Wheel W9 (planar, degree-9 hub)": ("planar",),
+        "K5 (planarization)": ("nonplanar",),
+        "K3,3 (planarization)": ("nonplanar",),
     }
 
     sections = []
@@ -1465,8 +1662,13 @@ def main() -> None:
             try:
                 print(f"  Running {spec.name}...")
                 layout = run_layout(spec, nodes, links)
-                show_ortho = isinstance(layout, (KandinskyLayout, GIOTTOLayout))
-                svg = layout_to_svg(layout, spec, graph_name, show_orthogonal=show_ortho)
+                if isinstance(layout, PlanarizationLayout):
+                    svg = planarization_layout_to_svg(layout, spec, graph_name)
+                elif isinstance(layout, MixedModelLayout):
+                    svg = mixed_model_layout_to_svg(layout, spec, graph_name)
+                else:
+                    show_ortho = isinstance(layout, (KandinskyLayout, GIOTTOLayout))
+                    svg = layout_to_svg(layout, spec, graph_name, show_orthogonal=show_ortho)
                 svgs.append(svg)
 
                 # Cross-cutting: for Kandinsky layouts, also show OptimalFlex

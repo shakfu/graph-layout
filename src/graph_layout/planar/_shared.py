@@ -32,9 +32,7 @@ Rotation = dict[int, list[int]]
 # ---------------------------------------------------------------------------
 
 
-def normalize_edges(
-    num_nodes: int, edges: Sequence[Edge]
-) -> list[Edge]:
+def normalize_edges(num_nodes: int, edges: Sequence[Edge]) -> list[Edge]:
     """Drop self-loops and duplicate (undirected) edges, keep in-range ones."""
     seen: set[Edge] = set()
     clean: list[Edge] = []
@@ -187,8 +185,7 @@ def triangulate(rotation: Rotation) -> tuple[Rotation, set[Edge]]:
 
         if not chord_added:
             raise ValueError(
-                "face cannot be triangulated with a simple chord "
-                "(would need a Steiner vertex)"
+                "face cannot be triangulated with a simple chord (would need a Steiner vertex)"
             )
 
     return rotation, added
@@ -199,9 +196,7 @@ def triangulate(rotation: Rotation) -> tuple[Rotation, set[Edge]]:
 # ---------------------------------------------------------------------------
 
 
-def choose_outer_triangle(
-    rotation: Rotation, faces: list[list[int]]
-) -> tuple[int, int, int]:
+def choose_outer_triangle(rotation: Rotation, faces: list[list[int]]) -> tuple[int, int, int]:
     """Pick an outer triangle ``(v1, v2, vn)`` from a triangulated embedding.
 
     Prefers a triangle incident to an edge of a large original face so the
@@ -224,9 +219,7 @@ def choose_outer_triangle(
     return f[0], f[1], f[2]
 
 
-def canonical_order(
-    rotation: Rotation, outer: tuple[int, int, int]
-) -> list[int]:
+def canonical_order(rotation: Rotation, outer: tuple[int, int, int]) -> list[int]:
     """Compute a de Fraysseix-Pach-Pollack canonical ordering.
 
     ``rotation`` must be a maximal planar (triangulated) embedding and
@@ -268,9 +261,7 @@ def canonical_order(
             vk = picked
         order.append(vk)
         present[vk] = False
-        outer_cycle = _update_cycle_after_removal(
-            outer_cycle, vk, rotation, present
-        )
+        outer_cycle = _update_cycle_after_removal(outer_cycle, vk, rotation, present)
 
     order.append(v2)
     order.append(v1)
@@ -346,9 +337,7 @@ def _face_cycle(rotation: Rotation, u: int, v: int) -> list[int]:
     return cycle
 
 
-def _has_chord(
-    v: int, outer_cycle: list[int], adj: list[set[int]], present: list[bool]
-) -> bool:
+def _has_chord(v: int, outer_cycle: list[int], adj: list[set[int]], present: list[bool]) -> bool:
     """Does ``v`` have a chord: an edge to a non-adjacent vertex on the cycle?"""
     pos = {w: i for i, w in enumerate(outer_cycle)}
     i = pos[v]
@@ -418,5 +407,5 @@ def _update_cycle_after_removal(
         # p not last (degenerate wheel); drop any occurrence of p.
         fan = [w for w in fan if w != p]
 
-    new_cycle = outer_cycle[:i] + fan + outer_cycle[i + 1:]
+    new_cycle = outer_cycle[:i] + fan + outer_cycle[i + 1 :]
     return new_cycle

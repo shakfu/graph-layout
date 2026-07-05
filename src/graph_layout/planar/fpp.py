@@ -27,9 +27,7 @@ from ._shared import (
 )
 
 
-def fpp_coordinates(
-    num_nodes: int, edges: Sequence[Edge]
-) -> Optional[dict[int, tuple[int, int]]]:
+def fpp_coordinates(num_nodes: int, edges: Sequence[Edge]) -> Optional[dict[int, tuple[int, int]]]:
     """Compute integer FPP grid coordinates for a planar graph.
 
     Returns a mapping ``vertex -> (x, y)`` on the ``(2n-4) x (n-2)`` grid, or

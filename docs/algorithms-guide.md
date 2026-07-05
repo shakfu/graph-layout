@@ -11,6 +11,8 @@ This guide explains the different graph layout algorithms available in `graph-la
 | **Hierarchical** | Sugiyama, Reingold-Tilford, Radial Tree | Layer-based or tree-structured layouts |
 | **Circular** | Circular, Shell | Arrange nodes on circles |
 | **Spectral** | Spectral | Use graph eigenvalues for positioning |
+| **Orthogonal** | Kandinsky, GIOTTO | Route edges with horizontal/vertical segments |
+| **Planar** | Schnyder, FPP, Tutte, Mixed-Model, Planarization | Crossing-free straight-line/visibility drawings of planar graphs |
 
 ---
 
@@ -496,6 +498,38 @@ layout.run()
 
 ---
 
+## Planar Layouts
+
+Crossing-free drawings of planar graphs. All draw any connected planar simple graph (>= 3 vertices) — internally triangulating and reusing one embedding/canonical-ordering substrate — and fall back to a circular placement for out-of-domain input, reporting the path taken via a `used_*` flag.
+
+### Schnyder / FPP / Tutte (straight-line)
+
+Straight-line grid drawings. `SchnyderLayout` uses a realizer with vertex-count barycentric coordinates on the `(n-1) x (n-1)` grid; `FPPLayout` uses the de Fraysseix-Pach-Pollack shift method on the `(2n-4) x (n-2)` grid; `TutteLayout` fixes one face to a convex polygon and solves the barycentric equilibrium, giving convex faces for 3-connected planar graphs.
+
+```python
+from graph_layout import SchnyderLayout
+
+layout = SchnyderLayout(nodes=nodes, links=links, size=(800, 600))
+layout.run()
+assert layout.used_schnyder  # False if the graph was non-planar/disconnected
+```
+
+**Use when:** you want a compact, provably crossing-free drawing of a planar graph and prefer straight edges. Prefer Tutte for 3-connected graphs where convex faces matter.
+
+### Mixed-Model (visibility representation)
+
+Draws vertices as horizontal bars and edges as bendless vertical segments attaching at distinct ports, spreading a high-degree vertex's edges across its bar for good angular resolution. Exposes `vertex_bars` and `edge_routes`.
+
+**Use when:** the graph has high-degree vertices whose edges would be cramped in a straight-line drawing.
+
+### Planarization (non-planar input)
+
+Draws a non-planar graph by replacing crossings with dummy vertices, then routing each edge as a polyline through its crossing points, so edges meet only at explicit crossing dots. Exposes `crossings`, `crossing_count`, and `edge_routes`.
+
+**Use when:** the graph is non-planar but you still want a clean drawing with a small, explicit set of crossings.
+
+---
+
 ## Algorithm Comparison
 
 | Algorithm | Complexity | Best Graph Size | Constraints | Overlap Avoidance | Deterministic |
@@ -511,6 +545,10 @@ layout.run()
 | Circular | O(n) | Small-Medium | Circle | No | Yes |
 | Shell | O(n) | Small-Medium | Concentric | No | Yes |
 | Spectral | O(n^3) | Small (<500) | No | No | Yes |
+| Schnyder / FPP | O(n^2) | Planar, any size | Planar | Grid points | Yes |
+| Tutte | O(n^3) solve | 3-connected planar | Planar | Convex faces | Yes |
+| Mixed-Model | O(n^2) | Planar (esp. high-degree) | Planar | Bars/ports | Yes |
+| Planarization | O((n+c)^2) | Non-planar | None | Explicit crossings | Yes |
 
 ---
 
@@ -557,6 +595,10 @@ Do you want nodes on a circle?
 | Deterministic layout | Circular, Spectral, or hierarchical |
 | Real-time/interactive | FR + Barnes-Hut or Spring |
 | Reveal clustering | Spectral |
+| Crossing-free planar drawing | Schnyder / FPP (straight-line), Tutte (convex) |
+| Planar graph with high-degree nodes | Mixed-Model |
+| Non-planar with few, explicit crossings | Planarization |
+| Orthogonal (UML/ER/flowchart) | Kandinsky, GIOTTO |
 
 ---
 

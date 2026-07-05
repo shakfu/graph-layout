@@ -16,7 +16,7 @@ Available algorithms:
 - export: Export to SVG, DOT (Graphviz), and GraphML formats
 """
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 # Shared types for all algorithms
 # Base classes for building layouts
@@ -82,7 +82,13 @@ from .metrics import (
 from .orthogonal import GIOTTOLayout, KandinskyLayout
 
 # Planar straight-line layouts
-from .planar import FPPLayout, SchnyderLayout, TutteLayout
+from .planar import (
+    FPPLayout,
+    MixedModelLayout,
+    PlanarizationLayout,
+    SchnyderLayout,
+    TutteLayout,
+)
 
 # Planarity testing
 from .planarity import (
@@ -191,6 +197,8 @@ __all__ = [
     "SchnyderLayout",
     "FPPLayout",
     "TutteLayout",
+    "PlanarizationLayout",
+    "MixedModelLayout",
     # Metrics
     "edge_crossings",
     "stress",

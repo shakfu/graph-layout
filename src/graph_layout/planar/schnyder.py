@@ -1,12 +1,20 @@
 """Schnyder straight-line grid layout.
 
-Draws a planar graph with straight-line edges on an integer grid of side at
-most ``2n - 5``, using Schnyder's realizer (a decomposition of a triangulation
-into three edge-disjoint trees). For each interior vertex the three trees give
-three paths to the three outer corners; these paths split the triangulation
-into three regions, and the number of triangular faces in each region gives
-barycentric coordinates that place the vertex. Schnyder proved the resulting
-straight-line drawing has no crossings.
+Draws a planar graph with straight-line edges on an integer grid of side
+``n - 1``, using Schnyder's realizer (a decomposition of a triangulation into
+three edge-disjoint trees). For each interior vertex the three trees give three
+paths to the three outer corners; these paths split the triangulation into
+three regions, and the *number of vertices* in each region gives barycentric
+coordinates ``(r1, r2, r3)`` with ``r1 + r2 + r3 = n - 1`` that place the vertex
+at ``(r1, r2)``. Schnyder proved the resulting straight-line drawing has no
+crossings.
+
+Vertex counting (this module) is more compact than counting faces: it lands on
+the ``(n-1) x (n-1)`` grid rather than ``2n-5``. Schnyder's classical optimum is
+one unit tighter, the ``(n-2) x (n-2)`` grid, but reaching it requires a
+boundary tie-breaking that permits controlled collinearity at the outer edges
+(e.g. for K4 the sole interior grid point on the ``2 x 2`` grid lies on an outer
+edge); the ``n-1`` placement here is strictly non-degenerate.
 
 Reference:
     Schnyder, W. (1990). "Embedding planar graphs on the grid." Proc. 1st ACM-SIAM
@@ -46,6 +54,16 @@ def _path_edges(v: int, parent: dict[int, int]) -> set[Edge]:
     return edges
 
 
+def _path_vertices(v: int, parent: dict[int, int]) -> list[int]:
+    """Vertices on the tree path from ``v`` up to and including its root."""
+    seq = [v]
+    cur = v
+    while cur in parent:
+        cur = parent[cur]
+        seq.append(cur)
+    return seq
+
+
 def schnyder_coordinates(
     num_nodes: int, edges: Sequence[Edge]
 ) -> Optional[dict[int, tuple[int, int]]]:
@@ -71,24 +89,20 @@ def schnyder_coordinates(
     interior_faces: list[tuple[int, int, int]] = []
     outer_seen = False
     for f in all_faces:
-        if (
-            not outer_seen
-            and len(f) == 3
-            and f[0] == v1
-            and f[1] == v2
-            and f[2] == vn
-        ):
+        if not outer_seen and len(f) == 3 and f[0] == v1 and f[1] == v2 and f[2] == vn:
             outer_seen = True
             continue
         interior_faces.append((f[0], f[1], f[2]))
 
-    total_faces = len(interior_faces)  # 2n - 5 for a triangulation
-
     # Edge -> incident interior face indices (each interior edge borders two).
     edge_faces: dict[Edge, list[int]] = {}
+    incident_faces: list[set[int]] = [set() for _ in range(num_nodes)]
     for fi, (a, b, c) in enumerate(interior_faces):
         for x, y in ((a, b), (b, c), (c, a)):
             edge_faces.setdefault(_uedge(x, y), []).append(fi)
+        incident_faces[a].add(fi)
+        incident_faces[b].add(fi)
+        incident_faces[c].add(fi)
 
     def seed_face(oa: int, ob: int) -> Optional[int]:
         """Interior face bordering outer edge (oa, ob)."""
@@ -96,16 +110,14 @@ def schnyder_coordinates(
         return faces_on[0] if faces_on else None
 
     # Region i is seeded from the interior face on the outer edge opposite root i.
-    seed_r1 = seed_face(v2, vn)  # region opposite v1
-    seed_r2 = seed_face(v1, vn)  # region opposite v2
-    seed_r3 = seed_face(v1, v2)  # region opposite vn
+    seed = {1: seed_face(v2, vn), 2: seed_face(v1, vn), 3: seed_face(v1, v2)}
 
-    def flood(seed: Optional[int], blocked: set[Edge]) -> set[int]:
-        """Faces reachable from ``seed`` without crossing a ``blocked`` edge."""
-        if seed is None:
+    def flood(start: Optional[int], blocked: set[Edge]) -> set[int]:
+        """Faces reachable from ``start`` without crossing a ``blocked`` edge."""
+        if start is None:
             return set()
-        reached: set[int] = {seed}
-        queue: deque[int] = deque([seed])
+        reached: set[int] = {start}
+        queue: deque[int] = deque([start])
         while queue:
             fi = queue.popleft()
             a, b, c = interior_faces[fi]
@@ -120,28 +132,55 @@ def schnyder_coordinates(
         return reached
 
     coords: dict[int, tuple[int, int]] = {}
-    S = total_faces
+    S = num_nodes - 1
     coords[v1] = (S, 0)
     coords[v2] = (0, S)
     coords[vn] = (0, 0)
 
+    parents = {1: parent_1, 2: parent_2, 3: parent_3}
+    # Path P_i (to root i) is credited, on its clockwise side, to region R_{i+1}.
+    path_region = {1: 2, 2: 3, 3: 1}
+
     interior = set(range(num_nodes)) - {v1, v2, vn}
     for v in interior:
-        blocked = (
-            _path_edges(v, parent_1)
-            | _path_edges(v, parent_2)
-            | _path_edges(v, parent_3)
-        )
-        r1 = flood(seed_r1, blocked)
-        r2 = flood(seed_r2, blocked)
-        r3 = flood(seed_r3, blocked)
-        t1, t2, t3 = len(r1), len(r2), len(r3)
-        if t1 + t2 + t3 != total_faces:
-            # Regions did not cleanly partition the faces -- realizer/paths are
-            # inconsistent for this vertex. Signal failure rather than emit a
-            # bad drawing.
+        # The three monochromatic paths from v to the corners, as vertex sets.
+        paths = {i: _path_vertices(v, parents[i]) for i in (1, 2, 3)}
+        on_path: dict[int, int] = {}
+        blocked: set[Edge] = set()
+        for i in (1, 2, 3):
+            pv = paths[i]
+            for u in pv[1:]:  # every path vertex except v itself (incl. the root)
+                on_path[u] = i
+            for a, b in zip(pv, pv[1:]):
+                blocked.add(_uedge(a, b))
+
+        # The three paths cut the interior faces into three regions.
+        face_region: dict[int, int] = {}
+        for ri in (1, 2, 3):
+            for fi in flood(seed[ri], blocked):
+                face_region[fi] = ri
+
+        # Tally vertices: a path vertex counts for its clockwise-adjacent region;
+        # every other vertex counts for the region its incident faces all lie in.
+        r = {1: 0, 2: 0, 3: 0}
+        ok = True
+        for u in range(num_nodes):
+            if u == v:
+                continue
+            if u in on_path:
+                r[path_region[on_path[u]]] += 1
+                continue
+            touched = {fr for fi in incident_faces[u] if (fr := face_region.get(fi)) is not None}
+            if len(touched) != 1:
+                ok = False
+                break
+            r[next(iter(touched))] += 1
+
+        if not ok or r[1] + r[2] + r[3] != S:
+            # Realizer/paths inconsistent for this vertex; fail rather than emit
+            # a bad drawing.
             return None
-        coords[v] = (t1, t2)
+        coords[v] = (r[1], r[2])
 
     return coords
 
@@ -150,11 +189,11 @@ class SchnyderLayout(StaticLayout):
     """Straight-line planar grid layout via Schnyder's realizer.
 
     Positions the vertices of a connected planar graph with straight-line edges
-    and no crossings on an integer grid of side ``O(n)``, then scales the
-    drawing onto the canvas. The graph is internally triangulated, so the
-    algorithm draws any connected planar simple graph with at least three
-    vertices; the added chords are used only to compute positions and are not
-    drawn.
+    and no crossings on the ``(n-1) x (n-1)`` integer grid (via vertex-count
+    barycentric coordinates from the realizer), then scales the drawing onto the
+    canvas. The graph is internally triangulated, so the algorithm draws any
+    connected planar simple graph with at least three vertices; the added chords
+    are used only to compute positions and are not drawn.
 
     Non-planar, disconnected, or trivially small graphs fall back to a
     deterministic circular placement; ``used_schnyder`` reports which path ran.

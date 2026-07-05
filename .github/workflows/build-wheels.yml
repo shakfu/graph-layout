@@ -69,9 +69,14 @@ jobs:
           # Architecture selection per matrix entry
           CIBW_ARCHS: ${{ matrix.cibw_archs }}
 
-          # Linux specific: Use manylinux2014
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
+          # Linux: build against manylinux_2_28 (glibc 2.28). manylinux2014
+          # (glibc 2.17, EOL) can no longer be used: numpy >= 2.1 -- the only
+          # numpy that ships wheels for cp312+ -- publishes manylinux_2_27
+          # wheels, which will not install in a glibc-2.17 container, so the
+          # in-container test step is forced to build numpy from source and
+          # fails on manylinux2014's ancient GCC.
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
 
       - uses: actions/upload-artifact@v7
         with:

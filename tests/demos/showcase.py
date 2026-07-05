@@ -25,6 +25,7 @@ from graph_layout import (
     BipartiteLayout,
     CircularLayout,
     ForceAtlas2Layout,
+    FPPLayout,
     FruchtermanReingoldLayout,
     GIOTTOLayout,
     KamadaKawaiLayout,
@@ -33,11 +34,13 @@ from graph_layout import (
     PlanarityResult,
     RadialTreeLayout,
     ReingoldTilfordLayout,
+    SchnyderLayout,
     ShellLayout,
     SMACOFLayout,
     SpectralLayout,
     SpringLayout,
     SugiyamaLayout,
+    TutteLayout,
     YifanHuLayout,
     check_planarity,
 )
@@ -209,6 +212,28 @@ LAYOUTS: list[LayoutSpec] = [
         },
         description="Bend-optimal orthogonal (all connected planar graphs)",
         suitable_for=("degree4_planar",),
+    ),
+    # Planar straight-line (crossing-free)
+    LayoutSpec(
+        name="Schnyder",
+        cls=SchnyderLayout,
+        params={},
+        description="Realizer-based straight-line drawing on the 2n-5 grid",
+        suitable_for=("planar",),
+    ),
+    LayoutSpec(
+        name="FPP (shift)",
+        cls=FPPLayout,
+        params={},
+        description="de Fraysseix-Pach-Pollack shift method on the (2n-4)x(n-2) grid",
+        suitable_for=("planar",),
+    ),
+    LayoutSpec(
+        name="Tutte (barycentric)",
+        cls=TutteLayout,
+        params={},
+        description="Spring embedding with convex faces (3-connected planar)",
+        suitable_for=("planar",),
     ),
     # Cola (constraint-based)
     LayoutSpec(
@@ -444,6 +469,53 @@ def generate_bridged_graph() -> tuple[list[dict], list[dict]]:
         {"source": 6, "target": 7},
         {"source": 7, "target": 4},
     ]
+    return nodes, links
+
+
+def generate_cube_graph() -> tuple[list[dict], list[dict]]:
+    """Generate the cube graph Q3: a 3-connected planar graph.
+
+    Its faces are all 4-cycles, so Tutte draws the iconic nested-squares figure
+    (outer face fixed as a square, the inner four vertices relaxed to a smaller
+    concentric square). Schnyder and FPP triangulate it internally.
+    """
+    nodes = [{} for _ in range(8)]
+    links = [
+        # Outer 4-cycle
+        {"source": 0, "target": 1},
+        {"source": 1, "target": 2},
+        {"source": 2, "target": 3},
+        {"source": 3, "target": 0},
+        # Inner 4-cycle
+        {"source": 4, "target": 5},
+        {"source": 5, "target": 6},
+        {"source": 6, "target": 7},
+        {"source": 7, "target": 4},
+        # Spokes
+        {"source": 0, "target": 4},
+        {"source": 1, "target": 5},
+        {"source": 2, "target": 6},
+        {"source": 3, "target": 7},
+    ]
+    return nodes, links
+
+
+def generate_triangulated_planar_graph() -> tuple[list[dict], list[dict]]:
+    """Generate a maximal planar (triangulated) 3-connected graph.
+
+    A pentagonal bipyramid: a 5-cycle equator with two apexes, one above and one
+    below, each joined to all five equator vertices. Every face is a triangle,
+    so it exercises the realizer / shift methods on a genuine triangulation while
+    staying 3-connected for Tutte.
+    """
+    nodes = [{} for _ in range(7)]
+    equator = [0, 1, 2, 3, 4]
+    top, bottom = 5, 6
+    links = []
+    for i, v in enumerate(equator):
+        links.append({"source": v, "target": equator[(i + 1) % 5]})
+        links.append({"source": top, "target": v})
+        links.append({"source": bottom, "target": v})
     return nodes, links
 
 
@@ -907,6 +979,7 @@ def generate_html(sections: list[tuple[str, list[str]]]) -> str:
                 <li><strong>Spectral:</strong> Laplacian eigenvector</li>
                 <li><strong>Hierarchical:</strong> Sugiyama, Reingold-Tilford, Radial</li>
                 <li><strong>Orthogonal:</strong> Kandinsky, Kandinsky (ILP), GIOTTO</li>
+                <li><strong>Planar straight-line:</strong> Schnyder, FPP, Tutte</li>
                 <li><strong>Constraint-based:</strong> Cola</li>
             </ul>
             <h3 style="margin-top: 1rem;">New Features</h3>
@@ -1355,6 +1428,8 @@ def main() -> None:
         "Ladder Graph (GIOTTO)": generate_ladder_graph(),
         "Wheel W6 hub, deg 6 (GIOTTO)": generate_high_degree_hub_graph(),
         "Two squares + bridge (GIOTTO)": generate_bridged_graph(),
+        "Cube Q3 (planar straight-line)": generate_cube_graph(),
+        "Pentagonal bipyramid (planar straight-line)": generate_triangulated_planar_graph(),
     }
 
     # Which layouts to use for which graph types
@@ -1369,6 +1444,8 @@ def main() -> None:
         "Ladder Graph (GIOTTO)": ("degree4_planar",),
         "Wheel W6 hub, deg 6 (GIOTTO)": ("degree4_planar",),
         "Two squares + bridge (GIOTTO)": ("degree4_planar",),
+        "Cube Q3 (planar straight-line)": ("planar",),
+        "Pentagonal bipyramid (planar straight-line)": ("planar",),
     }
 
     sections = []

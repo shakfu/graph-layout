@@ -86,14 +86,30 @@ Fast MDS approximation using pivot nodes. `O(k*n) where k << n`. Very fast initi
 
 ### Planar Straight-Line Drawing Algorithms (New Category)
 
-Entire category missing from graph-layout. Foundational in graph drawing theory.
+The realizer, shift, and barycentric methods are now implemented
+(`graph_layout/planar/`), sharing one substrate: a combinatorial embedding from
+the LR-planarity test, ear-based triangulation to a maximal planar graph, and a
+de Fraysseix-Pach-Pollack canonical ordering (`planar/_shared.py`). Each layout
+draws any connected planar simple graph (>= 3 vertices) crossing-free, then
+scales onto the canvas; non-planar or disconnected inputs fall back to a
+deterministic circular placement (`used_schnyder` / `used_fpp` / `used_tutte`
+report which path ran). Correctness is pinned by a brute-force crossing-free
+oracle over grids, wheels, trees, and random triangulations, plus Hypothesis
+fuzzing (`tests/test_planar_straightline.py`).
 
 | Algorithm | Description | Reference |
 |-----------|-------------|-----------|
-| **SchnyderLayout** | Realizer-based drawing on (n-2) x (n-2) grid -- most compact | Schnyder 1990 |
-| **FPPLayout** | de Fraysseix-Pach-Pollack convex grid drawing on (2n-4) x (n-2) grid | de Fraysseix et al. 1990 |
-| **MixedModelLayout** | Combines visibility representation with barycentric refinement | Kant 1996 |
-| **PlanarizationLayout** | Layout for non-planar graphs via planarization (insert dummy crossings) | Batini et al. 1986 |
+| [x] **SchnyderLayout** | Realizer-based drawing; face-count barycentric coordinates on the `2n-5` grid | Schnyder 1990 |
+| [x] **FPPLayout** | de Fraysseix-Pach-Pollack shift method on the `(2n-4) x (n-2)` grid | de Fraysseix et al. 1990 |
+| [x] **TutteLayout** | Barycentric spring embedding with convex faces for 3-connected planar graphs | Tutte 1963 |
+| [ ] **MixedModelLayout** | Combines visibility representation with barycentric refinement | Kant 1996 |
+| [ ] **PlanarizationLayout** | Layout for non-planar graphs via planarization (insert dummy crossings) | Batini et al. 1986 |
+
+Possible refinement (not planned): Schnyder currently uses the face-count
+variant (grid side `2n-5`); the vertex-count variant reaches the tighter
+`(n-2) x (n-2)` grid but needs the clockwise-inclusive boundary convention for
+region counting. The crossing-free oracle already in place would validate a
+swap.
 
 ### Upward Drawing Algorithms (New Category)
 
@@ -112,7 +128,7 @@ Algorithms representing fundamentally different optimization paradigms from curr
 | Algorithm | Description | Distinct Value |
 |-----------|-------------|----------------|
 | **GEMLayout** | Per-node adaptive temperature | Different convergence behavior |
-| **TutteLayout** | Barycentric embedding for 3-connected planar graphs | Provably convex planar drawings |
+| ~~**TutteLayout**~~ | Done -- see Planar Straight-Line Drawing above (`planar/tutte.py`) | Provably convex planar drawings |
 | **DavidsonHarelLayout** | Simulated annealing with composite energy | Different optimization paradigm entirely |
 | **NodeRespecterLayout** | Force-directed with built-in non-overlap | Pure force approach (vs Cola's constraint approach) |
 | **BertaultLayout** | Force-directed preserving graph topology | Crossings never change |

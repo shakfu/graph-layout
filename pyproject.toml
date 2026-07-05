@@ -163,6 +163,7 @@ select = ["E", "F", "I", "N", "W"]
 "src/graph_layout/force/*.py" = ["N806"]
 "src/graph_layout/hierarchical/*.py" = ["N806"]
 "src/graph_layout/orthogonal/*.py" = ["N806"]
+"src/graph_layout/planar/*.py" = ["N806"]
 # Tests: allow mathematical names, lambdas, explicit boolean comparisons, unused setup vars, class args
 "tests/*.py" = ["N803", "N806", "E741", "E731", "E712", "F841"]
 # Scripts: allow class variable names

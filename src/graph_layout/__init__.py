@@ -81,6 +81,9 @@ from .metrics import (
 # Orthogonal layouts
 from .orthogonal import GIOTTOLayout, KandinskyLayout
 
+# Planar straight-line layouts
+from .planar import FPPLayout, SchnyderLayout, TutteLayout
+
 # Planarity testing
 from .planarity import (
     FixedEmbedder,
@@ -184,6 +187,10 @@ __all__ = [
     # Orthogonal layouts
     "GIOTTOLayout",
     "KandinskyLayout",
+    # Planar straight-line layouts
+    "SchnyderLayout",
+    "FPPLayout",
+    "TutteLayout",
     # Metrics
     "edge_crossings",
     "stress",

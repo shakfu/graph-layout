@@ -41,17 +41,40 @@ def _orient(a: Point, b: Point, c: Point) -> float:
     return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
 
 
+def _orient_sign(a: Point, b: Point, c: Point, rel: float = 1e-9) -> int:
+    """Sign of the orientation determinant, robust to floating-point noise.
+
+    Returns -1, 0, or +1. The determinant is compared against ``rel`` times the
+    product of the two vector magnitudes, so a configuration that is collinear to
+    within floating-point precision reads as 0 rather than as an arbitrary sign.
+
+    This matters for the Tutte drawings: barycentric embeddings of stacked
+    triangulations crowd interior vertices until sets of them are collinear to
+    within machine epsilon, and the raw determinant sign of such a near-degenerate
+    triple is decided by rounding alone (so it differs across BLAS/LAPACK builds).
+    Tutte's theorem guarantees the true embedding is crossing-free, so any such
+    "crossing" is a false positive. For the integer-grid methods (Schnyder, FPP,
+    planarization) the determinant is an exact integer -- 0 when collinear, at
+    least 1 for a real crossing -- so the relative tolerance changes nothing.
+    """
+    d = _orient(a, b, c)
+    scale = math.hypot(b[0] - a[0], b[1] - a[1]) * math.hypot(c[0] - a[0], c[1] - a[1])
+    if scale == 0.0 or abs(d) <= rel * scale:
+        return 0
+    return 1 if d > 0 else -1
+
+
 def _on_seg(a: Point, b: Point, p: Point) -> bool:
     return min(a[0], b[0]) <= p[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= p[1] <= max(a[1], b[1])
 
 
 def _proper_intersect(p1: Point, p2: Point, p3: Point, p4: Point) -> bool:
     """True if segments p1p2 and p3p4 cross or collinearly overlap."""
-    d1 = _orient(p3, p4, p1)
-    d2 = _orient(p3, p4, p2)
-    d3 = _orient(p1, p2, p3)
-    d4 = _orient(p1, p2, p4)
-    if ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)):
+    d1 = _orient_sign(p3, p4, p1)
+    d2 = _orient_sign(p3, p4, p2)
+    d3 = _orient_sign(p1, p2, p3)
+    d4 = _orient_sign(p1, p2, p4)
+    if d1 != 0 and d2 != 0 and d3 != 0 and d4 != 0 and d1 != d2 and d3 != d4:
         return True
     if d1 == 0 and _on_seg(p3, p4, p1):
         return True
@@ -85,7 +108,11 @@ def assert_crossing_free(
             # the shared endpoint.
             shared = {a, b} & {c, d}
             p1, p2, p3, p4 = pts[a], pts[b], pts[c], pts[d]
-            if abs(_orient(p1, p2, p3)) < tol and abs(_orient(p1, p2, p4)) < tol:
+            # Scale-relative collinearity (see _orient_sign): an absolute
+            # threshold misfires on the tiny edges of a crowded Tutte drawing,
+            # where two adjacent edges meeting at a shallow but real angle would
+            # look collinear. Integer-grid drawings are unaffected (exact zero).
+            if _orient_sign(p1, p2, p3) == 0 and _orient_sign(p1, p2, p4) == 0:
                 sv = next(iter(shared))
                 for x in {a, b} - shared:
                     if _on_seg(pts[c], pts[d], pts[x]) and x != sv:

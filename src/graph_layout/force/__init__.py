@@ -5,6 +5,7 @@ This module provides classic force-directed layout algorithms:
 - FruchtermanReingold: Classic force-directed with repulsion/attraction
 - SpringLayout: Simple spring-based layout
 - KamadaKawai: Stress minimization based on graph-theoretic distances
+- SMACOF: Stress majorization (Guttman transform), converges more reliably than KK
 - ForceAtlas2: Continuous layout with adaptive speeds (Gephi algorithm)
 - YifanHu: Multilevel force-directed for medium-large graphs
 """
@@ -12,6 +13,7 @@ This module provides classic force-directed layout algorithms:
 from .force_atlas2 import ForceAtlas2Layout
 from .fruchterman_reingold import FruchtermanReingoldLayout
 from .kamada_kawai import KamadaKawaiLayout
+from .smacof import SMACOFLayout
 from .spring import SpringLayout
 from .yifan_hu import YifanHuLayout
 
@@ -20,5 +22,6 @@ __all__ = [
     "FruchtermanReingoldLayout",
     "SpringLayout",
     "KamadaKawaiLayout",
+    "SMACOFLayout",
     "YifanHuLayout",
 ]

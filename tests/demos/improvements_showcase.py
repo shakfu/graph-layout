@@ -371,8 +371,9 @@ def _section_giotto() -> str:
         "The orthogonalization computes a bend-minimal representation. Before, it "
         "was discarded and edges were routed heuristically. With bend_optimal=True "
         "(now the default) the representation drives the drawing; it covers every "
-        "connected planar graph and falls back safely only for non-planar or "
-        "disconnected input.",
+        "connected planar graph -- and, via per-component packing, disconnected "
+        "planar graphs too (see the disconnected-graphs section) -- falling back "
+        "safely only for non-planar input.",
         "".join(rows),
     )
 
@@ -938,6 +939,82 @@ def _section_planarization() -> str:
     )
 
 
+def _grid_edges(w: int, h: int, base: int) -> list[tuple[int, int]]:
+    edges: list[tuple[int, int]] = []
+    for r in range(h):
+        for c in range(w):
+            v = base + r * w + c
+            if c + 1 < w:
+                edges.append((v, v + 1))
+            if r + 1 < h:
+                edges.append((v, v + w))
+    return edges
+
+
+def _disconnected_planar() -> tuple[int, list[tuple[int, int]]]:
+    """A disconnected planar graph: 3x3 grid + 4-cycle + triangle + isolated vertex."""
+    edges = _grid_edges(3, 3, 0)  # nodes 0..8
+    edges += [(9, 10), (10, 11), (11, 12), (12, 9)]  # 4-cycle 9..12
+    edges += [(13, 14), (14, 15), (15, 13)]  # triangle 13..15
+    return 17, edges  # node 16 is isolated
+
+
+def _disconnected_nonplanar() -> tuple[int, list[tuple[int, int]]]:
+    """A square island plus a non-planar K5 island (Kandinsky-only bend-optimal)."""
+    edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+    edges += [(4 + i, 4 + j) for i in range(5) for j in range(i + 1, 5)]  # K5 on 4..8
+    return 9, edges
+
+
+def _section_disconnected() -> str:
+    rows = []
+
+    n, edges = _disconnected_planar()
+    heur = _giotto(n, edges, False)
+    opt = _giotto(n, edges, True)
+    rows.append(
+        '<div class="pair">'
+        + _orthogonal_svg(
+            heur,
+            "Disconnected planar - heuristic router",
+            f"{_total_bends(heur)} bends, used_bend_optimal={heur.used_bend_optimal}",
+        )
+        + _orthogonal_svg(
+            opt,
+            "Disconnected planar - bend_optimal (GIOTTO)",
+            f"{_total_bends(opt)} bends, used_bend_optimal={opt.used_bend_optimal}; "
+            "each component drawn then packed",
+        )
+        + "</div>"
+    )
+
+    n2, edges2 = _disconnected_nonplanar()
+    kand = _kandinsky(n2, edges2, True)
+    rows.append(
+        '<div class="pair">'
+        + _orthogonal_svg(
+            kand,
+            "Disconnected + non-planar island - Kandinsky bend_optimal",
+            f"{_total_bends(kand)} bends, used_bend_optimal={kand.used_bend_optimal}; "
+            "the K5 island is drawn through orthogonal crossings",
+        )
+        + "</div>"
+    )
+
+    return _block(
+        "Disconnected graphs: per-component bend-optimal drawing + packing",
+        "A planar embedding is defined only per connected component, so the bend-optimal "
+        "path used to fall back to the heuristic router for any disconnected input. Each "
+        "component is now drawn bend-optimally in its own frame and the drawings are packed "
+        "side by side with non-overlapping bounding boxes (over node boxes and edge bends), "
+        "then centered. GIOTTO covers disconnected planar graphs; Kandinsky additionally "
+        "draws disconnected graphs whose components are non-planar (a K5 island here) via "
+        "per-component planarization. If any component is out of domain the whole graph "
+        "falls back and used_bend_optimal reports it.",
+        "".join(rows),
+    )
+
+
 def _block(title: str, desc: str, body: str) -> str:
     return (
         f'<section><h2>{escape(title)}</h2><p class="desc">{escape(desc)}</p>'
@@ -952,6 +1029,7 @@ def main() -> None:
         + _section_kandinsky()
         + _section_kandinsky_crossings()
         + _section_extended_domain()
+        + _section_disconnected()
         + _section_nudging()
         + _section_cola()
         + _section_groups()

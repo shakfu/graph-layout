@@ -56,6 +56,7 @@ from .force import (
     ForceAtlas2Layout,
     FruchtermanReingoldLayout,
     KamadaKawaiLayout,
+    SMACOFLayout,
     SpringLayout,
     YifanHuLayout,
 )
@@ -169,6 +170,7 @@ __all__ = [
     "FruchtermanReingoldLayout",
     "SpringLayout",
     "KamadaKawaiLayout",
+    "SMACOFLayout",
     "YifanHuLayout",
     # Hierarchical layouts
     "ReingoldTilfordLayout",

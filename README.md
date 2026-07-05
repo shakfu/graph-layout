@@ -12,6 +12,7 @@ A collection of graph layout algorithms in Python.
 | **Force-Directed** | `ForceAtlas2Layout` | Continuous layout with adaptive speeds (Gephi algorithm) |
 | | `FruchtermanReingoldLayout` | Classic force-directed with cooling temperature |
 | | `KamadaKawaiLayout` | Stress minimization based on graph-theoretic distances |
+| | `SMACOFLayout` | Stress majorization (Guttman transform); converges more reliably than Kamada-Kawai |
 | | `SpringLayout` | Simple Hooke's law spring forces |
 | | `YifanHuLayout` | Multilevel force-directed for medium-large graphs |
 | **Hierarchical** | `SugiyamaLayout` | Layered DAG drawing (Sugiyama method) |

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 from ..base import StaticLayout
 from ..planarity import PlanarityResult, check_planarity
 from ..planarity.embedders import MaxFaceEmbedder, PlanarEmbedder
+from ..preprocessing import connected_components
 from ..types import (
     Event,
     GroupLike,
@@ -41,8 +42,12 @@ from .orthogonalization import (
     compute_orthogonal_representation,
 )
 from .planarization import is_planar_quick_check
-from .realization import bend_optimal_representation, realize_bend_optimal_drawing
-from .types import NodeBox, OrthogonalEdge, Side
+from .realization import (
+    bend_optimal_representation,
+    pack_component_drawings,
+    realize_bend_optimal_drawing,
+)
+from .types import NodeBox, OrthogonalEdge, Port, Side
 
 
 class GIOTTOLayout(StaticLayout):
@@ -397,6 +402,23 @@ class GIOTTOLayout(StaticLayout):
         # Phase 2: Position nodes on grid
         self._position_nodes(layers)
 
+        # Phase 2.5: Disconnected planar graphs. A single planar embedding
+        # spanning several components is ill-defined, so the shared realizer only
+        # handles connected input. Draw each component bend-optimally in its own
+        # frame and pack the drawings side by side; fall back (below) if any
+        # component is out of the bend-optimal domain.
+        if self._bend_optimal and is_planar:
+            components = connected_components(
+                n, self._links, self._get_source_index, self._get_target_index
+            )
+            if len(components) > 1 and self._draw_disconnected_bend_optimal(components):
+                self._used_bend_optimal = True
+                for i, box in enumerate(self._node_boxes):
+                    if i < len(self._nodes):
+                        self._nodes[i].x = box.x
+                        self._nodes[i].y = box.y
+                return
+
         # Phase 3+4: For planar inputs, compute the bend-minimal orthogonal
         # representation (expanding degree > 4 vertices into cages when
         # necessary) and, if requested and realizable, draw directly from it.
@@ -459,6 +481,131 @@ class GIOTTOLayout(StaticLayout):
             return False
         self._node_boxes, self._orthogonal_edges = result
         return True
+
+    def _draw_disconnected_bend_optimal(self, components: list[list[int]]) -> bool:
+        """Draw a disconnected planar graph by packing per-component drawings.
+
+        Each connected component is drawn bend-optimally in its own frame (via a
+        recursive :class:`GIOTTOLayout` on the component's subgraph, or placed
+        directly for an isolated vertex), then the drawings are shelf-packed into
+        one non-overlapping layout. Returns False -- leaving the caller to fall
+        back to the heuristic router for the whole graph -- if any non-trivial
+        component is outside the bend-optimal domain, so ``used_bend_optimal``
+        stays truthful.
+        """
+        n = len(self._nodes)
+        drawings: list[tuple[list[NodeBox], list[OrthogonalEdge]]] = []
+        for comp in components:
+            comp_sorted = sorted(comp)
+            result = self._draw_component(comp_sorted)
+            if result is None:
+                return False
+            drawings.append(result)
+
+        packed_boxes, packed_edges = pack_component_drawings(
+            drawings, separation=self._node_separation, canvas_size=self._canvas_size
+        )
+
+        boxes_by_index: list[Optional[NodeBox]] = [None] * n
+        for box in packed_boxes:
+            if 0 <= box.index < n:
+                boxes_by_index[box.index] = box
+        if any(b is None for b in boxes_by_index):
+            return False  # some vertex went undrawn -- fail safe
+
+        self._node_boxes = [b for b in boxes_by_index if b is not None]
+        self._orthogonal_edges = packed_edges
+        return True
+
+    def _draw_component(
+        self, comp_sorted: list[int]
+    ) -> Optional[tuple[list[NodeBox], list[OrthogonalEdge]]]:
+        """Draw one connected component, returning (boxes, edges) in *global*
+        vertex indices, or None if the component is not bend-optimal drawable."""
+        if len(comp_sorted) == 1:
+            # Isolated vertex: no edges, so zero bends -- trivially optimal.
+            orig = comp_sorted[0]
+            node = self._nodes[orig]
+            width = float(getattr(node, "width", None) or self._node_width)
+            height = float(getattr(node, "height", None) or self._node_height)
+            return [NodeBox(index=orig, x=0.0, y=0.0, width=width, height=height)], []
+
+        local_of = {orig: i for i, orig in enumerate(comp_sorted)}
+        comp_set = set(comp_sorted)
+
+        sub_nodes: list[dict[str, Any]] = []
+        for orig in comp_sorted:
+            node = self._nodes[orig]
+            sub_nodes.append(
+                {
+                    "width": getattr(node, "width", None) or self._node_width,
+                    "height": getattr(node, "height", None) or self._node_height,
+                }
+            )
+
+        sub_links: list[dict[str, int]] = []
+        for link in self._links:
+            src = self._get_source_index(link)
+            tgt = self._get_target_index(link)
+            if src in comp_set and tgt in comp_set:
+                sub_links.append({"source": local_of[src], "target": local_of[tgt]})
+
+        child = GIOTTOLayout(
+            nodes=sub_nodes,
+            links=sub_links,
+            size=self._canvas_size,
+            node_width=self._node_width,
+            node_height=self._node_height,
+            node_separation=self._node_separation,
+            edge_separation=self._edge_separation,
+            layer_separation=self._layer_separation,
+            strict=False,
+            embedder=self._embedder,
+            compaction_method=self._compaction_method,
+            bend_optimal=True,
+        )
+        child.run()
+        if not child.used_bend_optimal:
+            return None
+
+        k = len(comp_sorted)
+        boxes = [
+            NodeBox(
+                index=comp_sorted[b.index],
+                x=b.x,
+                y=b.y,
+                width=b.width,
+                height=b.height,
+            )
+            for b in child.node_boxes
+            if 0 <= b.index < k
+        ]
+        edges: list[OrthogonalEdge] = []
+        for e in child.orthogonal_edges:
+            if not (0 <= e.source < k and 0 <= e.target < k):
+                continue
+            gsrc = comp_sorted[e.source]
+            gtgt = comp_sorted[e.target]
+            edges.append(
+                OrthogonalEdge(
+                    source=gsrc,
+                    target=gtgt,
+                    source_port=Port(
+                        node=gsrc,
+                        side=e.source_port.side,
+                        position=e.source_port.position,
+                        edge=e.source_port.edge,
+                    ),
+                    target_port=Port(
+                        node=gtgt,
+                        side=e.target_port.side,
+                        position=e.target_port.position,
+                        edge=e.target_port.edge,
+                    ),
+                    bends=list(e.bends),
+                )
+            )
+        return boxes, edges
 
     def _compute_orthogonal_rep(self) -> None:
         """

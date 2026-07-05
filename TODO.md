@@ -57,19 +57,28 @@ Possible follow-ups (not planned):
   the same cage side). Not a bug in the current bend-minimal drawing.
 - [ ] True Kandinsky 0-degree-angle flow model (bend-minimal in the Kandinsky
   metric proper, rather than over the expanded graph)
-- [ ] Disconnected graphs: per-component TSM drawing + component packing
+- [x] **Disconnected graphs: per-component TSM drawing + component packing**:
+  `GIOTTOLayout` and `KandinskyLayout(bend_optimal=True)` split a disconnected
+  graph into connected components, draw each bend-optimally in its own frame
+  (recursively, reusing the full pipeline), and reassemble them with a shared
+  shelf-packer (`realization.pack_component_drawings`) whose gaps keep component
+  bounding boxes -- over boxes and bends -- non-overlapping. Any component
+  outside the bend-optimal domain falls the whole graph back to the heuristic
+  router (`used_bend_optimal` stays truthful); Kandinsky additionally covers
+  disconnected graphs with non-planar components
+  (`tests/test_orthogonal_disconnected.py`).
 
 ---
 
 ## Medium Priority
 
-### Stress Majorization (SMACOF)
+### Stress Majorization (SMACOF) -- DONE
 
-Iterative stress minimization that converges faster than Kamada-Kawai with similar quality. Different from KK -- uses majorization, not gradient descent, and scales better.
-
-- Better optimization than gradient descent used in KK
-- Handles weighted graphs well
-- Reference: [Gansner et al. 2004](https://graphviz.org/Documentation/GKN04.pdf)
+Implemented as `SMACOFLayout` (`force/smacof.py`). Iterative stress
+minimization by majorization (the Guttman transform) rather than the per-node
+Newton-Raphson of Kamada-Kawai, so the stress decreases monotonically and it
+converges more reliably. Reference:
+[Gansner et al. 2004](https://graphviz.org/Documentation/GKN04.pdf).
 
 ### Pivot MDS
 

@@ -279,6 +279,105 @@ def realize_bend_optimal_drawing(
     return node_boxes, orthogonal_edges
 
 
+def pack_component_drawings(
+    drawings: Sequence[tuple[list[NodeBox], list[OrthogonalEdge]]],
+    *,
+    separation: float,
+    canvas_size: tuple[float, float],
+) -> tuple[list[NodeBox], list[OrthogonalEdge]]:
+    """Pack independently-drawn connected components into one drawing.
+
+    Each ``(boxes, edges)`` entry is an orthogonal drawing of one connected
+    component in its own coordinate frame (as produced by
+    :func:`realize_bend_optimal_drawing`). A single planar embedding spanning
+    several components is ill-defined, so the realizer only handles connected
+    input; disconnected graphs are drawn per component and reassembled here.
+
+    Components are shelf-packed into rows, roughly square overall, with
+    ``separation`` gaps so their bounding boxes -- taken over both node boxes and
+    edge bends -- never overlap; the packed result is then centered on
+    ``canvas_size``. Node and edge *indices* are left untouched: only
+    coordinates are translated (node box centers and edge bend points; port
+    fractions are position-independent).
+
+    Returns the concatenated ``(node_boxes, orthogonal_edges)`` across all
+    components.
+    """
+    if not drawings:
+        return [], []
+
+    # Bounding box of each component over its boxes and bends.
+    extents: list[tuple[float, float, float, float]] = []  # (min_x, min_y, w, h)
+    for boxes, edges in drawings:
+        xs: list[float] = []
+        ys: list[float] = []
+        for b in boxes:
+            xs.extend((b.left, b.right))
+            ys.extend((b.top, b.bottom))
+        for e in edges:
+            for bx, by in e.bends:
+                xs.append(bx)
+                ys.append(by)
+        if not xs:
+            extents.append((0.0, 0.0, 0.0, 0.0))
+            continue
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        extents.append((min_x, min_y, max_x - min_x, max_y - min_y))
+
+    # Target row width: roughly square packing, but never narrower than the
+    # widest single component.
+    total_area = sum(w * h for (_mx, _my, w, h) in extents)
+    widest = max((w for (_mx, _my, w, _h) in extents), default=0.0)
+    target_w = max(widest, total_area**0.5)
+
+    # Shelf-pack tallest-first (stable tie-break keeps the layout deterministic).
+    order = sorted(range(len(drawings)), key=lambda i: (-extents[i][3], i))
+    offsets: list[tuple[float, float]] = [(0.0, 0.0)] * len(drawings)
+    cursor_x = 0.0
+    cursor_y = 0.0
+    row_height = 0.0
+    for i in order:
+        min_x, min_y, w, h = extents[i]
+        if cursor_x > 0.0 and cursor_x + w > target_w:
+            cursor_x = 0.0
+            cursor_y += row_height + separation
+            row_height = 0.0
+        offsets[i] = (cursor_x - min_x, cursor_y - min_y)
+        cursor_x += w + separation
+        row_height = max(row_height, h)
+
+    # Center the packed extent on the canvas.
+    packed_min_x = min(extents[i][0] + offsets[i][0] for i in range(len(drawings)))
+    packed_min_y = min(extents[i][1] + offsets[i][1] for i in range(len(drawings)))
+    packed_max_x = max(extents[i][0] + extents[i][2] + offsets[i][0] for i in range(len(drawings)))
+    packed_max_y = max(extents[i][1] + extents[i][3] + offsets[i][1] for i in range(len(drawings)))
+    canvas_w, canvas_h = canvas_size
+    center_dx = (canvas_w - (packed_max_x - packed_min_x)) / 2.0 - packed_min_x
+    center_dy = (canvas_h - (packed_max_y - packed_min_y)) / 2.0 - packed_min_y
+
+    out_boxes: list[NodeBox] = []
+    out_edges: list[OrthogonalEdge] = []
+    for i, (boxes, edges) in enumerate(drawings):
+        dx = offsets[i][0] + center_dx
+        dy = offsets[i][1] + center_dy
+        for b in boxes:
+            out_boxes.append(
+                NodeBox(index=b.index, x=b.x + dx, y=b.y + dy, width=b.width, height=b.height)
+            )
+        for e in edges:
+            out_edges.append(
+                OrthogonalEdge(
+                    source=e.source,
+                    target=e.target,
+                    source_port=e.source_port,
+                    target_port=e.target_port,
+                    bends=[(bx + dx, by + dy) for bx, by in e.bends],
+                )
+            )
+    return out_boxes, out_edges
+
+
 def _dummy_rotations_alternate(planarized: PlanarizedGraph, embedding: PlanarEmbedding) -> bool:
     """Whether every crossing dummy alternates its two original edges.
 
@@ -470,4 +569,5 @@ __all__ = [
     "bend_optimal_representation",
     "realize_bend_optimal_drawing",
     "realize_planarized_drawing",
+    "pack_component_drawings",
 ]

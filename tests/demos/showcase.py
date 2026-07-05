@@ -34,6 +34,7 @@ from graph_layout import (
     RadialTreeLayout,
     ReingoldTilfordLayout,
     ShellLayout,
+    SMACOFLayout,
     SpectralLayout,
     SpringLayout,
     SugiyamaLayout,
@@ -97,6 +98,13 @@ LAYOUTS: list[LayoutSpec] = [
         cls=KamadaKawaiLayout,
         params={},
         description="Stress minimization using graph-theoretic distances",
+        suitable_for=("general", "random"),
+    ),
+    LayoutSpec(
+        name="SMACOF",
+        cls=SMACOFLayout,
+        params={},
+        description="Stress majorization (Guttman transform); converges more reliably than KK",
         suitable_for=("general", "random"),
     ),
     LayoutSpec(

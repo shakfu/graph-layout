@@ -16,7 +16,7 @@ Available algorithms:
 - export: Export to SVG, DOT (Graphviz), and GraphML formats
 """
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 # Shared types for all algorithms
 # Base classes for building layouts

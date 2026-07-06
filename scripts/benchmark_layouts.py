@@ -75,7 +75,7 @@ def run_benchmarks(
 ) -> list[dict]:
     """Run benchmarks on matching graphs."""
 
-    graphs_dir = Path(__file__).parent.parent / "benchmarks" / "graphs"
+    graphs_dir = Path(__file__).parent.parent / "tests" / "benchmarks" / "graphs"
     index_file = graphs_dir / "index.json"
 
     if not index_file.exists():

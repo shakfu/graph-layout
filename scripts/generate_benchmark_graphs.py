@@ -386,5 +386,5 @@ def load_json_graph(filepath: Path) -> tuple[list[dict], list[dict]]:
 
 
 if __name__ == "__main__":
-    output_dir = Path(__file__).parent.parent / "benchmarks" / "graphs"
+    output_dir = Path(__file__).parent.parent / "tests" / "benchmarks" / "graphs"
     generate_benchmark_suite(output_dir)

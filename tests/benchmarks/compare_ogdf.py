@@ -17,10 +17,10 @@ is apples-to-apples. This is a dev/benchmark tool, not part of the package; it
 exits cleanly with a message if ``ogdf-py`` is not installed.
 
 Usage:
-    uv run python benchmarks/compare_ogdf.py                 # default: small+medium
-    uv run python benchmarks/compare_ogdf.py --graphs small_random grid_small
-    uv run python benchmarks/compare_ogdf.py --all           # include large/xlarge
-    uv run python benchmarks/compare_ogdf.py --max-nodes 600
+    uv run python tests/benchmarks/compare_ogdf.py                 # default: small+medium
+    uv run python tests/benchmarks/compare_ogdf.py --graphs small_random grid_small
+    uv run python tests/benchmarks/compare_ogdf.py --all           # include large/xlarge
+    uv run python tests/benchmarks/compare_ogdf.py --max-nodes 600
 """
 
 from __future__ import annotations
@@ -49,6 +49,14 @@ DEFAULT_GRAPHS = [
 
 # Only count crossings for graphs at or below this edge count (O(m^2)).
 CROSSINGS_MAX_EDGES = 500
+
+# Stress is an all-pairs O(n^2) sum. Above this many node pairs it is estimated
+# from a fixed random sample instead of every pair -- an unbiased estimator of the
+# same normalized stress, and (being seeded) the *same* pairs are scored for every
+# engine on a given graph, so comparisons stay fair. Keeps 5000-node graphs
+# tractable without materializing ~12M pairs.
+MAX_STRESS_PAIRS = 200_000
+STRESS_SAMPLE_SEED = 20240101
 
 
 # ---------------------------------------------------------------------------
@@ -110,44 +118,79 @@ def all_finite(positions: list[tuple[float, float]]) -> bool:
     return all(math.isfinite(x) and math.isfinite(y) for x, y in positions)
 
 
-def normalized_stress(
-    positions: list[tuple[float, float]], dist: list[list[float]]
-) -> float:
-    """Scale-invariant normalized stress (lower is better).
+def stress_pairs(
+    n: int, dist: list[list[float]], max_pairs: int, seed: int
+) -> list[tuple[int, int]]:
+    """Node pairs to score stress over: all finite pairs, or a seeded sample.
 
-    Stress is ``sum_{i<j} w_ij (s * ||p_i - p_j|| - d_ij)^2`` with weights
-    ``w_ij = 1 / d_ij^2``. The optimal global scale ``s`` has a closed form and is
-    applied before scoring, so the result is invariant to each engine's
-    coordinate units -- the only fair way to compare two implementations whose
-    canvases differ. Pairs in different components (``d = inf``) are skipped. The
-    sum is normalized by the pair count so graphs of different sizes are roughly
-    comparable.
+    Returns every finite, positive-distance pair when there are at most
+    ``max_pairs`` of them; otherwise a deterministic random sample of that size.
+    Computed once per graph and reused for every engine, so all engines are scored
+    on identical pairs.
     """
-    n = len(positions)
+    import random
+
+    total = n * (n - 1) // 2
+    if total <= max_pairs:
+        return [
+            (i, j)
+            for i in range(n)
+            for j in range(i + 1, n)
+            if math.isfinite(dist[i][j]) and dist[i][j] > 0.0
+        ]
+    rng = random.Random(seed)
+    seen: set[tuple[int, int]] = set()
+    pairs: list[tuple[int, int]] = []
+    tries = 0
+    while len(pairs) < max_pairs and tries < max_pairs * 8:
+        tries += 1
+        i, j = rng.randrange(n), rng.randrange(n)
+        if i == j:
+            continue
+        a, b = (i, j) if i < j else (j, i)
+        if (a, b) in seen:
+            continue
+        d = dist[a][b]
+        if not math.isfinite(d) or d <= 0.0:
+            continue
+        seen.add((a, b))
+        pairs.append((a, b))
+    return pairs
+
+
+def normalized_stress(
+    positions: list[tuple[float, float]],
+    dist: list[list[float]],
+    pairs: list[tuple[int, int]],
+) -> float:
+    """Scale-invariant normalized stress over ``pairs`` (lower is better).
+
+    Stress is ``sum (s * ||p_i - p_j|| - d_ij)^2 / d_ij^2`` with the optimal global
+    scale ``s`` (closed form) applied first, so the result is invariant to each
+    engine's coordinate units -- the only fair way to compare implementations
+    whose canvases differ. Two passes over ``pairs`` (solve for ``s``, then sum),
+    so memory is O(1) in the pair count. Normalized by the pair count.
+    """
+    if not pairs:
+        return math.nan
     num = 0.0
     den = 0.0
-    geo: list[tuple[float, float]] = []  # (euclidean, d_ij) for finite pairs
-    for i in range(n):
-        xi, yi = positions[i]
-        di = dist[i]
-        for j in range(i + 1, n):
-            d = di[j]
-            if d == math.inf or d == 0.0:
-                continue
-            xj, yj = positions[j]
-            eucl = math.hypot(xi - xj, yi - yj)
-            geo.append((eucl, d))
-            w = 1.0 / (d * d)
-            num += w * d * eucl
-            den += w * eucl * eucl
-    if not geo or den == 0.0:
+    for i, j in pairs:
+        d = dist[i][j]
+        eucl = math.hypot(positions[i][0] - positions[j][0], positions[i][1] - positions[j][1])
+        w = 1.0 / (d * d)
+        num += w * d * eucl
+        den += w * eucl * eucl
+    if den == 0.0:
         return math.nan
     s = num / den
     total = 0.0
-    for eucl, d in geo:
+    for i, j in pairs:
+        d = dist[i][j]
+        eucl = math.hypot(positions[i][0] - positions[j][0], positions[i][1] - positions[j][1])
         r = s * eucl - d
         total += (r * r) / (d * d)
-    return total / len(geo)
+    return total / len(pairs)
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +286,9 @@ def benchmark_graph(
     dist = graph_distances(n, edges)
     n_components = component_count(dist)
     disc = f", {n_components} components" if n_components > 1 else ""
-    print(f"\n=== {name}: {n} nodes, {len(edges)} edges{disc} ===")
+    pairs = stress_pairs(n, dist, MAX_STRESS_PAIRS, STRESS_SAMPLE_SEED)
+    sampled = " (stress sampled)" if n * (n - 1) // 2 > MAX_STRESS_PAIRS else ""
+    print(f"\n=== {name}: {n} nodes, {len(edges)} edges{disc}{sampled} ===")
     do_crossings = len(edges) <= CROSSINGS_MAX_EDGES
     links = [Link(u, v) for u, v in edges] if do_crossings else []
 
@@ -268,7 +313,7 @@ def benchmark_graph(
             # e.g. PivotMDS / KK on a disconnected graph -> NaN coordinates.
             print(f"{family:7}  {label:24}  {dt:9.3f}  {'non-finite':>9}  {'-':>9}")
             continue
-        ns = normalized_stress(positions, dist)
+        ns = normalized_stress(positions, dist, pairs)
         if do_crossings:
             scored_nodes = [Node(x=p[0], y=p[1]) for p in positions]
             xings = str(edge_crossings(scored_nodes, links))

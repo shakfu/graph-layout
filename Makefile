@@ -108,7 +108,7 @@ demos:
 # Needs the ogdf-py oracle (dev group / `make oracle-install`); prints a message
 # and exits cleanly if it is absent. Pass args via ARGS, e.g. ARGS="--all".
 bench-ogdf:
-	@uv run python benchmarks/compare_ogdf.py $(ARGS)
+	@uv run python tests/benchmarks/compare_ogdf.py $(ARGS)
 
 # Run tests with HTML coverage report
 test-html:

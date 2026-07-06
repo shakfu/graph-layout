@@ -84,8 +84,7 @@ def atlas_graphs() -> Iterator[tuple[int, list[tuple[int, int]]]]:
             continue
         relabel = {old: i for i, old in enumerate(nodes)}
         edges = sorted(
-            (min(relabel[u], relabel[v]), max(relabel[u], relabel[v]))
-            for u, v in g.edges()
+            (min(relabel[u], relabel[v]), max(relabel[u], relabel[v])) for u, v in g.edges()
         )
         yield n, edges
 
@@ -188,9 +187,7 @@ def test_exhaustive_connectivity_atlas():
             n,
             edges,
         )
-        assert build_block_cut_tree(n, adj).cut_vertices == _brute_cut_vertices(
-            n, adj
-        ), (n, edges)
+        assert build_block_cut_tree(n, adj).cut_vertices == _brute_cut_vertices(n, adj), (n, edges)
 
 
 # ---------------------------------------------------------------------------

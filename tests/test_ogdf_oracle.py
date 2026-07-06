@@ -79,9 +79,7 @@ def _complete_bipartite(a: int, b: int) -> tuple[int, list[tuple[int, int]]]:
     return a + b, [(i, a + j) for i in range(a) for j in range(b)]
 
 
-def _random_connected_simple(
-    rng: random.Random, n: int
-) -> tuple[int, list[tuple[int, int]]]:
+def _random_connected_simple(rng: random.Random, n: int) -> tuple[int, list[tuple[int, int]]]:
     """A random connected simple graph on ``n`` vertices.
 
     A random spanning tree guarantees connectivity; a random number of extra
@@ -269,8 +267,7 @@ def test_planar_layout_flag_is_truthful(layout_cls, flag, seed):
             )
     if not ogdf_planar:
         assert not used, (
-            f"{layout_cls.__name__} set {flag} on a non-planar graph: "
-            f"n={n} edges={edges}"
+            f"{layout_cls.__name__} set {flag} on a non-planar graph: n={n} edges={edges}"
         )
 
 

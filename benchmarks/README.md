@@ -86,6 +86,25 @@ uv run python scripts/benchmark_layouts.py --iterations 100
 uv run python scripts/generate_benchmark_graphs.py
 ```
 
+### Comparing against OGDF
+
+`compare_ogdf.py` benchmarks graph-layout's layouts against the equivalent C++
+layouts in [OGDF](https://ogdf.github.io/) (via the `ogdf-py` oracle) on the same
+graphs. It reports, per layout, wall-clock time, **scale-invariant normalized
+stress** (each drawing is optimally rescaled before scoring, so quality is
+compared independent of coordinate scale), and edge crossings on small graphs.
+Comparable layouts are grouped by family (stress/MDS, force-directed) so the
+numbers line up directly; OGDF sets the C++ speed/quality ceiling.
+
+```bash
+make bench-ogdf                          # default: small + medium graphs
+make bench-ogdf ARGS="--all"             # include large / xlarge
+make bench-ogdf ARGS="--graphs grid_small small_random"
+```
+
+Requires the `ogdf-py` oracle (installed by `uv sync` on supported platforms, or
+`make oracle-install`); the script exits cleanly with a message if it is absent.
+
 ## Benchmark Results (50 iterations)
 
 ### Medium Graphs (500 nodes)

@@ -844,6 +844,7 @@ dev = [
     { name = "networkx", version = "3.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "ogdf-py", marker = "python_full_version >= '3.10' and python_full_version < '3.14' and sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -866,6 +867,7 @@ dev = [
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "mypy", specifier = ">=1.14.1" },
     { name = "networkx", specifier = ">=3.0" },
+    { name = "ogdf-py", marker = "python_full_version >= '3.10' and python_full_version < '3.14' and sys_platform != 'win32'", specifier = ">=0.1.1" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "ruff", specifier = ">=0.13.3" },
@@ -1808,6 +1810,30 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/57/62/208293d7d6b2a8998a4a1f23ac758648c3c32182d4ce4346062018362e29/numpy-2.3.3-pp311-pypy311_pp73-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:8596ba2f8af5f93b01d97563832686d20206d303024777f6dfc2e7c7c3f1850e", size = 14420354, upload-time = "2025-09-09T15:58:52.704Z" },
     { url = "https://files.pythonhosted.org/packages/ed/0c/8e86e0ff7072e14a71b4c6af63175e40d1e7e933ce9b9e9f765a95b4e0c3/numpy-2.3.3-pp311-pypy311_pp73-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e1ec5615b05369925bd1125f27df33f3b6c8bc10d788d5999ecd8769a1fa04db", size = 16760413, upload-time = "2025-09-09T15:58:55.027Z" },
     { url = "https://files.pythonhosted.org/packages/af/11/0cc63f9f321ccf63886ac203336777140011fb669e739da36d8db3c53b98/numpy-2.3.3-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:2e267c7da5bf7309670523896df97f93f6e469fb931161f483cd6882b3b1a5dc", size = 12971844, upload-time = "2025-09-09T15:58:57.359Z" },
+]
+
+[[package]]
+name = "ogdf-py"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/99/e1f04899e0d16d5823ce48d7ab09cba6d19af081dc77de2e934c6262c349/ogdf_py-0.1.1.tar.gz", hash = "sha256:cf0c358d9b4453cedaae8dc5d84ae981c0ba679af3f555349f910c1e55bb6354", size = 90927, upload-time = "2026-07-06T05:04:20.622Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/12/6f/4666bb6807429744be446fefcdea43fac730a6f1d723f2edfb015d295389/ogdf_py-0.1.1-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:9bc8628623abe1a63abca49f913550bd6104e5ad743efa54c616b85d94413f38", size = 2595771, upload-time = "2026-07-06T05:03:50.154Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/4d/d329b82171d783847a3630867ee65320b4d2da8979f7f4f7339a7e375b84/ogdf_py-0.1.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:fcc9579ff870561f898e1e99e57796f4f30dbfa2638277622a5ba3da61b9898e", size = 2205357, upload-time = "2026-07-06T05:03:52.098Z" },
+    { url = "https://files.pythonhosted.org/packages/67/6b/f0a7c13e211e6d33b76fdf726d0942398cea8bcac32ede0d52b61fc3c42a/ogdf_py-0.1.1-cp310-cp310-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9db5c41123088ccd84a65585e14981cfcc8927a3d87cca2ae74b8478450492f5", size = 3093247, upload-time = "2026-07-06T05:03:53.827Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/de/80278593a8852ff707274a8362d39840a1a58fb7b8d2deea168f76c72300/ogdf_py-0.1.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a7cb63bbf934596e8aa936ee9cd1b40b990e06687eb7b815c492094b8a001c4e", size = 3470572, upload-time = "2026-07-06T05:03:57.464Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/67/046e93c1d7afeff09d2ad3cf9571ee9d8f214d846aa9be5777db22a94f73/ogdf_py-0.1.1-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:a7a1c77303a0ae37b3a6c5b1850014faa9e272f10f85b077ddf43d3f2d937cfc", size = 2595880, upload-time = "2026-07-06T05:03:59.411Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/f1/4f1ccd36e1c380fe8e6ecf83fb60a64b8771d2900d61504dee17314b7b08/ogdf_py-0.1.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:8e7bb47f32a5a0f00fff812db163850b45fce088747b65337df1716f933c1bbe", size = 2205517, upload-time = "2026-07-06T05:04:00.986Z" },
+    { url = "https://files.pythonhosted.org/packages/67/b6/e18205d5236c60090eca3c568db240ff8ffae6eedf05a499c9bc7a669f90/ogdf_py-0.1.1-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3f3fadde1ec3edef4740a19c21856476c3b6a6ccce7e41f5571cf420d3a9b358", size = 3093291, upload-time = "2026-07-06T05:04:02.801Z" },
+    { url = "https://files.pythonhosted.org/packages/86/cf/d90b08d0abd4e4909b5d2fafc6ee908588489900ec6cee7321e0a67b55b4/ogdf_py-0.1.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1f8cfb882d55747f05fa8eafa2bcba0625754e68a7289bbe48d1d95d5f033aa7", size = 3470699, upload-time = "2026-07-06T05:04:04.784Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/88/08a00cdfb628a4336976e7d5943f82b28a60e739486891c4078d3cafc9a0/ogdf_py-0.1.1-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:b947f732ab0eeb773642859d0cec2991d4cfdf15027621a87508d90b8b67d4cd", size = 2595224, upload-time = "2026-07-06T05:04:06.508Z" },
+    { url = "https://files.pythonhosted.org/packages/be/13/960f6824da095da57a82a4e679db5934a4fe76045ebdd9b45a21d76eb21e/ogdf_py-0.1.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:a4f143972211e7331c6558babb54fafcf185f035770774f445d1dbec13694ca5", size = 2204058, upload-time = "2026-07-06T05:04:08.115Z" },
+    { url = "https://files.pythonhosted.org/packages/71/1b/0733ea5c0b481a77ca6f9319dcb1407fb00c14690e1f38b6a3d3bad86ba5/ogdf_py-0.1.1-cp312-cp312-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4550791092dd9cb50154cd4d6a349d9a26f597d58aaa22bfb3ef81b1b8887b3c", size = 3092349, upload-time = "2026-07-06T05:04:09.854Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/89/66b0737c9e9ea6f63b7509417177041751738b615c57a6ca3099fd401f3a/ogdf_py-0.1.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cdea58b2efdbefba9e7fcb9afa3cff9b5e1d2518bd60077147fecfb6e2403b28", size = 3469726, upload-time = "2026-07-06T05:04:11.522Z" },
+    { url = "https://files.pythonhosted.org/packages/61/5d/279d833c70064485e71c7ee87fee86ddb8f20e92fbd6b39152ed8dd8ad9e/ogdf_py-0.1.1-cp313-cp313-macosx_10_15_x86_64.whl", hash = "sha256:92b63c0c58a628409948f9a6cc24c877c691f065fc85fc7a2fc99419a8a2853d", size = 2595283, upload-time = "2026-07-06T05:04:13.135Z" },
+    { url = "https://files.pythonhosted.org/packages/98/4c/1396278f8eb3773b9b6c47c66228d321863e47e42196aba402b34a0208db/ogdf_py-0.1.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:bace79d866eec7b94c5a4cc92211ca362a1c289cd82e94f9f37281ca222930fd", size = 2203957, upload-time = "2026-07-06T05:04:14.762Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/ce/6a17a6ec2e619a592c240bb54c707bf84a82e19df5bcd4a40cbda0327512/ogdf_py-0.1.1-cp313-cp313-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:72b2f7e5993c725bce666ae8985eb1f9c76afe058ebcee1852c665a36003dbfa", size = 3092232, upload-time = "2026-07-06T05:04:16.25Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/b8/9a19f57d771a44c58206b93ba398e434b4f7df9c22996f87248003d96481/ogdf_py-0.1.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1e356c329645f0e3de10b6a7b8af8684d0aa2b36ade227492891d1e9c00ab5f4", size = 3469606, upload-time = "2026-07-06T05:04:18.138Z" },
 ]
 
 [[package]]

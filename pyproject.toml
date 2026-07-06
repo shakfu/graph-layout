@@ -76,6 +76,12 @@ dev = [
     # Differential-testing oracle for the planarity suite (tests/test_planarity_regression.py).
     # Not a runtime dependency; the oracle tests skip gracefully if it is absent.
     "networkx>=3.0",
+    # Second, independent differential-testing oracle backed by OGDF, used by
+    # tests/test_ogdf_oracle.py. Not a runtime dependency. It is a compiled C++
+    # extension, so it is pinned only where PyPI ships prebuilt wheels
+    # (CPython 3.10-3.13 on Linux/macOS); elsewhere the oracle tests skip via the
+    # guard in tests/_ogdf_oracle.py rather than forcing a from-source OGDF build.
+    "ogdf-py>=0.1.1; sys_platform != 'win32' and python_version >= '3.10' and python_version < '3.14'",
 ]
 
 [project.urls]

@@ -3,7 +3,8 @@
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
 		lint format check typecheck all dev sync build publish publish-test \
-		wheel-check rebuild-cython qa showcase showcase-improvements demos
+		wheel-check rebuild-cython qa showcase showcase-improvements demos \
+		oracle-install bench-ogdf
 
 # Source and test directories
 SRC_DIR := src/graph_layout
@@ -65,6 +66,16 @@ dev: sync
 test:
 	@uv run pytest
 
+# The OGDF differential-testing oracle (ogdf-py) is pinned in the dev group and
+# installed from PyPI by `uv sync`. Use this target only to test graph-layout
+# against a LOCAL, unreleased build of the sibling ogdf-py checkout: it builds a
+# wheel from OGDF_PY and installs it over the pinned release in the dev venv.
+OGDF_PY ?= ../ogdf-py
+oracle-install:
+	@cd $(OGDF_PY) && uv build --wheel
+	@uv pip install --reinstall $(OGDF_PY)/dist/ogdf_py-*.whl
+	@uv run python -c "import ogdf; print('local ogdf oracle installed:', ogdf.__version__)"
+
 # Run tests in watch mode
 test-watch:
 	@uv run pytest-watch -- -v
@@ -92,6 +103,12 @@ demos:
 	done
 	@echo "All demos written to build/"
 	@if [ "$$(uname)" = "Darwin" ]; then open build/*showcase.html; fi
+
+# Compare graph-layout vs OGDF (ogdf-py) on layout quality and speed.
+# Needs the ogdf-py oracle (dev group / `make oracle-install`); prints a message
+# and exits cleanly if it is absent. Pass args via ARGS, e.g. ARGS="--all".
+bench-ogdf:
+	@uv run python benchmarks/compare_ogdf.py $(ARGS)
 
 # Run tests with HTML coverage report
 test-html:

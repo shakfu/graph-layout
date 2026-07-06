@@ -2,6 +2,9 @@
 
 A collection of graph layout algorithms in Python.
 
+Written in pure Python (with optional Cython acceleration), it installs anywhere with `pip`—no native compiler or build toolchain required. If you need C++-level performance for large graphs or a more comprehensive graph algorithm and file format toolkit, see the sibling project [ogdf-py](https://github.com/shakfu/ogdf-py). For guidance on choosing between the two, see [**graph-layout vs. ogdf-py**](#related-project-ogdf-py).
+
+
 ## Layout Algorithms
 
 | Family | Algorithm | Description |
@@ -385,9 +388,13 @@ print(f"Drew via Schnyder: {layout.used_schnyder}")
 ```
 
 - **`SchnyderLayout`** — realizer-based drawing; vertex-count barycentric coordinates on the `(n-1) x (n-1)` grid (Schnyder 1990).
+
 - **`FPPLayout`** — de Fraysseix-Pach-Pollack shift method (slope-±1 "tent" over the contour) on the `(2n-4) x (n-2)` grid.
+
 - **`TutteLayout`** — barycentric spring embedding; provably convex faces for 3-connected planar graphs (Tutte 1963).
+
 - **`MixedModelLayout`** — Tamassia-Tollis visibility representation: vertices are horizontal bars, edges bendless vertical segments at distinct ports (high angular resolution for high-degree vertices). Exposes `vertex_bars` and `edge_routes`.
+
 - **`PlanarizationLayout`** — draws *non-planar* graphs by replacing crossings with dummy vertices, then routing each edge as a polyline through its crossing points. Exposes `crossings`, `crossing_count`, and `edge_routes`.
 
 ```python
@@ -721,9 +728,35 @@ make lint          # Lint code
 make qa            # Run all qualtiy checks
 ```
 
+## Related project: ogdf-py
+
+[ogdf-py](https://github.com/shakfu/ogdf-py) is a sibling project: Python bindings (via nanobind) to the C++ [Open Graph Drawing Framework (OGDF)](https://ogdf.github.io/). The two overlap heavily -- graph-layout reimplements in pure Python many algorithms OGDF implements in C++ -- and graph-layout's own test suite uses ogdf-py as an independent correctness oracle (`tests/test_ogdf_oracle.py`) and as a speed baseline (`tests/benchmarks/compare_ogdf.py`).
+
+**Prefer `ogdf-py` when:**
+
+- **Scale and speed matter.** OGDF is compiled C++. On the *identical* stress-majorization algorithm it runs ~15-20x faster than graph-layout, and the gap grows with size: at 5000 nodes graph-layout's `SMACOF` takes ~4.5 minutes versus OGDF's ~16 seconds (see `tests/benchmarks/README.md`). For graphs beyond ~1000 nodes, or performance-critical pipelines, reach for ogdf-py.
+
+- **You need more than layout.** OGDF ships a large, mature toolkit graph-layout does not: maximum and minimum-cost flow, matching, Steiner trees, triconnectivity / SPQR-trees, node colouring, and read/write for the GML, GraphML, DOT, GEXF, GDF, and TLP formats.
+
+- **You want a battle-tested reference.** OGDF is a long-standing framework from the graph-drawing research community.
+
+**Prefer `graph-layout` when:**
+
+- **Zero native dependency.** Pure Python (plus optional Cython); `pip install graph-layout` needs no C++ toolchain and works on every platform and Python version -- including those where ogdf-py ships no prebuilt wheel (Windows, Python 3.9, 3.14+).
+
+- **You want readable, hackable implementations.** Every algorithm is Python you can read, modify, and extend -- useful for learning and experimentation.
+
+- **You need a layout ogdf-py doesn't expose.** Constraint-based layout (Cola: overlap avoidance, separation constraints, groups), ForceAtlas2, and the FPP and mixed-model planar straight-line layouts are graph-layout-only. (Both libraries also do force-directed, hierarchical, orthogonal, and Schnyder/Tutte planar drawing.)
+
+- **Throughput on a budget.** Not every graph-layout algorithm is slower: its multilevel `YifanHu` is *faster* than OGDF's flagship `FMMM` at every size tested, trading ~20% layout quality for speed.
+
+In short: ogdf-py for C++ performance and algorithmic breadth; graph-layout for a dependency-free, readable, easily-extended pure-Python library with a handful of layout families of its own.
+
+Another earlier graph-drawing sibling project, [hola-graph](https://github.com/shakfu/hola-graph), is a pybind11 wrapper for the [adaptagrams](https://www.adaptagrams.org) HOLA: Human-like Orthogonal Network Layout algorithm by Steve Kieffer, Tim Dwyer, Kim Marriott and Michael Wybrow.
+
 ## Credits
 
-- **Cola**: Port of [WebCola](https://github.com/tgdwyer/WebCola) by Tim Dwyer (see also [libcola-releated papers](https://www.adaptagrams.org/documentation/libcola.html) in the [adaptagrams project](https://www.adaptagrams.org).
+- **Cola**: Port of [WebCola](https://github.com/tgdwyer/WebCola) by [Tim Dwyer](https://ialab.it.monash.edu/~dwyer/) (see also [libcola-releated papers](https://www.adaptagrams.org/documentation/libcola.html) in the [adaptagrams project](https://www.adaptagrams.org).
 
 - **ForceAtlas2**: Based on "ForceAtlas2, a Continuous Graph Layout Algorithm for Handy Network Visualization" by Jacomy et al. (2014)
 

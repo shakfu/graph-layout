@@ -239,6 +239,19 @@ class KandinskyLayout(StaticLayout):
     # Properties
     # -------------------------------------------------------------------------
 
+    def _translate_extra(self, dx: float, dy: float) -> None:
+        """Move the node boxes and edge bends along with the node positions."""
+        for i, box in enumerate(self._node_boxes):
+            self._node_boxes[i] = NodeBox(
+                index=box.index,
+                x=box.x + dx,
+                y=box.y + dy,
+                width=box.width,
+                height=box.height,
+            )
+        for edge in self._orthogonal_edges:
+            edge.bends = [(bx + dx, by + dy) for bx, by in edge.bends]
+
     @property
     def node_width(self) -> float:
         """Get default node width."""

@@ -71,7 +71,7 @@ class Layout:
     force-directed graph layout with constraints.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize layout with default parameters."""
         self._canvasSize: list[float] = [1.0, 1.0]
         self._linkDistance: Union[float, LinkNumericPropertyAccessor] = 20.0

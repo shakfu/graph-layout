@@ -10,10 +10,10 @@ Extended with improvements from:
 
 from __future__ import annotations
 
-import warnings
 from collections import deque
 from typing import Any, Callable, Optional, Sequence
 
+from .._warnings import warn_at_caller
 from ..base import StaticLayout, run_deep_recursive
 from ..types import (
     Event,
@@ -211,12 +211,11 @@ class ReingoldTilfordLayout(StaticLayout):
                 return i
 
         # Fallback to node 0
-        warnings.warn(
+        warn_at_caller(
             "No root node found (all nodes have incoming edges). "
             "This suggests the graph is not a tree. "
             "Reingold-Tilford layout is designed for trees; results may be suboptimal.",
             TreeStructureWarning,
-            stacklevel=4,
         )
         return 0
 
@@ -256,12 +255,11 @@ class ReingoldTilfordLayout(StaticLayout):
         # Check for disconnected nodes
         unvisited = [i for i in range(n) if not visited[i]]
         if unvisited:
-            warnings.warn(
+            warn_at_caller(
                 f"Found {len(unvisited)} disconnected node(s) not reachable from root. "
                 "These nodes will be placed at arbitrary positions. "
                 "Reingold-Tilford layout is designed for connected trees.",
                 TreeStructureWarning,
-                stacklevel=3,
             )
 
         return tree_root

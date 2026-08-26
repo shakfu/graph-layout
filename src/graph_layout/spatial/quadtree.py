@@ -233,12 +233,15 @@ class QuadTree:
         """
         # ``_calculate_force`` accumulates ``k * m_source / d`` per interaction,
         # i.e. it applies the *source* mass (aggregated as ``total_mass``) but
-        # not the acting body's own mass. For ForceAtlas2 the repulsion is
-        # ``scaling * (deg_i + 1) * (deg_j + 1) / d``, so the acting body's mass
-        # ``(deg_i + 1)`` must also be applied. Force is linear in that factor,
-        # so scaling the accumulated total is equivalent to scaling each term.
-        # (Fruchterman-Reingold / Yifan Hu pass ``mass = 1.0``, so this is a
-        # no-op for them.)
+        # not the acting body's own mass, which is applied here. For ForceAtlas2
+        # the repulsion is ``scaling * (deg_i + 1) * (deg_j + 1) / d``: the
+        # ``(deg_i + 1)`` factor is ``body.mass`` below, and the ``(deg_j + 1)``
+        # factor must come from the *tree*, so the caller has to build it with
+        # per-node masses (``QuadTree.from_nodes(..., masses=...)``). Force is
+        # linear in the acting factor, so scaling the accumulated total is
+        # equivalent to scaling each term. (Fruchterman-Reingold / Spring /
+        # Yifan Hu use uniform ``mass = 1.0`` on both sides, so this is a no-op
+        # for them.)
         fx, fy = self._calculate_force(self.root, body, repulsion_constant)
         return fx * body.mass, fy * body.mass
 
@@ -296,6 +299,7 @@ class QuadTree:
         nodes: Sequence[Node],
         padding: float = 10.0,
         theta: float = 0.5,
+        masses: Optional[Sequence[float]] = None,
     ) -> QuadTree:
         """
         Build quadtree from a list of Node objects.
@@ -304,6 +308,12 @@ class QuadTree:
             nodes: List of Node objects with x, y attributes
             padding: Padding around bounding box
             theta: Barnes-Hut threshold
+            masses: Optional per-node masses, parallel to ``nodes``. Defaults to
+                1.0 for every body, which is what the uniform-repulsion layouts
+                (Fruchterman-Reingold, Spring, Yifan Hu) want. Degree-weighted
+                layouts such as ForceAtlas2 must pass ``degree + 1`` here so the
+                aggregated ``total_mass`` carries the source-side weight; see
+                ``calculate_force``.
 
         Returns:
             QuadTree with all nodes inserted and mass computed
@@ -320,7 +330,8 @@ class QuadTree:
 
         for i, node in enumerate(nodes):
             idx = node.index if node.index is not None else i
-            tree.insert(Body(node.x, node.y, mass=1.0, index=idx))
+            mass = 1.0 if masses is None else float(masses[i])
+            tree.insert(Body(node.x, node.y, mass=mass, index=idx))
 
         tree.compute_mass_distribution()
         return tree

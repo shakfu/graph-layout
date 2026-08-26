@@ -259,8 +259,15 @@ class TestPriorityQueue:
 
         pq = PriorityQueue(lambda a, b: a < b)
 
+        # Seeded so a failure is reproducible. This dataset used to come from the
+        # process-global RNG, which earlier tests in the suite happened to pin;
+        # once layouts stopped seeding that generator the input changed on every
+        # run, and the test began failing intermittently -- which is how the
+        # duplicate-key defect in is_heap() was found (see test_duplicate_keys).
+        rng = random.Random(20240517)
+
         # Insert random numbers
-        numbers = [random.randint(1, 1000) for _ in range(100)]
+        numbers = [rng.randint(1, 1000) for _ in range(100)]
         for n in numbers:
             pq.push(n)
 
@@ -273,3 +280,48 @@ class TestPriorityQueue:
             assert pq.pop() == expected
 
         assert pq.empty()
+
+
+class TestDuplicateKeys:
+    """A heap may legitimately hold equal keys.
+
+    ``is_heap`` used to assert ``less_than(parent, child)``, demanding a strict
+    ordering between a node and its children. With the natural ``a < b``
+    comparator that reports any heap containing a repeated key as invalid: the
+    smallest failing case is the two-element heap [3, 3]. Roughly 8% of random
+    100-element datasets drawn from 1..1000 contain enough duplicates to trip it.
+    The heap structure itself was never affected -- pop order and count were
+    correct throughout -- only the diagnostic.
+    """
+
+    def test_two_equal_elements(self):
+        pq = PriorityQueue(lambda a, b: a < b)
+        pq.push(3)
+        pq.push(3)
+        assert pq.is_heap()
+        assert pq.count() == 2
+        assert pq.pop() == 3
+        assert pq.pop() == 3
+        assert pq.empty()
+
+    def test_all_elements_equal(self):
+        pq = PriorityQueue(lambda a, b: a < b)
+        for _ in range(50):
+            pq.push(7)
+        assert pq.is_heap()
+        assert pq.count() == 50
+        assert [pq.pop() for _ in range(50)] == [7] * 50
+
+    def test_heavy_duplicates_stay_sorted(self):
+        """Datasets dense in duplicates must remain valid heaps and pop sorted."""
+        import random
+
+        rng = random.Random(4242)
+        for _ in range(200):
+            numbers = [rng.randint(1, 12) for _ in range(40)]
+            pq = PriorityQueue(lambda a, b: a < b)
+            for n in numbers:
+                pq.push(n)
+            assert pq.count() == len(numbers)
+            assert pq.is_heap(), f"valid heap reported invalid for {numbers}"
+            assert [pq.pop() for _ in range(len(numbers))] == sorted(numbers)

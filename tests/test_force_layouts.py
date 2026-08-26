@@ -461,6 +461,11 @@ class TestKamadaKawaiLayout:
         nodes = [{"x": 0, "y": 0}, {"x": 50, "y": 0}, {"x": 100, "y": 0}]
         links = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
 
+        # The layout discards the positions above (run() defaults to
+        # random_init=True) and starts from its own placement. That placement is
+        # circular by default and therefore deterministic; see
+        # TestKamadaKawaiInitialLayout for why, and for the folding this used to
+        # exhibit from random starts.
         layout = KamadaKawaiLayout(
             nodes=nodes,
             links=links,
@@ -629,3 +634,133 @@ class TestAllForceLayouts:
         layout.run()
 
         assert len(layout.nodes) == 3
+
+
+class TestKamadaKawaiInitialLayout:
+    """Kamada-Kawai starts from a circle, as in the original paper.
+
+    The minimisation is local, so the starting placement decides which optimum
+    is reached. From uniformly random starts the three-node path 0-1-2 folds --
+    node 2 landing between 0 and 1, giving a 0.5 distance ratio instead of 2.0 --
+    on roughly 10% of runs. A circular start reached the correct drawing on 200
+    of 200 runs and had the better worst case on every family measured.
+    """
+
+    PATH_NODES = [{"x": 0, "y": 0}, {"x": 50, "y": 0}, {"x": 100, "y": 0}]
+    PATH_LINKS = [{"source": 0, "target": 1}, {"source": 1, "target": 2}]
+
+    def _ratio(self, layout):
+        d01 = math.dist(
+            (layout.nodes[0].x, layout.nodes[0].y), (layout.nodes[1].x, layout.nodes[1].y)
+        )
+        d02 = math.dist(
+            (layout.nodes[0].x, layout.nodes[0].y), (layout.nodes[2].x, layout.nodes[2].y)
+        )
+        return d02 / d01 if d01 > 0 else 0.0
+
+    def test_circular_is_the_default(self):
+        assert KamadaKawaiLayout().initial_layout == "circular"
+
+    def test_circular_start_is_deterministic_and_unfolded(self):
+        """Repeated unseeded runs must agree, and must not fold."""
+        results = []
+        for _ in range(25):
+            layout = KamadaKawaiLayout(
+                nodes=[dict(n) for n in self.PATH_NODES],
+                links=[dict(link) for link in self.PATH_LINKS],
+                size=(500, 500),
+                edge_length=100,
+                iterations=200,
+            )
+            layout.run()
+            results.append(self._ratio(layout))
+
+        for ratio in results:
+            assert 1.5 < ratio < 2.5, f"folded to ratio {ratio}"
+        assert max(results) - min(results) < 1e-9, "circular start should be deterministic"
+
+    def test_random_start_remains_available(self):
+        layout = KamadaKawaiLayout(
+            nodes=[dict(n) for n in self.PATH_NODES],
+            links=[dict(link) for link in self.PATH_LINKS],
+            size=(500, 500),
+            initial_layout="random",
+            random_seed=42,
+        )
+        assert layout.initial_layout == "random"
+        layout.run()
+        assert all(math.isfinite(n.x) and math.isfinite(n.y) for n in layout.nodes)
+
+    def test_rejects_an_unknown_mode(self):
+        with pytest.raises(ValueError, match="initial_layout"):
+            KamadaKawaiLayout(initial_layout="spectral")
+        layout = KamadaKawaiLayout()
+        with pytest.raises(ValueError, match="initial_layout"):
+            layout.initial_layout = "spectral"
+
+    def test_fixed_nodes_keep_their_positions(self):
+        """The circular placement must not move pinned nodes."""
+        nodes = [
+            {"x": 111.0, "y": 222.0, "fixed": 1},
+            {"x": 0, "y": 0},
+            {"x": 0, "y": 0},
+        ]
+        layout = KamadaKawaiLayout(
+            nodes=nodes, links=[dict(link) for link in self.PATH_LINKS], size=(500, 500)
+        )
+        layout._initialize_indices()
+        layout._initialize_circular()
+        assert (layout.nodes[0].x, layout.nodes[0].y) == (111.0, 222.0)
+
+
+class TestFruchtermanReingoldFallbackParity:
+    """The compiled and pure-Python paths must agree.
+
+    Nothing else exercises the pure-Python fallback, which is what runs when the
+    ``_speedups`` extension is unavailable. That gap is how a real divergence in
+    ForceAtlas2's Barnes-Hut path went unnoticed (see
+    tests/test_force_atlas2.py::TestCythonFallbackParity).
+    """
+
+    @staticmethod
+    def _grid(w, h):
+        nodes = []
+        links = []
+        for r in range(h):
+            for c in range(w):
+                nodes.append({"x": float(c * 13 % 97), "y": float(r * 29 % 89)})
+                v = r * w + c
+                if c + 1 < w:
+                    links.append({"source": v, "target": v + 1})
+                if r + 1 < h:
+                    links.append({"source": v, "target": v + w})
+        return nodes, links
+
+    @pytest.mark.parametrize("use_barnes_hut", [False, True])
+    def test_paths_agree(self, monkeypatch, use_barnes_hut):
+        from graph_layout.force import fruchterman_reingold as module
+
+        if not module._HAS_CYTHON:
+            pytest.skip("_speedups extension not built; only one path available")
+
+        results = []
+        for use_cython in (True, False):
+            monkeypatch.setattr(module, "_HAS_CYTHON", use_cython)
+            nodes, links = self._grid(10, 10)
+            layout = module.FruchtermanReingoldLayout(
+                nodes=nodes,
+                links=links,
+                size=(800, 800),
+                random_seed=1,
+                use_barnes_hut=use_barnes_hut,
+                iterations=10,
+            )
+            layout.run(random_init=False)
+            results.append([(n.x, n.y) for n in layout.nodes])
+
+        worst = max(math.dist(a, b) for a, b in zip(results[0], results[1]))
+        # Exact agreement without Barnes-Hut; with it, only float accumulation
+        # order differs (measured ~6e-6 on this graph).
+        assert worst < 1e-4, (
+            f"compiled and pure-Python paths diverge by {worst:.6g} (barnes_hut={use_barnes_hut})"
+        )

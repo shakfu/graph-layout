@@ -776,3 +776,103 @@ class TestForceAtlas2Gravity:
 
             assert np.allclose(dx, exp_dx, rtol=1e-9, atol=1e-9)
             assert np.allclose(dy, exp_dy, rtol=1e-9, atol=1e-9)
+
+
+# =============================================================================
+# Cython / pure-Python parity
+# =============================================================================
+
+
+class TestCythonFallbackParity:
+    """The compiled and pure-Python paths must compute the same layout.
+
+    The pure-Python fallback runs whenever ``_speedups`` is unavailable -- an
+    sdist install on a platform with no wheel, or a failed build. Nothing else
+    in the suite exercises it, which is how a real divergence went unnoticed:
+    ``QuadTree.from_nodes`` hard-coded ``mass=1.0``, so the pure-Python
+    Barnes-Hut path silently dropped the source-side ``(deg_j + 1)`` factor of
+    the ForceAtlas2 repulsion while the Cython kernel applied it. That is a
+    different force model, not a rounding difference, and it is the default
+    path: Barnes-Hut is enabled by default above 50 nodes.
+    """
+
+    @staticmethod
+    def _grid(w, h):
+        """Deterministic starting positions -- no reliance on random init."""
+        nodes = []
+        links = []
+        for r in range(h):
+            for c in range(w):
+                nodes.append({"x": float(c * 13 % 97), "y": float(r * 29 % 89)})
+                v = r * w + c
+                if c + 1 < w:
+                    links.append({"source": v, "target": v + 1})
+                if r + 1 < h:
+                    links.append({"source": v, "target": v + w})
+        return nodes, links
+
+    def _positions(self, monkeypatch, use_cython, *, use_barnes_hut, iterations):
+        from graph_layout.force import force_atlas2 as fa2_module
+
+        monkeypatch.setattr(fa2_module, "_HAS_CYTHON", use_cython)
+        nodes, links = self._grid(10, 10)
+        layout = fa2_module.ForceAtlas2Layout(
+            nodes=nodes,
+            links=links,
+            size=(800, 800),
+            iterations=iterations,
+            random_seed=1,
+            use_barnes_hut=use_barnes_hut,
+        )
+        layout.run(random_init=False)
+        return np.array([(n.x, n.y) for n in layout.nodes])
+
+    @pytest.mark.parametrize("use_barnes_hut", [False, True])
+    @pytest.mark.parametrize("iterations", [1, 10])
+    def test_paths_agree(self, monkeypatch, use_barnes_hut, iterations):
+        from graph_layout.force import force_atlas2 as fa2_module
+
+        if not fa2_module._HAS_CYTHON:
+            pytest.skip("_speedups extension not built; only one path available")
+
+        compiled = self._positions(
+            monkeypatch, True, use_barnes_hut=use_barnes_hut, iterations=iterations
+        )
+        fallback = self._positions(
+            monkeypatch, False, use_barnes_hut=use_barnes_hut, iterations=iterations
+        )
+
+        # Both paths do the same arithmetic in the same order, so they agree far
+        # more tightly than a physics tolerance would require. The bug this
+        # guards produced a divergence of ~8 units on iteration 1 and ~59 by
+        # iteration 10, on a graph spanning ~100 units.
+        max_diff = float(np.max(np.linalg.norm(compiled - fallback, axis=1)))
+        assert max_diff < 1e-6, (
+            f"compiled and pure-Python paths diverge by {max_diff:.6g} "
+            f"(barnes_hut={use_barnes_hut}, iterations={iterations})"
+        )
+
+    def test_barnes_hut_tree_carries_degree_weights(self):
+        """The FA2 quadtree must be built with degree+1 masses, not uniform 1.0.
+
+        A direct check of the root cause, independent of the Cython comparison,
+        so it still guards on platforms where the extension is absent.
+        """
+        from graph_layout.spatial.quadtree import QuadTree
+
+        nodes, links = self._grid(4, 4)
+        layout = ForceAtlas2Layout(nodes=nodes, links=links, size=(400, 400))
+        layout.run(random_init=False)
+
+        degrees = [0] * len(layout.nodes)
+        for link in layout.links:
+            degrees[layout._get_source_index(link)] += 1
+            degrees[layout._get_target_index(link)] += 1
+
+        masses = [float(d + 1) for d in degrees]
+        tree = QuadTree.from_nodes(layout.nodes, padding=10.0, theta=1.2, masses=masses)
+
+        # Total mass aggregated at the root must be sum(degree + 1), not the
+        # node count that a uniform-mass tree would produce.
+        assert tree.root.total_mass == pytest.approx(sum(masses))
+        assert tree.root.total_mass > len(layout.nodes)

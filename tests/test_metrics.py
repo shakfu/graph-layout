@@ -355,3 +355,37 @@ class TestMetricsWithRealLayout:
         assert summary["edge_crossings"] == 0
         # Uniformity should be reasonable
         assert summary["edge_length_uniformity"] > 0.3
+
+
+class TestStressSignature:
+    """``stress`` follows the same (nodes, links) shape as the other metrics.
+
+    It previously took ``ideal_distances`` second, so ``stress(nodes, links)`` --
+    the call every other metric in the module accepts -- treated the links as a
+    distance matrix and died with "'Link' object is not subscriptable" deep in
+    the loop.
+    """
+
+    def test_links_may_be_positional(self):
+        nodes = [Node(x=0, y=0), Node(x=100, y=0), Node(x=200, y=0)]
+        links = [Link(0, 1), Link(1, 2)]
+        assert stress(nodes, links) == pytest.approx(stress(nodes, links=links))
+
+    def test_matches_the_other_metrics_calling_convention(self):
+        from graph_layout.metrics import edge_crossings, edge_length_variance
+
+        nodes = [Node(x=0, y=0), Node(x=100, y=0), Node(x=200, y=0)]
+        links = [Link(0, 1), Link(1, 2)]
+        for metric in (edge_crossings, edge_length_variance, stress):
+            metric(nodes, links)  # must not raise
+
+    def test_a_matrix_passed_positionally_is_reported_clearly(self):
+        nodes = [Node(x=0, y=0), Node(x=100, y=0)]
+        matrix = [[0.0, 100.0], [100.0, 0.0]]
+        with pytest.raises(TypeError, match="ideal_distances"):
+            stress(nodes, matrix)
+
+    def test_ideal_distances_still_works_by_keyword(self):
+        nodes = [Node(x=0, y=0), Node(x=100, y=0)]
+        matrix = [[0.0, 100.0], [100.0, 0.0]]
+        assert stress(nodes, ideal_distances=matrix) == pytest.approx(0.0)

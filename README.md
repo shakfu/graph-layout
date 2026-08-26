@@ -2,7 +2,7 @@
 
 A collection of graph layout algorithms in Python.
 
-Written in pure Python (with optional Cython acceleration), it installs anywhere with `pip`—no native compiler or build toolchain required. If you need C++-level performance for large graphs or a more comprehensive graph algorithm and file format toolkit, see the sibling project [ogdf-py](https://github.com/shakfu/ogdf-py). For guidance on choosing between the two, see [**graph-layout vs. ogdf-py**](#related-project-ogdf-py).
+Written in pure Python with optional Cython acceleration. Prebuilt wheels are published for CPython 3.9-3.14 on Linux (x86_64/aarch64), macOS (Intel/Apple Silicon) and 64-bit Windows, so `pip install` needs no compiler there. The accelerated module is optional at *runtime* -- every algorithm falls back to pure Python if it is missing -- but building from the sdist does require a C compiler and CMake, which is what happens on platforms outside that matrix (musllinux/Alpine and 32-bit builds are not published). If you need C++-level performance for large graphs or a more comprehensive graph algorithm and file format toolkit, see the sibling project [ogdf-py](https://github.com/shakfu/ogdf-py). For guidance on choosing between the two, see [**graph-layout vs. ogdf-py**](#related-project-ogdf-py).
 
 
 ## Layout Algorithms

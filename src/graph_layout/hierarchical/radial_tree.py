@@ -8,9 +8,9 @@ and children placed at increasing radii.
 from __future__ import annotations
 
 import math
-import warnings
 from typing import Any, Callable, Optional, Sequence
 
+from .._warnings import warn_at_caller
 from ..base import StaticLayout, run_deep_recursive
 from ..types import (
     Event,
@@ -170,12 +170,11 @@ class RadialTreeLayout(StaticLayout):
             if not has_parent[i]:
                 return i
 
-        warnings.warn(
+        warn_at_caller(
             "No root node found (all nodes have incoming edges). "
             "This suggests the graph is not a tree. "
             "RadialTreeLayout is designed for trees; results may be suboptimal.",
             TreeStructureWarning,
-            stacklevel=3,
         )
         return 0
 
@@ -245,12 +244,11 @@ class RadialTreeLayout(StaticLayout):
         # Check for disconnected nodes
         unvisited = [i for i in range(n) if i not in visited]
         if unvisited:
-            warnings.warn(
+            warn_at_caller(
                 f"Found {len(unvisited)} disconnected node(s) not reachable from root. "
                 "These nodes will be placed at arbitrary positions. "
                 "RadialTreeLayout is designed for connected trees.",
                 TreeStructureWarning,
-                stacklevel=2,
             )
 
         # Center of layout

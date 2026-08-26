@@ -122,10 +122,21 @@ def _segments_intersect(
     return False
 
 
+def _looks_like_distance_matrix(value: Any) -> bool:
+    """True if ``value`` is a matrix of distances rather than a sequence of links."""
+    try:
+        first = value[0]
+    except (TypeError, IndexError, KeyError):
+        return False
+    if isinstance(first, (Link, dict)) or hasattr(first, "source"):
+        return False
+    return hasattr(first, "__len__")
+
+
 def stress(
     nodes: Sequence[Node],
-    ideal_distances: Optional[Sequence[Sequence[float]]] = None,
     links: Optional[Sequence[Link]] = None,
+    ideal_distances: Optional[Sequence[Sequence[float]]] = None,
     edge_length: float = 100.0,
 ) -> float:
     """
@@ -139,17 +150,33 @@ def stress(
 
     Args:
         nodes: List of positioned nodes
-        ideal_distances: n x n matrix of ideal distances.
-                        If None, computed from shortest paths using links.
-        links: Links (required if ideal_distances not provided)
+        links: Links, used to derive ideal distances from shortest paths.
+               Required unless ideal_distances is given.
+        ideal_distances: Precomputed n x n matrix of ideal distances, used in
+                         place of deriving them from links.
         edge_length: Base edge length for computing ideal distances
 
     Returns:
         Normalized stress value (0 = perfect, higher = worse)
+
+    Note:
+        ``links`` is the second positional parameter, matching every other
+        metric in this module (all of which are ``f(nodes, links)``). It used to
+        be ``ideal_distances``, so the natural call ``stress(nodes, links)``
+        silently took the links as a distance matrix and failed deep inside the
+        loop with "'Link' object is not subscriptable". Old positional callers
+        passing a matrix now get a clear error instead.
     """
     n = len(nodes)
     if n < 2:
         return 0.0
+
+    if links is not None and _looks_like_distance_matrix(links):
+        raise TypeError(
+            "stress() takes links as its second argument; pass a precomputed "
+            "matrix as ideal_distances=... . The order changed so that stress() "
+            "matches the other metrics, which are all f(nodes, links)."
+        )
 
     if ideal_distances is None:
         if links is None:

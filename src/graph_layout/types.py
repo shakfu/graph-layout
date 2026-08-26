@@ -38,6 +38,23 @@ class Event(TypedDict, total=False):
     listener: Optional[Callable[[], None]]
 
 
+_NODE_KNOWN_KEYS = frozenset(
+    {
+        "index",
+        "x",
+        "y",
+        "width",
+        "height",
+        "fixed",
+        "bounds",
+        "innerBounds",
+        "px",
+        "py",
+        "parent",
+    }
+)
+
+
 class Node:
     """
     Graph node with position and properties.
@@ -67,19 +84,25 @@ class Node:
         self.innerBounds: Optional[Any] = kwargs.get("innerBounds")
 
         # Internal: previous position (for drag operations)
-        self.px: Optional[float] = None
-        self.py: Optional[float] = None
+        self.px: Optional[float] = kwargs.get("px")
+        self.py: Optional[float] = kwargs.get("py")
 
         # Internal: parent group reference
-        self.parent: Optional[Group] = None
+        self.parent: Optional[Group] = kwargs.get("parent")
 
-        # Copy any additional custom properties
+        # Copy any additional custom properties. Testing `hasattr(self, key)`
+        # here would silently drop any kwarg naming an attribute already set
+        # above -- px, py and parent were assigned unconditionally, so
+        # Node(px=5.0) quietly produced px=None. Track what was consumed instead.
         for key, value in kwargs.items():
-            if not hasattr(self, key):
+            if key not in _NODE_KNOWN_KEYS:
                 setattr(self, key, value)
 
     def __repr__(self) -> str:
         return f"Node(index={self.index}, x={self.x:.2f}, y={self.y:.2f})"
+
+
+_LINK_KNOWN_KEYS = frozenset({"source", "target", "length", "weight"})
 
 
 class Link:
@@ -123,9 +146,10 @@ class Link:
         self.length = length
         self.weight = weight
 
-        # Copy any additional custom properties
+        # Copy any additional custom properties (see Node for why this does not
+        # test hasattr).
         for key, value in kwargs.items():
-            if not hasattr(self, key):
+            if key not in _LINK_KNOWN_KEYS:
                 setattr(self, key, value)
 
     def __repr__(self) -> str:
@@ -138,6 +162,9 @@ class Link:
         else:
             tgt = getattr(self.target, "index", None)
         return f"Link({src} -> {tgt})"
+
+
+_GROUP_KNOWN_KEYS = frozenset({"leaves", "groups", "padding", "parent", "index", "bounds"})
 
 
 class Group:
@@ -156,15 +183,16 @@ class Group:
         self.leaves: Optional[list[Union[Node, int]]] = kwargs.get("leaves")
         self.groups: Optional[list[Union[Group, int]]] = kwargs.get("groups")
         self.padding: float = kwargs.get("padding", 1.0)
-        self.parent: Optional[Group] = None
-        self.index: Optional[int] = None
+        self.parent: Optional[Group] = kwargs.get("parent")
+        self.index: Optional[int] = kwargs.get("index")
 
         # Bounds (used by layout algorithms)
         self.bounds: Optional[Any] = kwargs.get("bounds")
 
-        # Copy any additional custom properties
+        # Copy any additional custom properties (see Node for why this does not
+        # test hasattr).
         for key, value in kwargs.items():
-            if not hasattr(self, key):
+            if key not in _GROUP_KNOWN_KEYS:
                 setattr(self, key, value)
 
     def __repr__(self) -> str:

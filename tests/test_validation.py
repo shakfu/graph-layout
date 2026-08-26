@@ -266,3 +266,83 @@ class TestBaseLayoutValidation:
         # Should not raise
         result = layout.validate()
         assert result is layout  # Returns self for chaining
+
+
+class TestValidateOnLayouts:
+    """``BaseLayout.validate()`` as the documented fail-fast entry point."""
+
+    def test_validate_accepts_links_holding_unindexed_nodes(self):
+        """Links may reference Node objects, whose index is None until assigned.
+
+        This used to raise TypeError from int(None) inside the validator, so the
+        documented "call validate() early" path crashed on the equally
+        documented "links may hold Node objects" input.
+        """
+        from graph_layout import CircularLayout
+        from graph_layout.types import Link, Node
+
+        a, b = Node(), Node()
+        layout = CircularLayout(nodes=[a, b], links=[Link(a, b)], size=(100, 100))
+        assert layout.validate() is layout
+
+    def test_validate_rejects_an_endpoint_outside_the_graph(self):
+        from graph_layout import CircularLayout
+        from graph_layout.types import Link, Node
+        from graph_layout.validation import InvalidLinkError
+
+        inside, outside = Node(), Node()
+        layout = CircularLayout(nodes=[inside], links=[Link(inside, outside)], size=(100, 100))
+        with pytest.raises(InvalidLinkError):
+            layout.validate()
+
+    def test_run_stays_lenient_about_bad_indices(self):
+        """run() does not validate; out-of-range links are skipped, not fatal.
+
+        This is deliberate (see test_circular_layouts.test_out_of_range_link_indices);
+        validate() is opt-in for callers who would rather be told.
+        """
+        from graph_layout import CircularLayout
+        from graph_layout.validation import InvalidLinkError
+
+        layout = CircularLayout(
+            nodes=[{}, {}, {}], links=[{"source": 0, "target": 99}], size=(100, 100)
+        )
+        layout.run()  # must not raise
+        assert len(layout.nodes) == 3
+        with pytest.raises(InvalidLinkError):
+            layout.validate()
+
+
+class TestConstructorKeywordPassthrough:
+    """Custom kwargs must not be swallowed by attributes set in __init__.
+
+    Node/Link/Group copied "additional" kwargs only `if not hasattr(self, key)`.
+    Because px, py and parent were assigned unconditionally beforehand, passing
+    them was a silent no-op: Node(px=5.0) produced px=None with no error.
+    """
+
+    def test_node_accepts_internal_attribute_names(self):
+        node = Node(px=5.0, py=6.0)
+        assert node.px == 5.0
+        assert node.py == 6.0
+
+    def test_node_keeps_custom_attributes(self):
+        node = Node(x=1.0, label="hello", weight=3)
+        assert node.x == 1.0
+        assert node.label == "hello"
+        assert node.weight == 3
+
+    def test_node_parent_may_be_supplied(self):
+        parent = Group()
+        assert Node(parent=parent).parent is parent
+
+    def test_link_keeps_custom_attributes(self):
+        link = Link(0, 1, color="red")
+        assert link.source == 0
+        assert link.target == 1
+        assert link.color == "red"
+
+    def test_group_accepts_index_and_custom_attributes(self):
+        group = Group(index=3, kind="cluster")
+        assert group.index == 3
+        assert group.kind == "cluster"

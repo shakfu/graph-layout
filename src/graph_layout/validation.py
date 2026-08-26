@@ -94,12 +94,12 @@ def validate_link_indices(
         tgt = _get_index(link, "target")
 
         if src is None:
-            issues.append((i, f"Link {i}: source is None"))
+            issues.append((i, f"Link {i}: source is missing or not a resolvable node index"))
         elif src < 0 or src >= node_count:
             issues.append((i, f"Link {i}: source index {src} out of bounds [0, {node_count})"))
 
         if tgt is None:
-            issues.append((i, f"Link {i}: target is None"))
+            issues.append((i, f"Link {i}: target is missing or not a resolvable node index"))
         elif tgt < 0 or tgt >= node_count:
             issues.append((i, f"Link {i}: target index {tgt} out of bounds [0, {node_count})"))
 
@@ -214,18 +214,23 @@ def _get_index(obj: Any, attr: str) -> Optional[int]:
         return None
     if isinstance(val, int):
         return val
-    if hasattr(val, "index"):
-        return int(val.index)
-    return None
+    idx = getattr(val, "index", None)
+    if idx is None:
+        # An endpoint object that has not been given an index yet. Report it as
+        # missing rather than raising TypeError from int(None); callers going
+        # through BaseLayout.validate() have indices assigned first.
+        return None
+    return int(idx)
 
 
 def _get_index_simple(obj: Any) -> Optional[int]:
     """Extract index from int or object with index attribute."""
     if isinstance(obj, int):
         return obj
-    if hasattr(obj, "index"):
-        return int(obj.index)
-    return None
+    idx = getattr(obj, "index", None)
+    if idx is None:
+        return None
+    return int(idx)
 
 
 __all__ = [

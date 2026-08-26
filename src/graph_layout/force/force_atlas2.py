@@ -578,14 +578,23 @@ class ForceAtlas2Layout(IterativeLayout):
         assert self._disp_y is not None
         assert self._degrees is not None
 
-        # Build quadtree with degree as mass
-        tree = QuadTree.from_nodes(self._nodes, padding=10.0, theta=self._barnes_hut_theta)
+        # Build quadtree with degree+1 as mass. Both factors of the ForceAtlas2
+        # repulsion ``scaling * (deg_i + 1) * (deg_j + 1) / d`` have to be
+        # supplied: the source factor ``(deg_j + 1)`` via the tree's aggregated
+        # ``total_mass`` (hence ``masses`` here), and the acting factor
+        # ``(deg_i + 1)`` via ``body.mass`` below. Passing only the latter --
+        # leaving the tree at uniform mass 1.0 -- silently drops the
+        # degree weighting that defines the algorithm, and makes this path
+        # disagree with the Cython kernel.
+        masses = [float(d + 1) for d in self._degrees]
+        tree = QuadTree.from_nodes(
+            self._nodes, padding=10.0, theta=self._barnes_hut_theta, masses=masses
+        )
 
         scaling = self._scaling
 
         for i, node in enumerate(self._nodes):
-            # Use degree+1 as mass for degree-weighted repulsion
-            deg_i: float = float(self._degrees[i] + 1)
+            deg_i: float = masses[i]
             body = Body(node.x, node.y, mass=deg_i, index=i)
             # The quadtree returns force with repulsion_constant factor
             fx, fy = tree.calculate_force(body, repulsion_constant=scaling)

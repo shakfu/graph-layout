@@ -15,10 +15,10 @@ with the following phases:
 
 from __future__ import annotations
 
-import warnings
 from collections import deque
 from typing import Any, Callable, Optional, Sequence
 
+from .._warnings import warn_at_caller
 from ..base import StaticLayout
 from ..preprocessing import remove_cycles
 from ..types import (
@@ -249,12 +249,11 @@ class SugiyamaLayout(StaticLayout):
         # Find sources (nodes with no incoming edges)
         sources = [i for i in range(n) if not incoming[i]]
         if not sources:
-            warnings.warn(
+            warn_at_caller(
                 "No source nodes found (all nodes have incoming edges). "
                 "This suggests the graph contains cycles. "
                 "Sugiyama layout is designed for DAGs; results may be suboptimal.",
                 GraphStructureWarning,
-                stacklevel=3,
             )
             sources = [0]  # Fallback
 
@@ -281,11 +280,10 @@ class SugiyamaLayout(StaticLayout):
         # Handle disconnected nodes
         disconnected = [i for i in range(n) if layers[i] < 0]
         if disconnected:
-            warnings.warn(
+            warn_at_caller(
                 f"Found {len(disconnected)} disconnected node(s) unreachable from sources. "
                 "These will be placed in layer 0.",
                 GraphStructureWarning,
-                stacklevel=3,
             )
             for i in disconnected:
                 layers[i] = 0

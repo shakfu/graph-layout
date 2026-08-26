@@ -104,7 +104,11 @@ class PairingHeap(Generic[T]):
         for h in self.subheaps:
             if h.elem is None:
                 continue
-            if not less_than(self.elem, h.elem) or not h.is_heap(less_than):
+            # The invariant is that no child is strictly less than its parent.
+            # Testing ``less_than(parent, child)`` instead demands a *strict*
+            # ordering and so rejects any valid heap holding equal keys -- e.g.
+            # the two-element heap [3, 3].
+            if less_than(h.elem, self.elem) or not h.is_heap(less_than):
                 return False
         return True
 

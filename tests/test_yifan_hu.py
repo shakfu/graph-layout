@@ -4,6 +4,8 @@ Tests for Yifan Hu Multilevel layout algorithm.
 
 import math
 
+import pytest
+
 from graph_layout import Link, Node
 from graph_layout.force import YifanHuLayout
 
@@ -635,3 +637,297 @@ class TestYifanHuCompatibility:
         for node in layout.nodes:
             assert math.isfinite(node.x)
             assert math.isfinite(node.y)
+
+
+# =============================================================================
+# Convergence Regression Tests
+# =============================================================================
+
+
+def create_grid_graph(w, h):
+    """Create a w x h grid graph, whose optimal drawing has zero crossings."""
+    nodes = [{} for _ in range(w * h)]
+    links = []
+    for r in range(h):
+        for c in range(w):
+            v = r * w + c
+            if c + 1 < w:
+                links.append({"source": v, "target": v + 1})
+            if r + 1 < h:
+                links.append({"source": v, "target": v + w})
+    return nodes, links
+
+
+class TestYifanHuConvergence:
+    """Regression tests for the per-level convergence criterion.
+
+    The stopping rule compares a per-vertex root-mean-square displacement
+    against ``convergence_tolerance * k``. It previously compared the L2 norm of
+    the *whole* displacement vector -- which grows like ``sqrt(n)`` -- against a
+    threshold proportional to ``n``, so the test became easier to satisfy the
+    larger the level. The finest levels of the multilevel scheme, which are the
+    ones that determine the drawing, broke out after a single iteration and the
+    refinement was effectively a no-op.
+    """
+
+    def _iterations_per_level(self, layout):
+        """Run ``layout``, returning [(level_size, iterations_run), ...]."""
+        records = []
+        original = type(layout)._layout_level
+
+        def instrumented(
+            self,
+            n,
+            sources,
+            targets,
+            pos_x,
+            pos_y,
+            k,
+            max_iterations,
+            adaptive_step=True,
+            fixed_mask=None,
+        ):
+            # One tick event is fired per iteration of the inner loop.
+            count = [0]
+            outer_trigger = self.trigger
+
+            def counting_trigger(event):
+                count[0] += 1
+                return outer_trigger(event)
+
+            self.trigger = counting_trigger
+            try:
+                result = original(
+                    self,
+                    n,
+                    sources,
+                    targets,
+                    pos_x,
+                    pos_y,
+                    k,
+                    max_iterations,
+                    adaptive_step,
+                    fixed_mask,
+                )
+            finally:
+                self.trigger = outer_trigger
+            records.append((n, count[0]))
+            return result
+
+        type(layout)._layout_level = instrumented
+        try:
+            layout.run()
+        finally:
+            type(layout)._layout_level = original
+        return records
+
+    def test_every_level_refines(self):
+        """No refinement level may stop after a single iteration."""
+        nodes, links = create_grid_graph(12, 12)
+        layout = YifanHuLayout(nodes=nodes, links=links, size=(1000, 1000), random_seed=7)
+
+        records = self._iterations_per_level(layout)
+
+        # The graph is large enough to coarsen into several levels.
+        assert len(records) >= 3, f"expected a multilevel run, got {records}"
+        for level_size, iterations in records:
+            assert iterations > 1, (
+                f"level of size {level_size} ran {iterations} iteration(s); "
+                f"the convergence check is firing immediately. All levels: {records}"
+            )
+
+    def test_convergence_does_not_degrade_with_level_size(self):
+        """The criterion must be scale-invariant, not easier for larger levels.
+
+        This is the specific defect being guarded: with an ``n``-proportional
+        threshold the finest (largest) level ran far fewer iterations than the
+        coarsest one.
+        """
+        nodes, links = create_grid_graph(20, 20)
+        layout = YifanHuLayout(nodes=nodes, links=links, size=(1000, 1000), random_seed=11)
+
+        records = self._iterations_per_level(layout)
+        # Levels are produced coarsest-first; compare the refinement levels,
+        # skipping the coarsest which is given a larger iteration budget.
+        refinement = [iterations for _, iterations in records[1:]]
+
+        assert len(refinement) >= 2, f"expected several refinement levels, got {records}"
+        assert min(refinement) >= max(refinement) // 2, (
+            f"finer levels are converging much earlier than coarser ones: {records}"
+        )
+
+    def test_grid_layout_quality(self):
+        """A grid must be drawn substantially better than a random placement.
+
+        With the broken criterion this scored ~0.67 -- barely better than the
+        ~1.14 of a random layout. It now scores ~0.30 (0.28-0.34 across seeds).
+        """
+        from graph_layout import metrics
+
+        nodes, links = create_grid_graph(10, 10)
+        layout = YifanHuLayout(nodes=nodes, links=links, size=(1000, 1000), random_seed=3)
+        layout.run()
+
+        value = metrics.stress(layout.nodes, links=layout.links)
+        assert value < 0.45, f"grid layout stress regressed to {value:.4f}"
+
+
+class TestYifanHuMultilevel:
+    """The multilevel path must beat, not undercut, an uncoarsened run.
+
+    Refinement previously did two things wrong. It shrank ``k`` by
+    ``sqrt(level_n / coarser_n)`` at every level, so even the finest level was
+    drawn at the wrong optimal distance; and it refined with plain geometric
+    cooling, which caps a level's total displacement at ``step_0 / (1 - t) == k``
+    -- a vertex could never travel further than one optimal distance while
+    unfolding a level. Together those made drawing quality decay as the graph
+    grew, which is the opposite of what a multilevel scheme is for: coarsening
+    was worse than not coarsening at all.
+    """
+
+    @staticmethod
+    def _grid(w, h):
+        nodes = [{} for _ in range(w * h)]
+        links = []
+        for r in range(h):
+            for c in range(w):
+                v = r * w + c
+                if c + 1 < w:
+                    links.append({"source": v, "target": v + 1})
+                if r + 1 < h:
+                    links.append({"source": v, "target": v + w})
+        return nodes, links
+
+    def _stress(self, nodes, links, seed, **kwargs):
+        from graph_layout import metrics
+
+        layout = YifanHuLayout(
+            nodes=[dict(n) for n in nodes],
+            links=[dict(link) for link in links],
+            size=(1000, 1000),
+            random_seed=seed,
+            **kwargs,
+        )
+        layout.run()
+        return metrics.stress(layout.nodes, links=layout.links)
+
+    def test_multilevel_beats_single_level_on_a_grid(self):
+        """Coarsening must pay for itself on a mesh, where it helps most."""
+        nodes, links = self._grid(20, 20)
+        multilevel = self._stress(nodes, links, seed=5)
+        # min_coarsest_size above the node count stops coarsening entirely.
+        single_level = self._stress(nodes, links, seed=5, min_coarsest_size=10**6)
+
+        assert multilevel < single_level, (
+            f"multilevel ({multilevel:.3f}) is worse than an uncoarsened run "
+            f"({single_level:.3f}); coarsening is costing quality"
+        )
+
+    def test_quality_does_not_decay_with_graph_size(self):
+        """A larger grid must not be drawn disproportionately worse.
+
+        Before the fix, stress climbed monotonically with size -- 0.68 at 12x12,
+        0.93 at 30x30, approaching the ~1.14 of a random placement.
+        """
+        small = self._stress(*self._grid(12, 12), seed=5)
+        large = self._stress(*self._grid(30, 30), seed=5)
+
+        assert large < 0.55, f"30x30 grid stress {large:.3f} is close to random placement"
+        assert large < small * 4, (
+            f"stress grows sharply with size: {small:.3f} at 12x12 vs {large:.3f} at 30x30"
+        )
+
+
+class TestYifanHuMultilevelReproducibility:
+    """``random_seed`` must actually make a run reproducible.
+
+    The multilevel path drew from the process-global ``random`` module -- for
+    the coarsening shuffle, the coarsest-level placement and the prolongation
+    jitter -- so repeated runs diverged and results depended on whatever the
+    caller had done to the global stream. The existing seed test missed it by
+    using a three-node graph, which never reaches the multilevel path.
+    """
+
+    @staticmethod
+    def _positions(seed):
+        nodes, links = TestYifanHuMultilevel._grid(12, 12)
+        layout = YifanHuLayout(nodes=nodes, links=links, size=(1000, 1000), random_seed=seed)
+        layout.run()
+        return [(n.x, n.y) for n in layout.nodes]
+
+    def test_repeatable_on_the_multilevel_path(self):
+        assert self._positions(17) == self._positions(17)
+
+    def test_independent_of_the_global_random_stream(self):
+        import random
+
+        random.seed(1)
+        first = self._positions(17)
+        random.seed(999999)
+        [random.random() for _ in range(50)]
+        second = self._positions(17)
+        assert first == second, "layout output depends on the caller's global RNG state"
+
+    def test_does_not_disturb_the_global_random_stream(self):
+        import random
+
+        random.seed(4242)
+        expected = [random.random() for _ in range(5)]
+
+        random.seed(4242)
+        self._positions(17)
+        actual = [random.random() for _ in range(5)]
+
+        assert expected == actual, "running a layout consumed the caller's global RNG"
+
+
+class TestYifanHuFallbackParity:
+    """The compiled and pure-Python paths must agree.
+
+    Nothing else exercises the pure-Python fallback, which is what runs when the
+    ``_speedups`` extension is unavailable. That gap is how a real divergence in
+    ForceAtlas2's Barnes-Hut path went unnoticed (see
+    tests/test_force_atlas2.py::TestCythonFallbackParity).
+    """
+
+    @staticmethod
+    def _grid(w, h):
+        nodes = []
+        links = []
+        for r in range(h):
+            for c in range(w):
+                nodes.append({"x": float(c * 13 % 97), "y": float(r * 29 % 89)})
+                v = r * w + c
+                if c + 1 < w:
+                    links.append({"source": v, "target": v + 1})
+                if r + 1 < h:
+                    links.append({"source": v, "target": v + w})
+        return nodes, links
+
+    @pytest.mark.parametrize("use_barnes_hut", [False, True])
+    def test_paths_agree(self, monkeypatch, use_barnes_hut):
+        from graph_layout.force import yifan_hu as module
+
+        if not module._HAS_CYTHON:
+            pytest.skip("_speedups extension not built; only one path available")
+
+        results = []
+        for use_cython in (True, False):
+            monkeypatch.setattr(module, "_HAS_CYTHON", use_cython)
+            nodes, links = self._grid(10, 10)
+            layout = module.YifanHuLayout(
+                nodes=nodes,
+                links=links,
+                size=(800, 800),
+                random_seed=1,
+                use_barnes_hut=use_barnes_hut,
+            )
+            layout.run()
+            results.append([(n.x, n.y) for n in layout.nodes])
+
+        worst = max(math.dist(a, b) for a, b in zip(results[0], results[1]))
+        # Exact agreement without Barnes-Hut; with it, only float accumulation
+        # order differs (measured ~6e-6 on this graph).
+        assert worst < 1e-4, (
+            f"compiled and pure-Python paths diverge by {worst:.6g} (barnes_hut={use_barnes_hut})"
+        )

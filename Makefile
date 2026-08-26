@@ -2,7 +2,7 @@
 # Build system for graph layout algorithms in Python
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
-		lint format check typecheck all dev sync build publish publish-test \
+		lint format check typecheck typecheck-legacy all dev sync build publish publish-test \
 		wheel-check rebuild-cython qa showcase showcase-improvements demos \
 		oracle-install bench-ogdf
 
@@ -34,7 +34,8 @@ help:
 	@echo "  make format       - Format code with ruff"
 	@echo "  make lint         - Lint code with ruff"
 	@echo "  make check        - Run all checks (format check + lint)"
-	@echo "  make typecheck    - Run mypy type checking"
+	@echo "  make typecheck    - Run mypy type checking (incl. the legacy ratchet)"
+	@echo "  make typecheck-legacy - Check the modules pyproject.toml silences"
 	@echo "  make qa           - Run all QA checks (check + typecheck + test)"
 	@echo ""
 	@echo "Cleanup:"
@@ -131,8 +132,32 @@ check:
 	@uv run ruff check $(ALL_DIRS)
 
 # Run mypy type checking
-typecheck:
+typecheck: typecheck-legacy
 	@uv run mypy --strict $(SRC_DIR)
+
+# Ratchet on the cola modules that pyproject.toml silences with
+# `ignore_errors = true`. `make typecheck` reports success over those files
+# without checking them, and the suppressed count grew unnoticed from a
+# documented 146 to 158. This re-checks them under the project's own settings
+# (see mypy-legacy.ini) and fails if the count climbs above the baseline.
+#
+# Lower this number when you fix something; never raise it. At zero, delete
+# mypy-legacy.ini and the ignore_errors block in pyproject.toml.
+MYPY_LEGACY_BASELINE := 158
+typecheck-legacy:
+	@count=$$(uv run mypy --config-file=mypy-legacy.ini $(SRC_DIR) 2>&1 \
+		| grep -cE '^src/.*error:' || true); \
+	if [ "$$count" -gt "$(MYPY_LEGACY_BASELINE)" ]; then \
+		echo "FAIL: suppressed type errors rose to $$count (baseline $(MYPY_LEGACY_BASELINE))."; \
+		echo "      Fix them, or see mypy-legacy.ini for what this checks."; \
+		uv run mypy --config-file=mypy-legacy.ini $(SRC_DIR) 2>&1 | grep -E '^src/.*error:' || true; \
+		exit 1; \
+	elif [ "$$count" -lt "$(MYPY_LEGACY_BASELINE)" ]; then \
+		echo "Suppressed type errors down to $$count (baseline $(MYPY_LEGACY_BASELINE))."; \
+		echo "Lower MYPY_LEGACY_BASELINE in the Makefile to lock the improvement in."; \
+	else \
+		echo "Suppressed type errors: $$count (baseline $(MYPY_LEGACY_BASELINE))."; \
+	fi
 
 # Fix formatting and linting issues automatically
 fix:

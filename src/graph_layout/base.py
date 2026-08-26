@@ -148,6 +148,7 @@ class BaseLayout(ABC):
         self._canvas_size: tuple[float, float] = (1.0, 1.0)
         self._events: dict[EventType, Callable[[Optional[Event]], None]] = {}
         self._random_seed: Optional[int] = None
+        self._rng: Optional[random.Random] = None
 
         # Set initial values via properties (triggers normalization)
         if nodes is not None:
@@ -269,6 +270,32 @@ class BaseLayout(ABC):
     def random_seed(self, value: Optional[int]) -> None:
         """Set random seed for reproducible layouts."""
         self._random_seed = value
+        self._reset_rng()
+
+    @property
+    def rng(self) -> random.Random:
+        """The layout's own random number generator.
+
+        Layouts must draw from this rather than the ``random`` module, so that a
+        layout run neither depends on nor disturbs the caller's global random
+        stream (and so that two layouts can run concurrently without
+        interleaving draws from one shared generator).
+        """
+        rng = self._rng
+        if rng is None:
+            rng = self._reset_rng()
+        return rng
+
+    def _reset_rng(self) -> random.Random:
+        """Restart the layout's RNG from ``random_seed``.
+
+        Called at the start of every run (see ``_initialize_indices``) so that
+        repeated runs of the same configuration reproduce each other. An unset
+        seed yields a freshly entropy-seeded generator, which is still private
+        to this layout.
+        """
+        self._rng = random.Random(self._random_seed)
+        return self._rng
 
     # -------------------------------------------------------------------------
     # Event System
@@ -310,8 +337,14 @@ class BaseLayout(ABC):
         Validate current configuration.
 
         Checks that all link/group references point to valid node indices.
-        Called automatically by run() but can be called early for fail-fast
-        behavior.
+
+        This is **not** called by ``run()``. Layouts are deliberately lenient:
+        a link naming a node index that does not exist is silently skipped
+        (see ``_build_adjacency``) rather than aborting the drawing, and there
+        is a regression test pinning that behaviour. Call this explicitly when
+        you would rather find out than have edges quietly disappear::
+
+            layout.validate().run()
 
         Returns:
             self (for chaining)
@@ -320,6 +353,11 @@ class BaseLayout(ABC):
             InvalidLinkError: If any link references an invalid node index.
             InvalidGroupError: If any group references an invalid node/group index.
         """
+        # Links may reference Node objects rather than integers, and those nodes
+        # carry index=None until they are assigned. Resolving them first is what
+        # lets validate() be called before run() -- the documented fail-fast use
+        # -- instead of raising TypeError from int(None) inside the validator.
+        self._assign_indices()
         if self._links:
             validate_link_indices(self._links, len(self._nodes), strict=True)
         if self._groups:
@@ -358,11 +396,22 @@ class BaseLayout(ABC):
     # Utility Methods
     # -------------------------------------------------------------------------
 
-    def _initialize_indices(self) -> None:
-        """Assign indices to nodes that don't have them."""
+    def _assign_indices(self) -> None:
+        """Give every node an index, without any other side effect."""
         for i, node in enumerate(self._nodes):
             if node.index is None:
                 node.index = i
+
+    def _initialize_indices(self) -> None:
+        """Assign node indices, validate the graph, and start a fresh run.
+
+        Every ``run()`` implementation calls this first, which makes it the one
+        place guaranteed to be reached exactly once per run. Restarting the RNG
+        here is what makes ``random_seed`` mean "this run is reproducible":
+        without it a second run would continue the first one's stream.
+        """
+        self._reset_rng()
+        self._assign_indices()
 
     def _initialize_positions(
         self, random_init: bool = True, center: Optional[tuple[float, float]] = None
@@ -379,9 +428,7 @@ class BaseLayout(ABC):
         if center is None:
             center = (self._canvas_size[0] / 2, self._canvas_size[1] / 2)
 
-        if self._random_seed is not None:
-            random.seed(self._random_seed)
-
+        rng = self.rng
         w, h = self._canvas_size
         for node in self._nodes:
             # Skip fixed nodes - preserve their positions
@@ -390,8 +437,8 @@ class BaseLayout(ABC):
 
             if random_init or (node.x == 0.0 and node.y == 0.0):
                 # Initialize to random position within canvas
-                node.x = random.uniform(0, w)
-                node.y = random.uniform(0, h)
+                node.x = rng.uniform(0, w)
+                node.y = rng.uniform(0, h)
 
     def _center_graph(self) -> None:
         """Center the graph within the canvas."""
@@ -418,25 +465,23 @@ class BaseLayout(ABC):
             node.x += dx
             node.y += dy
 
-        # Translate orthogonal layout structures (node boxes and edge bends)
-        # if present, so they stay aligned with node positions.
-        node_boxes = getattr(self, "_node_boxes", None)
-        if node_boxes:
-            from .orthogonal.types import NodeBox
+        # Let subclasses move whatever else they draw.
+        self._translate_extra(dx, dy)
 
-            for i, box in enumerate(node_boxes):
-                node_boxes[i] = NodeBox(
-                    index=box.index,
-                    x=box.x + dx,
-                    y=box.y + dy,
-                    width=box.width,
-                    height=box.height,
-                )
+    def _translate_extra(self, dx: float, dy: float) -> None:
+        """Move any subclass-owned geometry alongside the node positions.
 
-        ortho_edges = getattr(self, "_orthogonal_edges", None)
-        if ortho_edges:
-            for edge in ortho_edges:
-                edge.bends = [(bx + dx, by + dy) for bx, by in edge.bends]
+        Called by ``_center_graph`` after it translates the nodes. Layouts that
+        maintain drawing structures beyond ``node.x``/``node.y`` -- the
+        orthogonal layouts keep node boxes and edge bend points -- override this
+        so their geometry stays aligned.
+
+        The base class previously probed for those structures itself with
+        ``getattr(self, "_node_boxes", None)`` and imported from the
+        ``orthogonal`` subpackage inside the method body to dodge a circular
+        import. That put knowledge of one concrete subpackage's private
+        attributes in the abstract base; the deferred import was the symptom.
+        """
 
     def _get_source_index(self, link: Link) -> int:
         """Get source node index from a link."""

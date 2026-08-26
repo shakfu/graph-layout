@@ -1,6 +1,6 @@
 [project]
 name = "graph-layout"
-version = "0.4.1"
+version = "0.5.0"
 description = "A collection of graph layout algorithms in Python"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -66,6 +66,11 @@ wheel.exclude = [
 dev = [
     "hypothesis>=6.0.0",
     "mypy>=1.14.1",
+    # Not a runtime dependency -- it backs the optional [ilp] extra. Without it
+    # in the dev environment the ILP compaction path sat at 15% coverage and the
+    # scipy-dependent embedder tests skipped, so neither was ever exercised
+    # locally or in CI.
+    "scipy>=1.9.0",
     "pytest>=8.3.5",
     "pytest-cov>=5.0.0",
     "ruff>=0.13.3",
@@ -131,9 +136,19 @@ warn_return_any = true
 # Legacy cola modules have less strict typing (ported from JavaScript)
 # These use dynamic patterns (fluent API with getter/setter overloads) that
 # don't fit well with static typing.
-# Known issues: 146 mypy errors when strict checking is enabled.
-# Main causes: Optional handling, Union types from getter/setter pattern,
-# dynamic attribute access on ported JavaScript objects.
+#
+# `ignore_errors` hides these files completely, so `make typecheck` reports
+# success over code it never checked. The count is currently 158 errors in 5
+# files under the project's own settings (was documented as 146; it grew
+# unnoticed, which is the hazard of a blanket suppression). Dominated by
+# union-attr (71) and arg-type (32) -- Optional handling and the Union types
+# produced by the getter/setter pattern.
+#
+# `make typecheck-legacy` re-checks them via mypy-legacy.ini and fails if that
+# number rises, so the suppression can shrink but not grow. Note that
+# graph_layout.cola.adapter is deliberately NOT listed below: it appeared in
+# both this list and the strict list above, and since the later section wins it
+# was silently unchecked despite being declared strict.
 [[tool.mypy.overrides]]
 module = [
     "graph_layout.cola.layout",
@@ -145,7 +160,6 @@ module = [
     "graph_layout.cola.geom",
     "graph_layout.cola.rectangle",
     "graph_layout.cola.powergraph",
-    "graph_layout.cola.adapter",
 ]
 ignore_errors = true
 

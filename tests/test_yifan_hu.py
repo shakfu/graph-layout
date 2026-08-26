@@ -905,7 +905,24 @@ class TestYifanHuFallbackParity:
         return nodes, links
 
     @pytest.mark.parametrize("use_barnes_hut", [False, True])
-    def test_paths_agree(self, monkeypatch, use_barnes_hut):
+    @pytest.mark.parametrize("iterations,level_iterations", [(1, 1), (20, 5)])
+    def test_paths_agree(self, monkeypatch, use_barnes_hut, iterations, level_iterations):
+        """Both paths must produce the same drawing over a bounded run.
+
+        The iteration counts are held down deliberately. Force-directed
+        dynamics are chaotic: a last-bit difference in one force grows by
+        roughly an order of magnitude every few dozen iterations, so comparing
+        the output of a full-length run (300 iterations at the coarsest level
+        plus 50 per refinement) measures how fast the system amplifies rounding
+        and not whether the two implementations agree -- and the answer then
+        depends on the compiler and the CPU. A short run still catches any
+        divergence that matters, because a wrong force model shows up
+        immediately: the ForceAtlas2 Barnes-Hut bug this class was written for
+        moved nodes ~8 units on the very first iteration.
+
+        The unamplified comparison lives in tests/test_cython_parity.py, which
+        checks the force fields themselves.
+        """
         from graph_layout.force import yifan_hu as module
 
         if not module._HAS_CYTHON:
@@ -921,13 +938,19 @@ class TestYifanHuFallbackParity:
                 size=(800, 800),
                 random_seed=1,
                 use_barnes_hut=use_barnes_hut,
+                iterations=iterations,
+                level_iterations=level_iterations,
             )
             layout.run()
             results.append([(n.x, n.y) for n in layout.nodes])
 
         worst = max(math.dist(a, b) for a, b in zip(results[0], results[1]))
-        # Exact agreement without Barnes-Hut; with it, only float accumulation
-        # order differs (measured ~6e-6 on this graph).
-        assert worst < 1e-4, (
-            f"compiled and pure-Python paths diverge by {worst:.6g} (barnes_hut={use_barnes_hut})"
+        # The naive path agrees bit for bit. Barnes-Hut uses two separate tree
+        # implementations that sum the same contributions in different orders,
+        # so it starts a few ulp apart; over this many iterations that stays
+        # far below a unit on an 800-unit canvas.
+        assert worst < 1e-6, (
+            f"compiled and pure-Python paths diverge by {worst:.6g} "
+            f"(barnes_hut={use_barnes_hut}, iterations={iterations}, "
+            f"level_iterations={level_iterations})"
         )

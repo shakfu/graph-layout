@@ -720,6 +720,12 @@ class TestFruchtermanReingoldFallbackParity:
     ``_speedups`` extension is unavailable. That gap is how a real divergence in
     ForceAtlas2's Barnes-Hut path went unnoticed (see
     tests/test_force_atlas2.py::TestCythonFallbackParity).
+
+    The run is kept short on purpose: the dynamics are chaotic, so over a
+    full-length run this would measure how fast rounding is amplified rather
+    than whether the two paths agree. The unamplified comparison, along with
+    the degenerate-separation cases that tell the two distance guards apart,
+    lives in tests/test_cython_parity.py.
     """
 
     @staticmethod
@@ -737,7 +743,8 @@ class TestFruchtermanReingoldFallbackParity:
         return nodes, links
 
     @pytest.mark.parametrize("use_barnes_hut", [False, True])
-    def test_paths_agree(self, monkeypatch, use_barnes_hut):
+    @pytest.mark.parametrize("iterations", [1, 5])
+    def test_paths_agree(self, monkeypatch, use_barnes_hut, iterations):
         from graph_layout.force import fruchterman_reingold as module
 
         if not module._HAS_CYTHON:
@@ -753,14 +760,19 @@ class TestFruchtermanReingoldFallbackParity:
                 size=(800, 800),
                 random_seed=1,
                 use_barnes_hut=use_barnes_hut,
-                iterations=10,
+                iterations=iterations,
             )
             layout.run(random_init=False)
             results.append([(n.x, n.y) for n in layout.nodes])
 
         worst = max(math.dist(a, b) for a, b in zip(results[0], results[1]))
-        # Exact agreement without Barnes-Hut; with it, only float accumulation
-        # order differs (measured ~6e-6 on this graph).
-        assert worst < 1e-4, (
-            f"compiled and pure-Python paths diverge by {worst:.6g} (barnes_hut={use_barnes_hut})"
+        # The naive path agrees bit for bit. Barnes-Hut starts a few ulp apart
+        # -- two tree implementations summing the same contributions in
+        # different orders -- and this graph then multiplies that gap by
+        # roughly 100 per iteration: 1e-13 at one iteration, 1e-9 at five,
+        # 6e-6 at ten, 0.7 at twenty. Hence the low iteration count; the
+        # unamplified check is in tests/test_cython_parity.py.
+        assert worst < 1e-6, (
+            f"compiled and pure-Python paths diverge by {worst:.6g} "
+            f"(barnes_hut={use_barnes_hut}, iterations={iterations})"
         )

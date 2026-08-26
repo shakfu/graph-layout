@@ -828,7 +828,7 @@ class TestCythonFallbackParity:
         return np.array([(n.x, n.y) for n in layout.nodes])
 
     @pytest.mark.parametrize("use_barnes_hut", [False, True])
-    @pytest.mark.parametrize("iterations", [1, 10])
+    @pytest.mark.parametrize("iterations", [1, 5])
     def test_paths_agree(self, monkeypatch, use_barnes_hut, iterations):
         from graph_layout.force import force_atlas2 as fa2_module
 
@@ -845,7 +845,16 @@ class TestCythonFallbackParity:
         # Both paths do the same arithmetic in the same order, so they agree far
         # more tightly than a physics tolerance would require. The bug this
         # guards produced a divergence of ~8 units on iteration 1 and ~59 by
-        # iteration 10, on a graph spanning ~100 units.
+        # iteration 10, on a graph spanning ~100 units -- a wrong force model
+        # is visible immediately, which is why a short run suffices.
+        #
+        # The run has to be short. Barnes-Hut starts a few ulp apart (two tree
+        # implementations summing the same contributions in different orders)
+        # and this graph multiplies that gap by roughly 40 per iteration:
+        # 6e-14 at one iteration, 8e-12 at five, 2e-09 at ten, 1e-06 at twenty.
+        # Comparing a full-length run would measure that amplification rather
+        # than agreement, and would give a different answer per compiler and
+        # CPU. The unamplified check is in tests/test_cython_parity.py.
         max_diff = float(np.max(np.linalg.norm(compiled - fallback, axis=1)))
         assert max_diff < 1e-6, (
             f"compiled and pure-Python paths diverge by {max_diff:.6g} "

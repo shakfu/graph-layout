@@ -30,6 +30,7 @@ from ..types import (
     NodeLike,
     SizeType,
 )
+from ._kernel_constants import MIN_ADJUSTED_DIST, MIN_DIST_SQ
 
 # Try to import Cython-optimized functions
 try:
@@ -541,34 +542,37 @@ class ForceAtlas2Layout(IterativeLayout):
                 dx = self._pos_x[i] - self._pos_x[j]
                 dy = self._pos_y[i] - self._pos_y[j]
                 dist_sq = dx * dx + dy * dy
+                # Cap the force on near-coincident nodes; see MIN_DIST_SQ. The
+                # clamp must match _speedups._compute_fa2_repulsive_forces
+                # (and ..._overlap) exactly, floor included, or the two paths
+                # compute different physics.
+                if dist_sq < MIN_DIST_SQ:
+                    dist_sq = MIN_DIST_SQ
+                dist = math.sqrt(dist_sq)
 
                 if self._prevent_overlap:
-                    # Subtract node radii from distance
-                    overlap_dist = self._sizes[i] + self._sizes[j]
-                    dist = math.sqrt(dist_sq) - overlap_dist
-                    if dist < 0:
-                        dist = 0.01  # Prevent negative/zero distance
+                    # Repel on the gap between the node borders, not between
+                    # their centres, floored so that overlapping nodes (negative
+                    # gap) push apart with a large but finite force.
+                    adjusted_dist = dist - (self._sizes[i] + self._sizes[j])
+                    if adjusted_dist < MIN_ADJUSTED_DIST:
+                        adjusted_dist = MIN_ADJUSTED_DIST
                 else:
-                    dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.01
+                    adjusted_dist = dist
 
-                if dist > 0:
-                    # ForceAtlas2 repulsion: scaling * (deg_i + 1) * (deg_j + 1) / distance
-                    deg_factor = (self._degrees[i] + 1) * (self._degrees[j] + 1)
-                    force = scaling * deg_factor / dist
+                # ForceAtlas2 repulsion: scaling * (deg_i + 1) * (deg_j + 1) / distance
+                deg_factor = (self._degrees[i] + 1) * (self._degrees[j] + 1)
+                force = scaling * deg_factor / adjusted_dist
 
-                    # Normalize direction
-                    if dist_sq > 0:
-                        inv_dist = 1.0 / math.sqrt(dist_sq)
-                        fx = dx * inv_dist * force
-                        fy = dy * inv_dist * force
-                    else:
-                        fx = force
-                        fy = 0
+                # Direction is always the centre-to-centre unit vector, even
+                # when the magnitude came from the border gap.
+                fx = (dx / dist) * force
+                fy = (dy / dist) * force
 
-                    self._disp_x[i] += fx
-                    self._disp_y[i] += fy
-                    self._disp_x[j] -= fx
-                    self._disp_y[j] -= fy
+                self._disp_x[i] += fx
+                self._disp_y[i] += fy
+                self._disp_x[j] -= fx
+                self._disp_y[j] -= fy
 
     def compute_repulsive_barnes_hut(self) -> None:
         """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""

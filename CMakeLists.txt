@@ -28,10 +28,17 @@ python_add_library(_speedups MODULE
 )
 
 # Optimization flags (mirrors the previous setuptools configuration)
+#
+# -ffp-contract=off / /fp:precise: the pure-Python fallbacks in
+# graph_layout.force must reproduce the compiled kernels bit for bit, and the
+# force-directed iterations amplify a single-ulp difference into a visibly
+# different drawing over a few hundred steps. Clang on arm64 macOS contracts
+# `dx * dx + dy * dy` into an FMA by default, which CPython's float arithmetic
+# never does, so contraction has to be disabled for the two paths to agree.
 if(MSVC)
-    target_compile_options(_speedups PRIVATE /O2)
+    target_compile_options(_speedups PRIVATE /O2 /fp:precise)
 else()
-    target_compile_options(_speedups PRIVATE -O3 -std=c99)
+    target_compile_options(_speedups PRIVATE -O3 -std=c99 -ffp-contract=off)
 endif()
 
 # Install alongside the package sources

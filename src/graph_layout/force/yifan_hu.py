@@ -28,6 +28,7 @@ from ..types import (
     NodeLike,
     SizeType,
 )
+from ._kernel_constants import MIN_DIST_SQ
 
 # Try to import Cython-optimized functions, fallback to pure Python if unavailable
 try:
@@ -743,18 +744,22 @@ class YifanHuLayout(IterativeLayout):
                 dx = pos_x[i] - pos_x[j]
                 dy = pos_y[i] - pos_y[j]
                 dist_sq = dx * dx + dy * dy
-                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+                # Cap the force on near-coincident nodes; see MIN_DIST_SQ. The
+                # clamp must match _speedups._compute_repulsive_forces exactly,
+                # floor included, or the two paths compute different physics.
+                if dist_sq < MIN_DIST_SQ:
+                    dist_sq = MIN_DIST_SQ
+                dist = math.sqrt(dist_sq)
 
-                if dist > 0:
-                    # Repulsive force: C * K^2 / d
-                    force = c * k_sq / dist
-                    fx = (dx / dist) * force
-                    fy = (dy / dist) * force
+                # Repulsive force: C * K^2 / d
+                force = c * k_sq / dist
+                fx = (dx / dist) * force
+                fy = (dy / dist) * force
 
-                    disp_x[i] += fx
-                    disp_y[i] += fy
-                    disp_x[j] -= fx
-                    disp_y[j] -= fy
+                disp_x[i] += fx
+                disp_y[i] += fy
+                disp_x[j] -= fx
+                disp_y[j] -= fy
 
     def compute_repulsive_barnes_hut(
         self,
@@ -806,18 +811,22 @@ class YifanHuLayout(IterativeLayout):
             dx = pos_x[src] - pos_x[tgt]
             dy = pos_y[src] - pos_y[tgt]
             dist_sq = dx * dx + dy * dy
-            dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+            # Coincident endpoints have no direction to pull along, and the
+            # force vanishes as d^2 anyway. Skipping matches
+            # _speedups._compute_attractive_forces.
+            if dist_sq < MIN_DIST_SQ:
+                continue
+            dist = math.sqrt(dist_sq)
 
-            if dist > 0:
-                # Attractive force: d^2 / K (simplified: d / K for linear)
-                force = dist_sq / k
-                fx = (dx / dist) * force
-                fy = (dy / dist) * force
+            # Attractive force: d^2 / K (simplified: d / K for linear)
+            force = dist_sq / k
+            fx = (dx / dist) * force
+            fy = (dy / dist) * force
 
-                disp_x[src] -= fx
-                disp_y[src] -= fy
-                disp_x[tgt] += fx
-                disp_y[tgt] += fy
+            disp_x[src] -= fx
+            disp_y[src] -= fy
+            disp_x[tgt] += fx
+            disp_y[tgt] += fy
 
     def _run_single_level(self, random_init: bool = True) -> None:
         """Run layout without multilevel coarsening (for small graphs)."""

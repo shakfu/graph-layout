@@ -395,6 +395,14 @@ def create_calculator(
 from libc.math cimport sqrt
 
 
+# The 1e-10 squared-distance floor and the 0.01 overlap-gap floor used by the
+# kernels below are mirrored in graph_layout/force/_kernel_constants.py, which
+# the pure-Python fallbacks import. The two sets of values must stay in step:
+# tests/test_cython_parity.py compares the kernels against those fallbacks on
+# coincident and near-coincident input, which is the only input that tells them
+# apart.
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef void _compute_repulsive_forces(

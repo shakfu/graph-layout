@@ -27,6 +27,7 @@ from ..types import (
     NodeLike,
     SizeType,
 )
+from ._kernel_constants import MIN_DIST_SQ
 
 # Try to import Cython-optimized functions
 try:
@@ -384,18 +385,22 @@ class FruchtermanReingoldLayout(IterativeLayout):
                 dx = self._nodes[src].x - self._nodes[tgt].x
                 dy = self._nodes[src].y - self._nodes[tgt].y
                 dist_sq = dx * dx + dy * dy
-                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+                # Coincident endpoints have no direction to pull along, and the
+                # force vanishes as d^2 anyway. Skipping matches
+                # _speedups._compute_attractive_forces.
+                if dist_sq < MIN_DIST_SQ:
+                    continue
+                dist = math.sqrt(dist_sq)
 
                 # Attractive force: f_a = d^2 / k
-                if dist > 0:
-                    force = dist_sq / k
-                    fx = (dx / dist) * force
-                    fy = (dy / dist) * force
+                force = dist_sq / k
+                fx = (dx / dist) * force
+                fy = (dy / dist) * force
 
-                    self._disp_x[src] -= fx
-                    self._disp_y[src] -= fy
-                    self._disp_x[tgt] += fx
-                    self._disp_y[tgt] += fy
+                self._disp_x[src] -= fx
+                self._disp_y[src] -= fy
+                self._disp_x[tgt] += fx
+                self._disp_y[tgt] += fy
 
         # Apply center gravity if enabled
         if self._center_gravity and self._gravity > 0:
@@ -468,18 +473,22 @@ class FruchtermanReingoldLayout(IterativeLayout):
                 dx = self._nodes[i].x - self._nodes[j].x
                 dy = self._nodes[i].y - self._nodes[j].y
                 dist_sq = dx * dx + dy * dy
-                dist = math.sqrt(dist_sq) if dist_sq > 0 else 0.0001
+                # Cap the force on near-coincident nodes; see MIN_DIST_SQ. The
+                # clamp must match _speedups._compute_repulsive_forces exactly,
+                # floor included, or the two paths compute different physics.
+                if dist_sq < MIN_DIST_SQ:
+                    dist_sq = MIN_DIST_SQ
+                dist = math.sqrt(dist_sq)
 
                 # Repulsive force: f_r = k^2 / d
-                if dist > 0:
-                    force = k_sq / dist
-                    fx = (dx / dist) * force
-                    fy = (dy / dist) * force
+                force = k_sq / dist
+                fx = (dx / dist) * force
+                fy = (dy / dist) * force
 
-                    self._disp_x[i] += fx
-                    self._disp_y[i] += fy
-                    self._disp_x[j] -= fx
-                    self._disp_y[j] -= fy
+                self._disp_x[i] += fx
+                self._disp_y[i] += fy
+                self._disp_x[j] -= fx
+                self._disp_y[j] -= fy
 
     def compute_repulsive_barnes_hut(self, k_sq: float) -> None:
         """Compute repulsive forces using Barnes-Hut O(n log n) approximation."""

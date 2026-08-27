@@ -45,3 +45,28 @@
 .graph-layout-figure.inline svg {
   width: 100%;
 }
+
+/* Each figure carries the code that produced it. Inline comparison figures keep
+   theirs collapsed so the row stays a row. */
+.graph-layout-source {
+  margin-top: 0.5rem;
+  text-align: left;
+  font-size: 0.7rem;
+}
+
+.graph-layout-source > summary {
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--md-default-fg-color--light, #666);
+}
+
+.graph-layout-source .highlight {
+  margin-top: 0.4rem;
+  overflow-x: auto;
+}
+
+.graph-layout-source .highlight pre {
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+}

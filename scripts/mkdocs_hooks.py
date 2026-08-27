@@ -92,8 +92,13 @@ def _build_error(message: str) -> Exception:
     try:
         from mkdocs.exceptions import PluginError
     except ImportError:
-        return GraphFenceError(message)
-    return PluginError(message)
+        error: Exception = GraphFenceError(message)
+    else:
+        error = PluginError(message)
+    # The class depends on whether mkdocs is installed, so mark the instance
+    # instead: render_markdown uses this to add the page path exactly once.
+    error._graph_fence = True  # type: ignore[attr-defined]
+    return error
 
 
 def _namespace() -> Dict[str, Any]:
@@ -338,12 +343,12 @@ def render_markdown(markdown: str, source_path: str = "<docs>") -> str:
             raise _build_error(f"{source_path}: unterminated {FENCE_LANGUAGE} block")
 
         code = "\n".join(lines[index + 1 : end])
-        options, render_kwargs = _parse_options(ours.group("opts"))
         try:
+            options, render_kwargs = _parse_options(ours.group("opts"))
             svg, caption = _render_block(code, options, render_kwargs)
         except Exception as exc:  # noqa: BLE001 - re-raised with page context
-            if isinstance(exc, GraphFenceError):
-                raise
+            if getattr(exc, "_graph_fence", False):
+                raise _build_error(f"{source_path}: {exc}") from exc
             raise _build_error(
                 f"{source_path}: {FENCE_LANGUAGE} block failed: {type(exc).__name__}: {exc}\n{code}"
             ) from exc

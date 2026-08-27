@@ -38,8 +38,11 @@ jobs:
         with:
           enable-cache: true
 
+      # The docs group is included so mkdocs is importable: tests/test_mkdocs_hooks.py
+      # covers scripts/mkdocs_hooks.py, whose error type depends on whether mkdocs
+      # is installed. Without it CI exercised a different path than local runs.
       - name: Sync dependencies
-        run: uv sync --python ${{ matrix.python-version }}
+        run: uv sync --group docs --python ${{ matrix.python-version }}
 
       - name: Confirm the Cython extension built
         run: uv run python -c "from graph_layout import _speedups; print('_speedups:', _speedups.__file__)"

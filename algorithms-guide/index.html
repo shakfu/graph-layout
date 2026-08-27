@@ -1,0 +1,2343 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A collection of graph layout algorithms in Python">
+      
+      
+      
+        <link rel="canonical" href="https://shakfu.github.io/graph-layout/algorithms-guide/">
+      
+      
+        <link rel="prev" href="../gallery/">
+      
+      
+        <link rel="next" href="../preprocessing-guide/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Algorithms - graph-layout</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#graph-layout-algorithms-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="graph-layout" class="md-header__button md-logo" aria-label="graph-layout" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            graph-layout
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Algorithms
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/shakfu/graph-layout" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakfu/graph-layout
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="graph-layout" class="md-nav__button md-logo" aria-label="graph-layout" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    graph-layout
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/shakfu/graph-layout" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakfu/graph-layout
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm-families" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Families
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#force-directed-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Force-Directed Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Force-Directed Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fruchterman-reingold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fruchterman-Reingold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kamada-kawai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kamada-Kawai
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spring-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spring Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constraint-based-layout-cola" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraint-Based Layout (Cola)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Constraint-Based Layout (Cola)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#colalayoutadapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ColaLayoutAdapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hierarchical-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hierarchical Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hierarchical Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sugiyama-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sugiyama Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reingold-tilford-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reingold-Tilford Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#radial-tree-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radial Tree Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#circular-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Circular Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Circular Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#circular-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Circular Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shell-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spectral-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spectral Layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spectral-layout_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#planar-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planar Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Planar Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schnyder-fpp-tutte-straight-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schnyder / FPP / Tutte (straight-line)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-model-visibility-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed-Model (visibility representation)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#planarization-non-planar-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planarization (non-planar input)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-based-on-graph-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose based on graph type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-based-on-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose based on requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../preprocessing-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedding-visualizations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding Visualizations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rectangularization-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rectangularization Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kandinsky-implementation-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kandinsky Implementation Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm-families" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Families
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#force-directed-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Force-Directed Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Force-Directed Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fruchterman-reingold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fruchterman-Reingold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kamada-kawai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kamada-Kawai
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spring-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spring Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constraint-based-layout-cola" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraint-Based Layout (Cola)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Constraint-Based Layout (Cola)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#colalayoutadapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ColaLayoutAdapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hierarchical-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hierarchical Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hierarchical Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sugiyama-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sugiyama Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reingold-tilford-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reingold-Tilford Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#radial-tree-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radial Tree Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#circular-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Circular Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Circular Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#circular-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Circular Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shell-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spectral-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spectral Layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spectral-layout_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#planar-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planar Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Planar Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schnyder-fpp-tutte-straight-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schnyder / FPP / Tutte (straight-line)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-model-visibility-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed-Model (visibility representation)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#planarization-non-planar-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Planarization (non-planar input)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-based-on-graph-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose based on graph type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-based-on-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose based on requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="graph-layout-algorithms-guide">Graph Layout Algorithms Guide<a class="headerlink" href="#graph-layout-algorithms-guide" title="Permanent link">&para;</a></h1>
+<p>This guide explains the different graph layout algorithms available in <code>graph-layout</code>, their characteristics, and when to use each one.</p>
+<h2 id="algorithm-families">Algorithm Families<a class="headerlink" href="#algorithm-families" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Algorithms</th>
+<th>Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Force-Directed</strong></td>
+<td>Fruchterman-Reingold, Kamada-Kawai, Spring</td>
+<td>Simulate physical forces between nodes</td>
+</tr>
+<tr>
+<td><strong>Constraint-Based</strong></td>
+<td>Cola</td>
+<td>Optimize with constraints and overlap avoidance</td>
+</tr>
+<tr>
+<td><strong>Hierarchical</strong></td>
+<td>Sugiyama, Reingold-Tilford, Radial Tree</td>
+<td>Layer-based or tree-structured layouts</td>
+</tr>
+<tr>
+<td><strong>Circular</strong></td>
+<td>Circular, Shell</td>
+<td>Arrange nodes on circles</td>
+</tr>
+<tr>
+<td><strong>Spectral</strong></td>
+<td>Spectral</td>
+<td>Use graph eigenvalues for positioning</td>
+</tr>
+<tr>
+<td><strong>Orthogonal</strong></td>
+<td>Kandinsky, GIOTTO</td>
+<td>Route edges with horizontal/vertical segments</td>
+</tr>
+<tr>
+<td><strong>Planar</strong></td>
+<td>Schnyder, FPP, Tutte, Mixed-Model, Planarization</td>
+<td>Crossing-free straight-line/visibility drawings of planar graphs</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="force-directed-layouts">Force-Directed Layouts<a class="headerlink" href="#force-directed-layouts" title="Permanent link">&para;</a></h2>
+<p>Force-directed algorithms simulate a physical system where nodes repel each other (like charged particles) and edges act as springs pulling connected nodes together. The layout converges when forces reach equilibrium.</p>
+<h3 id="fruchterman-reingold">Fruchterman-Reingold<a class="headerlink" href="#fruchterman-reingold" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> General-purpose graph visualization with aesthetic results.</p>
+<p><img alt="Fruchterman-Reingold Layout" src="../img/fruchterman_reingold.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">FruchtermanReingoldLayout</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">FruchtermanReingoldLayout</span><span class="p">(</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">iterations</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">temperature</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>      <span class="c1"># Auto-calculated if None</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">cooling_factor</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span>   <span class="c1"># Temperature decay per iteration</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Uses temperature/cooling schedule for simulated annealing</p>
+</li>
+<li>
+<p>Repulsive force: <code>k^2 / d</code> (inverse of distance)</p>
+</li>
+<li>
+<p>Attractive force: <code>d^2 / k</code> (quadratic with distance)</p>
+</li>
+<li>
+<p>Cython-accelerated for high performance</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n^2) per iteration (or O(n log n) with Barnes-Hut)</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>iterations</code></td>
+<td>Number of simulation steps</td>
+<td>300</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td>Initial max displacement</td>
+<td>Auto</td>
+</tr>
+<tr>
+<td><code>cooling_factor</code></td>
+<td>Temperature multiplier per step</td>
+<td>0.95</td>
+</tr>
+<tr>
+<td><code>use_barnes_hut</code></td>
+<td>Enable O(n log n) approximation</td>
+<td>False</td>
+</tr>
+<tr>
+<td><code>barnes_hut_theta</code></td>
+<td>Accuracy vs speed (0=exact, 1=fast)</td>
+<td>0.5</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When to use Barnes-Hut:</strong></p>
+<ul>
+<li>
+<p>Graphs with 2000+ nodes</p>
+</li>
+<li>
+<p>When approximate positions are acceptable</p>
+</li>
+<li>
+<p>Real-time or interactive applications</p>
+</li>
+</ul>
+<hr />
+<h3 id="kamada-kawai">Kamada-Kawai<a class="headerlink" href="#kamada-kawai" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Small to medium graphs where edge lengths should reflect graph-theoretic distances.</p>
+<p><img alt="Kamada-Kawai Layout" src="../img/kamada_kawai.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">KamadaKawaiLayout</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">KamadaKawaiLayout</span><span class="p">(</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">iterations</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Minimizes stress: deviation between geometric and graph-theoretic distances</p>
+</li>
+<li>
+<p>Computes all-pairs shortest paths (expensive for large graphs)</p>
+</li>
+<li>
+<p>Produces layouts where edge length correlates with path length</p>
+</li>
+<li>
+<p>Good for revealing graph structure</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n^3) for shortest paths + O(n^2) per iteration</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>iterations</code></td>
+<td>Number of optimization steps</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>epsilon</code></td>
+<td>Convergence threshold</td>
+<td>1e-4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Trade-offs:</strong></p>
+<ul>
+<li>
+<p>Higher quality than Fruchterman-Reingold for small graphs</p>
+</li>
+<li>
+<p>Much slower for large graphs due to all-pairs shortest paths</p>
+</li>
+<li>
+<p>Best limited to graphs under ~200 nodes</p>
+</li>
+</ul>
+<hr />
+<h3 id="spring-layout">Spring Layout<a class="headerlink" href="#spring-layout" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Simple layouts, educational purposes, or as a baseline.</p>
+<p><img alt="Spring Layout" src="../img/spring.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpringLayout</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">SpringLayout</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">iterations</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">spring_length</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>   <span class="c1"># Ideal edge length</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">spring_strength</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="c1"># Spring constant</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">repulsion</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>      <span class="c1"># Repulsion strength</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">)</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Simple Hooke's law springs for edges</p>
+</li>
+<li>
+<p>Coulomb-like repulsion between all node pairs</p>
+</li>
+<li>
+<p>No cooling schedule (constant forces)</p>
+</li>
+<li>
+<p>Easy to understand and modify</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n^2) per iteration</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>iterations</code></td>
+<td>Number of simulation steps</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>spring_length</code></td>
+<td>Ideal edge length</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>spring_strength</code></td>
+<td>Edge spring constant</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td><code>repulsion</code></td>
+<td>Node repulsion strength</td>
+<td>1000</td>
+</tr>
+<tr>
+<td><code>damping</code></td>
+<td>Velocity damping factor</td>
+<td>0.5</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="constraint-based-layout-cola">Constraint-Based Layout (Cola)<a class="headerlink" href="#constraint-based-layout-cola" title="Permanent link">&para;</a></h2>
+<h3 id="colalayoutadapter">ColaLayoutAdapter<a class="headerlink" href="#colalayoutadapter" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Layouts requiring constraints, overlap avoidance, or hierarchical grouping.</p>
+<p><img alt="Cola Layout" src="../img/cola.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">ColaLayoutAdapter</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ColaLayoutAdapter</span><span class="p">(</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">avoid_overlaps</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">link_distance</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">iterations</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">)</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Port of WebCola constraint-based layout</p>
+</li>
+<li>
+<p>VPSC solver for separation constraints</p>
+</li>
+<li>
+<p>Supports node overlap avoidance</p>
+</li>
+<li>
+<p>Hierarchical group containment</p>
+</li>
+<li>
+<p>Flow layouts (directional bias)</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n^2) per iteration + constraint solving overhead</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>iterations</code></td>
+<td>Layout iterations</td>
+<td>50</td>
+</tr>
+<tr>
+<td><code>link_distance</code></td>
+<td>Ideal edge length (number or function)</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>avoid_overlaps</code></td>
+<td>Prevent node overlap</td>
+<td>False</td>
+</tr>
+<tr>
+<td><code>handle_disconnected</code></td>
+<td>Layout disconnected components</td>
+<td>True</td>
+</tr>
+<tr>
+<td><code>convergence_threshold</code></td>
+<td>Stop when stress change below this</td>
+<td>1e-4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Advanced Features:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Separation constraints</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout.cola.linklengths</span><span class="w"> </span><span class="kn">import</span> <span class="n">SeparationConstraint</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">constraint</span> <span class="o">=</span> <span class="n">SeparationConstraint</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">gap</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ColaLayoutAdapter</span><span class="p">(</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">constraints</span><span class="o">=</span><span class="p">[</span><span class="n">constraint</span><span class="p">],</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">)</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># Hierarchical groups</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">groups</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="p">{</span><span class="s1">&#39;leaves&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;padding&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="p">{</span><span class="s1">&#39;leaves&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="s1">&#39;padding&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="p">]</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ColaLayoutAdapter</span><span class="p">(</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">groups</span><span class="o">=</span><span class="n">groups</span><span class="p">,</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="p">)</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="c1"># Flow layout (left-to-right)</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ColaLayoutAdapter</span><span class="p">(</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>    <span class="n">flow_direction</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">,</span>  <span class="c1"># or &#39;y&#39; for top-to-bottom</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="hierarchical-layouts">Hierarchical Layouts<a class="headerlink" href="#hierarchical-layouts" title="Permanent link">&para;</a></h2>
+<h3 id="sugiyama-layout">Sugiyama Layout<a class="headerlink" href="#sugiyama-layout" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Directed acyclic graphs (DAGs), flowcharts, dependency graphs.</p>
+<p><img alt="Sugiyama Layout" src="../img/sugiyama.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">SugiyamaLayout</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">SugiyamaLayout</span><span class="p">(</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">layer_separation</span><span class="o">=</span><span class="mi">80</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">node_separation</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="p">)</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Assigns nodes to horizontal layers</p>
+</li>
+<li>
+<p>Minimizes edge crossings between layers</p>
+</li>
+<li>
+<p>Produces clean, readable hierarchical layouts</p>
+</li>
+<li>
+<p>Handles cycles by temporarily reversing edges</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n^2) for crossing minimization</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>layer_separation</code></td>
+<td>Vertical space between layers</td>
+<td>80</td>
+</tr>
+<tr>
+<td><code>node_separation</code></td>
+<td>Horizontal space between nodes</td>
+<td>50</td>
+</tr>
+<tr>
+<td><code>direction</code></td>
+<td>Layout direction ('TB', 'BT', 'LR', 'RL')</td>
+<td>'TB'</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="reingold-tilford-layout">Reingold-Tilford Layout<a class="headerlink" href="#reingold-tilford-layout" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Trees and hierarchical structures.</p>
+<p><img alt="Reingold-Tilford Layout" src="../img/reingold_tilford.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">ReingoldTilfordLayout</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ReingoldTilfordLayout</span><span class="p">(</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">root</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># Root node index</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Classic tree drawing algorithm</p>
+</li>
+<li>
+<p>Compact, balanced layouts</p>
+</li>
+<li>
+<p>Preserves tree structure clearly</p>
+</li>
+<li>
+<p>Requires a tree (single root, no cycles)</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n)</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>root</code></td>
+<td>Index of root node</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>node_separation</code></td>
+<td>Horizontal space between siblings</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td><code>level_separation</code></td>
+<td>Vertical space between levels</td>
+<td>1.0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="radial-tree-layout">Radial Tree Layout<a class="headerlink" href="#radial-tree-layout" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Trees displayed as concentric circles from a central root.</p>
+<p><img alt="Radial Tree Layout" src="../img/radial_tree.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">RadialTreeLayout</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">RadialTreeLayout</span><span class="p">(</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">800</span><span class="p">),</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">root</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="p">)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Root at center, children in concentric rings</p>
+</li>
+<li>
+<p>Good for visualizing distance from root</p>
+</li>
+<li>
+<p>Works best with roughly balanced trees</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n)</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>root</code></td>
+<td>Index of root node</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>level_separation</code></td>
+<td>Radial distance between levels</td>
+<td>100</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="circular-layouts">Circular Layouts<a class="headerlink" href="#circular-layouts" title="Permanent link">&para;</a></h2>
+<h3 id="circular-layout">Circular Layout<a class="headerlink" href="#circular-layout" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Showing connectivity patterns, ring topologies, complete graphs.</p>
+<p><img alt="Circular Layout" src="../img/circular.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircularLayout</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">CircularLayout</span><span class="p">(</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">800</span><span class="p">),</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">sort_by</span><span class="o">=</span><span class="s1">&#39;degree&#39;</span><span class="p">,</span>  <span class="c1"># Order nodes by degree</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="p">)</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>All nodes placed on a single circle</p>
+</li>
+<li>
+<p>Simple and predictable</p>
+</li>
+<li>
+<p>Edge crossings can be minimized by node ordering</p>
+</li>
+<li>
+<p>Good for small to medium dense graphs</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n)</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sort_by</code></td>
+<td>Node ordering ('none', 'degree', or callable)</td>
+<td>'none'</td>
+</tr>
+<tr>
+<td><code>start_angle</code></td>
+<td>Starting angle in radians</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="shell-layout">Shell Layout<a class="headerlink" href="#shell-layout" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Grouped or stratified data, showing node importance.</p>
+<p><img alt="Shell Layout" src="../img/shell.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">ShellLayout</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Automatic shells by degree</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ShellLayout</span><span class="p">(</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">800</span><span class="p">),</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">auto_shells</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>  <span class="c1"># Number of concentric circles</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p">)</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># Manual shell assignment</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ShellLayout</span><span class="p">(</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="n">shells</span><span class="o">=</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">8</span><span class="p">]],</span>  <span class="c1"># Node indices per shell</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="p">)</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Multiple concentric circles</p>
+</li>
+<li>
+<p>Can group nodes by degree or custom criteria</p>
+</li>
+<li>
+<p>Inner shells typically for important/central nodes</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n)</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>shells</code></td>
+<td>List of node index lists per shell</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>auto_shells</code></td>
+<td>Auto-generate shells by degree</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="spectral-layout">Spectral Layout<a class="headerlink" href="#spectral-layout" title="Permanent link">&para;</a></h2>
+<h3 id="spectral-layout_1">Spectral Layout<a class="headerlink" href="#spectral-layout_1" title="Permanent link">&para;</a></h3>
+<p><strong>Best for:</strong> Revealing cluster structure, dimensionality reduction.</p>
+<p><img alt="Spectral Layout" src="../img/spectral.png" /></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpectralLayout</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">SpectralLayout</span><span class="p">(</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="n">normalized</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Use normalized Laplacian</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="p">)</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>
+<p>Uses eigenvectors of the graph Laplacian matrix</p>
+</li>
+<li>
+<p>Positions based on graph's spectral properties</p>
+</li>
+<li>
+<p>Often reveals natural clustering</p>
+</li>
+<li>
+<p>Deterministic (same graph = same layout)</p>
+</li>
+</ul>
+<p><strong>Complexity:</strong> O(n^3) for eigendecomposition</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>normalized</code></td>
+<td>Use normalized Laplacian</td>
+<td>True</td>
+</tr>
+<tr>
+<td><code>dimensions</code></td>
+<td>Number of dimensions (2 or 3)</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Trade-offs:</strong></p>
+<ul>
+<li>
+<p>Good at revealing structure but may not be visually optimal</p>
+</li>
+<li>
+<p>Expensive for large graphs</p>
+</li>
+<li>
+<p>Best for graphs under ~500 nodes</p>
+</li>
+</ul>
+<hr />
+<h2 id="planar-layouts">Planar Layouts<a class="headerlink" href="#planar-layouts" title="Permanent link">&para;</a></h2>
+<p>Crossing-free drawings of planar graphs. All draw any connected planar simple graph (&gt;= 3 vertices) — internally triangulating and reusing one embedding/canonical-ordering substrate — and fall back to a circular placement for out-of-domain input, reporting the path taken via a <code>used_*</code> flag.</p>
+<h3 id="schnyder-fpp-tutte-straight-line">Schnyder / FPP / Tutte (straight-line)<a class="headerlink" href="#schnyder-fpp-tutte-straight-line" title="Permanent link">&para;</a></h3>
+<p>Straight-line grid drawings. <code>SchnyderLayout</code> uses a realizer with vertex-count barycentric coordinates on the <code>(n-1) x (n-1)</code> grid; <code>FPPLayout</code> uses the de Fraysseix-Pach-Pollack shift method on the <code>(2n-4) x (n-2)</code> grid; <code>TutteLayout</code> fixes one face to a convex polygon and solves the barycentric equilibrium, giving convex faces for 3-connected planar graphs.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">SchnyderLayout</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">SchnyderLayout</span><span class="p">(</span><span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span> <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">))</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="k">assert</span> <span class="n">layout</span><span class="o">.</span><span class="n">used_schnyder</span>  <span class="c1"># False if the graph was non-planar/disconnected</span>
+</code></pre></div>
+<p><strong>Use when:</strong> you want a compact, provably crossing-free drawing of a planar graph and prefer straight edges. Prefer Tutte for 3-connected graphs where convex faces matter.</p>
+<h3 id="mixed-model-visibility-representation">Mixed-Model (visibility representation)<a class="headerlink" href="#mixed-model-visibility-representation" title="Permanent link">&para;</a></h3>
+<p>Draws vertices as horizontal bars and edges as bendless vertical segments attaching at distinct ports, spreading a high-degree vertex's edges across its bar for good angular resolution. Exposes <code>vertex_bars</code> and <code>edge_routes</code>.</p>
+<p><strong>Use when:</strong> the graph has high-degree vertices whose edges would be cramped in a straight-line drawing.</p>
+<h3 id="planarization-non-planar-input">Planarization (non-planar input)<a class="headerlink" href="#planarization-non-planar-input" title="Permanent link">&para;</a></h3>
+<p>Draws a non-planar graph by replacing crossings with dummy vertices, then routing each edge as a polyline through its crossing points, so edges meet only at explicit crossing dots. Exposes <code>crossings</code>, <code>crossing_count</code>, and <code>edge_routes</code>.</p>
+<p><strong>Use when:</strong> the graph is non-planar but you still want a clean drawing with a small, explicit set of crossings.</p>
+<hr />
+<h2 id="algorithm-comparison">Algorithm Comparison<a class="headerlink" href="#algorithm-comparison" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Complexity</th>
+<th>Best Graph Size</th>
+<th>Constraints</th>
+<th>Overlap Avoidance</th>
+<th>Deterministic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fruchterman-Reingold</td>
+<td>O(n^2)/iter</td>
+<td>Any</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>FR + Barnes-Hut</td>
+<td>O(n log n)/iter</td>
+<td>Large (2000+)</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Kamada-Kawai</td>
+<td>O(n^3) + O(n^2)/iter</td>
+<td>Small (&lt;200)</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Spring</td>
+<td>O(n^2)/iter</td>
+<td>Small-Medium</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Cola</td>
+<td>O(n^2)/iter</td>
+<td>Medium</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Sugiyama</td>
+<td>O(n^2)</td>
+<td>Medium DAGs</td>
+<td>Layering</td>
+<td>Via spacing</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Reingold-Tilford</td>
+<td>O(n)</td>
+<td>Any tree</td>
+<td>Tree structure</td>
+<td>Via spacing</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Radial Tree</td>
+<td>O(n)</td>
+<td>Any tree</td>
+<td>Tree structure</td>
+<td>Via spacing</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Circular</td>
+<td>O(n)</td>
+<td>Small-Medium</td>
+<td>Circle</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Shell</td>
+<td>O(n)</td>
+<td>Small-Medium</td>
+<td>Concentric</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Spectral</td>
+<td>O(n^3)</td>
+<td>Small (&lt;500)</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Schnyder / FPP</td>
+<td>O(n^2)</td>
+<td>Planar, any size</td>
+<td>Planar</td>
+<td>Grid points</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Tutte</td>
+<td>O(n^3) solve</td>
+<td>3-connected planar</td>
+<td>Planar</td>
+<td>Convex faces</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Mixed-Model</td>
+<td>O(n^2)</td>
+<td>Planar (esp. high-degree)</td>
+<td>Planar</td>
+<td>Bars/ports</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Planarization</td>
+<td>O((n+c)^2)</td>
+<td>Non-planar</td>
+<td>None</td>
+<td>Explicit crossings</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="decision-guide">Decision Guide<a class="headerlink" href="#decision-guide" title="Permanent link">&para;</a></h2>
+<h3 id="choose-based-on-graph-type">Choose based on graph type<a class="headerlink" href="#choose-based-on-graph-type" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Is your graph a tree?
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>  Yes -&gt; Reingold-Tilford (classic) or Radial Tree (centered)
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  No  -&gt; Continue...
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>Is your graph a DAG (directed, no cycles)?
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  Yes -&gt; Sugiyama (layered hierarchy)
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  No  -&gt; Continue...
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>Do you need constraints or overlap avoidance?
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>  Yes -&gt; Cola
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>  No  -&gt; Continue...
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>Is your graph large (&gt;1000 nodes)?
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>  Yes -&gt; Fruchterman-Reingold with Barnes-Hut
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>  No  -&gt; Continue...
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>Do you want to reveal cluster structure?
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>  Yes -&gt; Spectral
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>  No  -&gt; Continue...
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>Do you want nodes on a circle?
+<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a>  Yes -&gt; Circular or Shell
+<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a>  No  -&gt; Fruchterman-Reingold (general purpose)
+</code></pre></div>
+<h3 id="choose-based-on-requirements">Choose based on requirements<a class="headerlink" href="#choose-based-on-requirements" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Recommended Algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>General-purpose, good aesthetics</td>
+<td>Fruchterman-Reingold</td>
+</tr>
+<tr>
+<td>Edge lengths reflect distances</td>
+<td>Kamada-Kawai</td>
+</tr>
+<tr>
+<td>Prevent node overlap</td>
+<td>Cola</td>
+</tr>
+<tr>
+<td>Hierarchical/layered display</td>
+<td>Sugiyama</td>
+</tr>
+<tr>
+<td>Tree visualization</td>
+<td>Reingold-Tilford</td>
+</tr>
+<tr>
+<td>Very large graphs (5000+)</td>
+<td>FR + Barnes-Hut</td>
+</tr>
+<tr>
+<td>Deterministic layout</td>
+<td>Circular, Spectral, or hierarchical</td>
+</tr>
+<tr>
+<td>Real-time/interactive</td>
+<td>FR + Barnes-Hut or Spring</td>
+</tr>
+<tr>
+<td>Reveal clustering</td>
+<td>Spectral</td>
+</tr>
+<tr>
+<td>Crossing-free planar drawing</td>
+<td>Schnyder / FPP (straight-line), Tutte (convex)</td>
+</tr>
+<tr>
+<td>Planar graph with high-degree nodes</td>
+<td>Mixed-Model</td>
+</tr>
+<tr>
+<td>Non-planar with few, explicit crossings</td>
+<td>Planarization</td>
+</tr>
+<tr>
+<td>Orthogonal (UML/ER/flowchart)</td>
+<td>Kandinsky, GIOTTO</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="performance-tips">Performance Tips<a class="headerlink" href="#performance-tips" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Use Cython acceleration</strong>: Install from PyPI to get pre-built Cython extensions.</p>
+</li>
+<li>
+<p><strong>Enable Barnes-Hut for large graphs</strong>:</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">FruchtermanReingoldLayout</span><span class="p">(</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span> <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">use_barnes_hut</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">barnes_hut_theta</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="p">)</span>
+</code></pre></div>
+<ol>
+<li>
+<p><strong>Reduce iterations for previews</strong>: Use fewer iterations during interactive exploration, full iterations for final output.</p>
+</li>
+<li>
+<p><strong>Pre-filter large graphs</strong>: For very large graphs, consider filtering to show only important nodes/edges.</p>
+</li>
+<li>
+<p><strong>Use appropriate algorithms</strong>: Don't use O(n^3) algorithms (Kamada-Kawai, Spectral) on large graphs.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      MIT licensed
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections", "navigation.top", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

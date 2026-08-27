@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/algorithms-guide/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/embedding-visualizations/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/gallery/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/kandinsky-implementation-plan/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/preprocessing-guide/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+    <url>
+         <loc>https://shakfu.github.io/graph-layout/rectangularization-plan/</loc>
+         <lastmod>2026-08-27</lastmod>
+    </url>
+</urlset>

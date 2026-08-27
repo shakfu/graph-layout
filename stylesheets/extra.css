@@ -1,0 +1,32 @@
+/* Figures produced by the ```graph-layout fence (scripts/mkdocs_hooks.py). */
+
+.graph-layout-figure {
+  margin: 1.2rem auto;
+  text-align: center;
+}
+
+.graph-layout-figure svg {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Node labels are rendered with fill="currentColor", so they follow the theme. */
+.graph-layout-figure .labels {
+  color: var(--md-default-fg-color, #000);
+}
+
+.graph-layout-figure figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--md-default-fg-color--light, #666);
+}
+
+/* Side-by-side figures for algorithm comparisons. */
+.graph-layout-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  justify-content: center;
+}

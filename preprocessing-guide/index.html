@@ -1,0 +1,1623 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A collection of graph layout algorithms in Python">
+      
+      
+      
+        <link rel="canonical" href="https://shakfu.github.io/graph-layout/preprocessing-guide/">
+      
+      
+        <link rel="prev" href="../algorithms-guide/">
+      
+      
+        <link rel="next" href="../embedding-visualizations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Preprocessing - graph-layout</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#graph-preprocessing-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="graph-layout" class="md-header__button md-logo" aria-label="graph-layout" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            graph-layout
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Preprocessing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/shakfu/graph-layout" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakfu/graph-layout
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="graph-layout" class="md-nav__button md-logo" aria-label="graph-layout" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    graph-layout
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/shakfu/graph-layout" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shakfu/graph-layout
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithms-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cycle-detection-and-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle Detection and Removal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cycle Detection and Removal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-remove-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Remove Cycles?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detecting-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detecting Cycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removing-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing Cycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topological-sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topological Sorting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connected-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connected Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connected Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-disconnected-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handling Disconnected Graphs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-1-layout-each-component-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1: Layout each component separately
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-use-cola-with-handle_disconnectedtrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2: Use Cola with handle_disconnected=True
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layer-assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer Assignment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer Assignment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-layers-for-custom-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Layers for Custom Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#crossing-minimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crossing Minimization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Crossing Minimization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-preprocessing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Preprocessing Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-link-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Link Formats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedding-visualizations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding Visualizations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rectangularization-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rectangularization Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kandinsky-implementation-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kandinsky Implementation Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cycle-detection-and-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle Detection and Removal
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cycle Detection and Removal">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-remove-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Remove Cycles?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detecting-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detecting Cycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removing-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing Cycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topological-sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topological Sorting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connected-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connected Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connected Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finding-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-disconnected-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handling Disconnected Graphs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-1-layout-each-component-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1: Layout each component separately
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-use-cola-with-handle_disconnectedtrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2: Use Cola with handle_disconnected=True
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layer-assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer Assignment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer Assignment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-layers-for-custom-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Layers for Custom Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#crossing-minimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crossing Minimization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Crossing Minimization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-preprocessing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete Preprocessing Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-link-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Link Formats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="graph-preprocessing-guide">Graph Preprocessing Guide<a class="headerlink" href="#graph-preprocessing-guide" title="Permanent link">&para;</a></h1>
+<p>This guide explains how to use the preprocessing utilities in <code>graph-layout</code> to prepare graphs before layout.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>Graph preprocessing utilities help you:</p>
+<ul>
+<li>
+<p><strong>Detect and remove cycles</strong> - Required for hierarchical layouts (Sugiyama)</p>
+</li>
+<li>
+<p><strong>Find connected components</strong> - Handle disconnected graphs</p>
+</li>
+<li>
+<p><strong>Compute topological order</strong> - Understand graph structure</p>
+</li>
+<li>
+<p><strong>Assign layers</strong> - Prepare for layered/hierarchical layouts</p>
+</li>
+<li>
+<p><strong>Minimize crossings</strong> - Improve layered layout aesthetics</p>
+</li>
+</ul>
+<p>All functions work with the standard <code>graph-layout</code> link format (<code>{'source': int, 'target': int}</code>) and support custom accessors for other formats.</p>
+<hr />
+<h2 id="cycle-detection-and-removal">Cycle Detection and Removal<a class="headerlink" href="#cycle-detection-and-removal" title="Permanent link">&para;</a></h2>
+<h3 id="why-remove-cycles">Why Remove Cycles?<a class="headerlink" href="#why-remove-cycles" title="Permanent link">&para;</a></h3>
+<p>Hierarchical layouts like <code>SugiyamaLayout</code> are designed for <strong>directed acyclic graphs (DAGs)</strong>. If your graph has cycles, you have two options:</p>
+<ol>
+<li>
+<p><strong>Let the algorithm warn you</strong> - Sugiyama will still run but results may be suboptimal</p>
+</li>
+<li>
+<p><strong>Preprocess to remove cycles</strong> - Reverse some edges to make the graph acyclic</p>
+</li>
+</ol>
+<h3 id="detecting-cycles">Detecting Cycles<a class="headerlink" href="#detecting-cycles" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_cycle</span><span class="p">,</span> <span class="n">has_cycle</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">nodes</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">)]</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>  <span class="c1"># Back edge creating cycle</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">]</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># Quick boolean check</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">if</span> <span class="n">has_cycle</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">),</span> <span class="n">links</span><span class="p">):</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Graph contains a cycle&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="c1"># Get the actual cycle</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">cycle</span> <span class="o">=</span> <span class="n">detect_cycle</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">),</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="k">if</span> <span class="n">cycle</span><span class="p">:</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cycle found: </span><span class="si">{</span><span class="n">cycle</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># e.g., [1, 2, 3, 1]</span>
+</code></pre></div>
+<h3 id="removing-cycles">Removing Cycles<a class="headerlink" href="#removing-cycles" title="Permanent link">&para;</a></h3>
+<p>The <code>remove_cycles()</code> function finds back edges using DFS and reverses them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">remove_cycles</span><span class="p">,</span> <span class="n">has_cycle</span><span class="p">,</span> <span class="n">SugiyamaLayout</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Original graph with cycle</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>  <span class="c1"># Creates cycle 0 -&gt; 1 -&gt; 2 -&gt; 0</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Remove cycles</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">acyclic_links</span><span class="p">,</span> <span class="n">reversed_indices</span> <span class="o">=</span> <span class="n">remove_cycles</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reversed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">reversed_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> edge(s): </span><span class="si">{</span><span class="n">reversed_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Is now acyclic: </span><span class="si">{</span><span class="ow">not</span><span class="w"> </span><span class="n">has_cycle</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">acyclic_links</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Now safe for hierarchical layout</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">SugiyamaLayout</span><span class="p">(</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">nodes</span><span class="o">=</span><span class="p">[{}</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)],</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">links</span><span class="o">=</span><span class="n">acyclic_links</span><span class="p">,</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">)</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Note:</strong> The reversed edges are tracked so you can render them differently (e.g., dashed lines) in your visualization.</p>
+<hr />
+<h2 id="topological-sorting">Topological Sorting<a class="headerlink" href="#topological-sorting" title="Permanent link">&para;</a></h2>
+<p>Topological sort orders nodes so that for every edge <code>u -&gt; v</code>, node <code>u</code> comes before <code>v</code>. This is useful for:</p>
+<ul>
+<li>
+<p>Understanding dependency order</p>
+</li>
+<li>
+<p>Processing nodes in correct sequence</p>
+</li>
+<li>
+<p>Verifying graph is acyclic</p>
+</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">topological_sort</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Dependency graph: A -&gt; B -&gt; D, A -&gt; C -&gt; D</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>  <span class="c1"># A -&gt; B</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>  <span class="c1"># A -&gt; C</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>  <span class="c1"># B -&gt; D</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>  <span class="c1"># C -&gt; D</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">]</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">order</span> <span class="o">=</span> <span class="n">topological_sort</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">if</span> <span class="n">order</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Topological order: </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># [0, 1, 2, 3] or [0, 2, 1, 3]</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Graph has cycles - no topological order exists&quot;</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="connected-components">Connected Components<a class="headerlink" href="#connected-components" title="Permanent link">&para;</a></h2>
+<h3 id="finding-components">Finding Components<a class="headerlink" href="#finding-components" title="Permanent link">&para;</a></h3>
+<p>Disconnected graphs (multiple separate subgraphs) can cause issues with some layouts. Use <code>connected_components()</code> to identify them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">connected_components</span><span class="p">,</span> <span class="n">is_connected</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>  <span class="c1"># Component 1</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>  <span class="c1"># Component 2</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">]</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># Quick check</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">is_connected</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">links</span><span class="p">):</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Graph is disconnected&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1"># Get all components</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">components</span> <span class="o">=</span> <span class="n">connected_components</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">)</span><span class="si">}</span><span class="s2"> components:&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">comp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">components</span><span class="p">):</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Component </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: nodes </span><span class="si">{</span><span class="n">comp</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="handling-disconnected-graphs">Handling Disconnected Graphs<a class="headerlink" href="#handling-disconnected-graphs" title="Permanent link">&para;</a></h3>
+<h3 id="option-1-layout-each-component-separately">Option 1: Layout each component separately<a class="headerlink" href="#option-1-layout-each-component-separately" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">connected_components</span><span class="p">,</span> <span class="n">FruchtermanReingoldLayout</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">layout_components</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">links</span><span class="p">,</span> <span class="n">size</span><span class="p">):</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Layout each component and arrange them side by side.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">components</span> <span class="o">=</span> <span class="n">connected_components</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="c1"># Create node index mapping for each component</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">x_offset</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">components</span><span class="p">:</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="c1"># Extract subgraph</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="n">node_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">old</span><span class="p">:</span> <span class="n">new</span> <span class="k">for</span> <span class="n">new</span><span class="p">,</span> <span class="n">old</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">comp</span><span class="p">)}</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="n">comp_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">nodes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">comp</span><span class="p">]</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        <span class="n">comp_links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>            <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="n">node_map</span><span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="s1">&#39;source&#39;</span><span class="p">]],</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="n">node_map</span><span class="p">[</span><span class="n">l</span><span class="p">[</span><span class="s1">&#39;target&#39;</span><span class="p">]]}</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>            <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">links</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>            <span class="k">if</span> <span class="n">l</span><span class="p">[</span><span class="s1">&#39;source&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">node_map</span> <span class="ow">and</span> <span class="n">l</span><span class="p">[</span><span class="s1">&#39;target&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">node_map</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>        <span class="p">]</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>        <span class="c1"># Layout component</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>        <span class="n">layout</span> <span class="o">=</span> <span class="n">FruchtermanReingoldLayout</span><span class="p">(</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>            <span class="n">nodes</span><span class="o">=</span><span class="n">comp_nodes</span><span class="p">,</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>            <span class="n">links</span><span class="o">=</span><span class="n">comp_links</span><span class="p">,</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>            <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">),</span> <span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>        <span class="p">)</span>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>        <span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>        <span class="c1"># Offset positions</span>
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>            <span class="n">node</span><span class="o">.</span><span class="n">x</span> <span class="o">+=</span> <span class="n">x_offset</span>
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>
+<a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>        <span class="n">results</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">layout</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span>
+<a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>        <span class="n">x_offset</span> <span class="o">+=</span> <span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">)</span>
+<a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>
+<a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a>    <span class="k">return</span> <span class="n">results</span>
+</code></pre></div>
+<h3 id="option-2-use-cola-with-handle_disconnectedtrue">Option 2: Use Cola with <code>handle_disconnected=True</code><a class="headerlink" href="#option-2-use-cola-with-handle_disconnectedtrue" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">ColaLayoutAdapter</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">ColaLayoutAdapter</span><span class="p">(</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">links</span><span class="o">=</span><span class="n">links</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">handle_disconnected</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Automatically handles disconnected components</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h2 id="layer-assignment">Layer Assignment<a class="headerlink" href="#layer-assignment" title="Permanent link">&para;</a></h2>
+<p>Layer assignment places nodes into horizontal layers for hierarchical visualization. This is the first step in the Sugiyama algorithm.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">assign_layers_longest_path</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Tree structure</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="p">]</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="n">layers</span> <span class="o">=</span> <span class="n">assign_layers_longest_path</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layers</span><span class="p">):</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Layer </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="c1"># Output:</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="c1"># Layer 0: [0]        (root)</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="c1"># Layer 1: [1, 2]     (children of root)</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="c1"># Layer 2: [3, 4, 5]  (grandchildren)</span>
+</code></pre></div>
+<h3 id="using-layers-for-custom-layout">Using Layers for Custom Layout<a class="headerlink" href="#using-layers-for-custom-layout" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">assign_layers_longest_path</span><span class="p">,</span> <span class="n">remove_cycles</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">simple_hierarchical_layout</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">links</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">layer_gap</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">node_gap</span><span class="o">=</span><span class="mi">50</span><span class="p">):</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple hierarchical layout using preprocessing utilities.&quot;&quot;&quot;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="c1"># Make acyclic if needed</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">acyclic_links</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">remove_cycles</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="c1"># Assign layers</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">layers</span> <span class="o">=</span> <span class="n">assign_layers_longest_path</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">acyclic_links</span><span class="p">)</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="c1"># Position nodes</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="n">size</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="k">for</span> <span class="n">layer_idx</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layers</span><span class="p">):</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>        <span class="n">y</span> <span class="o">=</span> <span class="mi">50</span> <span class="o">+</span> <span class="n">layer_idx</span> <span class="o">*</span> <span class="n">layer_gap</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>        <span class="n">layer_width</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">layer</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">node_gap</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>        <span class="n">start_x</span> <span class="o">=</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">layer_width</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>        <span class="k">for</span> <span class="n">pos</span><span class="p">,</span> <span class="n">node_idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">layer</span><span class="p">):</span>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>            <span class="n">nodes</span><span class="p">[</span><span class="n">node_idx</span><span class="p">][</span><span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">start_x</span> <span class="o">+</span> <span class="n">pos</span> <span class="o">*</span> <span class="n">node_gap</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>            <span class="n">nodes</span><span class="p">[</span><span class="n">node_idx</span><span class="p">][</span><span class="s1">&#39;y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y</span>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>
+<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>    <span class="k">return</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">layers</span>
+</code></pre></div>
+<hr />
+<h2 id="crossing-minimization">Crossing Minimization<a class="headerlink" href="#crossing-minimization" title="Permanent link">&para;</a></h2>
+<p>Edge crossings make graphs harder to read. The barycenter heuristic reorders nodes within layers to reduce crossings.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">assign_layers_longest_path</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">minimize_crossings_barycenter</span><span class="p">,</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">count_crossings</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p">)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="p">]</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="c1"># Get initial layers</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="n">layers</span> <span class="o">=</span> <span class="n">assign_layers_longest_path</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Initial crossings: </span><span class="si">{</span><span class="n">count_crossings</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span><span class="w"> </span><span class="n">links</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="c1"># Minimize crossings</span>
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="n">optimized_layers</span> <span class="o">=</span> <span class="n">minimize_crossings_barycenter</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="n">links</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After optimization: </span><span class="si">{</span><span class="n">count_crossings</span><span class="p">(</span><span class="n">optimized_layers</span><span class="p">,</span><span class="w"> </span><span class="n">links</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>layers</code></td>
+<td>List of layers from <code>assign_layers_longest_path()</code></td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>links</code></td>
+<td>Edge list</td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>iterations</code></td>
+<td>Number of sweep iterations</td>
+<td>24</td>
+</tr>
+</tbody>
+</table>
+<p>More iterations generally produce better results but take longer. 24 iterations is usually sufficient.</p>
+<hr />
+<h2 id="complete-preprocessing-pipeline">Complete Preprocessing Pipeline<a class="headerlink" href="#complete-preprocessing-pipeline" title="Permanent link">&para;</a></h2>
+<p>Here's a complete example combining all preprocessing steps:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">has_cycle</span><span class="p">,</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">remove_cycles</span><span class="p">,</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">is_connected</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">connected_components</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">assign_layers_longest_path</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">minimize_crossings_barycenter</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">count_crossings</span><span class="p">,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">SugiyamaLayout</span><span class="p">,</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="p">)</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">preprocess_for_hierarchical</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">links</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="sd">    Full preprocessing pipeline for hierarchical layout.</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="sd">        Tuple of (processed_links, layers, reversed_edges, components)</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>    <span class="c1"># Step 1: Check connectivity</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_connected</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">links</span><span class="p">):</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>        <span class="n">components</span> <span class="o">=</span> <span class="n">connected_components</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Graph has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">)</span><span class="si">}</span><span class="s2"> disconnected components&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>        <span class="n">components</span> <span class="o">=</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">))]</span>
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a>    <span class="c1"># Step 2: Remove cycles</span>
+<a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a>    <span class="k">if</span> <span class="n">has_cycle</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">links</span><span class="p">):</span>
+<a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a>        <span class="n">processed_links</span><span class="p">,</span> <span class="n">reversed_edges</span> <span class="o">=</span> <span class="n">remove_cycles</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a>        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+<a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">reversed_edges</span><span class="p">)</span><span class="si">}</span><span class="s2"> cycle-causing edge(s)&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a>        <span class="n">processed_links</span> <span class="o">=</span> <span class="n">links</span>
+<a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a>        <span class="n">reversed_edges</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+<a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a>
+<a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a>    <span class="c1"># Step 3: Assign layers</span>
+<a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a>    <span class="n">layers</span> <span class="o">=</span> <span class="n">assign_layers_longest_path</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">processed_links</span><span class="p">)</span>
+<a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a>    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+<a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Assigned nodes to </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">layers</span><span class="p">)</span><span class="si">}</span><span class="s2"> layers&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-42" name="__codelineno-9-42" href="#__codelineno-9-42"></a>
+<a id="__codelineno-9-43" name="__codelineno-9-43" href="#__codelineno-9-43"></a>    <span class="c1"># Step 4: Minimize crossings</span>
+<a id="__codelineno-9-44" name="__codelineno-9-44" href="#__codelineno-9-44"></a>    <span class="n">initial_crossings</span> <span class="o">=</span> <span class="n">count_crossings</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="n">processed_links</span><span class="p">)</span>
+<a id="__codelineno-9-45" name="__codelineno-9-45" href="#__codelineno-9-45"></a>    <span class="n">layers</span> <span class="o">=</span> <span class="n">minimize_crossings_barycenter</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="n">processed_links</span><span class="p">)</span>
+<a id="__codelineno-9-46" name="__codelineno-9-46" href="#__codelineno-9-46"></a>    <span class="n">final_crossings</span> <span class="o">=</span> <span class="n">count_crossings</span><span class="p">(</span><span class="n">layers</span><span class="p">,</span> <span class="n">processed_links</span><span class="p">)</span>
+<a id="__codelineno-9-47" name="__codelineno-9-47" href="#__codelineno-9-47"></a>    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+<a id="__codelineno-9-48" name="__codelineno-9-48" href="#__codelineno-9-48"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reduced crossings from </span><span class="si">{</span><span class="n">initial_crossings</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">final_crossings</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-49" name="__codelineno-9-49" href="#__codelineno-9-49"></a>
+<a id="__codelineno-9-50" name="__codelineno-9-50" href="#__codelineno-9-50"></a>    <span class="k">return</span> <span class="n">processed_links</span><span class="p">,</span> <span class="n">layers</span><span class="p">,</span> <span class="n">reversed_edges</span><span class="p">,</span> <span class="n">components</span>
+<a id="__codelineno-9-51" name="__codelineno-9-51" href="#__codelineno-9-51"></a>
+<a id="__codelineno-9-52" name="__codelineno-9-52" href="#__codelineno-9-52"></a>
+<a id="__codelineno-9-53" name="__codelineno-9-53" href="#__codelineno-9-53"></a><span class="c1"># Usage</span>
+<a id="__codelineno-9-54" name="__codelineno-9-54" href="#__codelineno-9-54"></a><span class="n">nodes</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+<a id="__codelineno-9-55" name="__codelineno-9-55" href="#__codelineno-9-55"></a><span class="n">links</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-9-56" name="__codelineno-9-56" href="#__codelineno-9-56"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+<a id="__codelineno-9-57" name="__codelineno-9-57" href="#__codelineno-9-57"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">},</span>
+<a id="__codelineno-9-58" name="__codelineno-9-58" href="#__codelineno-9-58"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>  <span class="c1"># Cycle!</span>
+<a id="__codelineno-9-59" name="__codelineno-9-59" href="#__codelineno-9-59"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+<a id="__codelineno-9-60" name="__codelineno-9-60" href="#__codelineno-9-60"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+<a id="__codelineno-9-61" name="__codelineno-9-61" href="#__codelineno-9-61"></a>    <span class="p">{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span>
+<a id="__codelineno-9-62" name="__codelineno-9-62" href="#__codelineno-9-62"></a><span class="p">]</span>
+<a id="__codelineno-9-63" name="__codelineno-9-63" href="#__codelineno-9-63"></a>
+<a id="__codelineno-9-64" name="__codelineno-9-64" href="#__codelineno-9-64"></a><span class="n">processed_links</span><span class="p">,</span> <span class="n">layers</span><span class="p">,</span> <span class="nb">reversed</span><span class="p">,</span> <span class="n">components</span> <span class="o">=</span> <span class="n">preprocess_for_hierarchical</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">links</span><span class="p">)</span>
+<a id="__codelineno-9-65" name="__codelineno-9-65" href="#__codelineno-9-65"></a>
+<a id="__codelineno-9-66" name="__codelineno-9-66" href="#__codelineno-9-66"></a><span class="c1"># Now use with Sugiyama (or custom layout using the layers)</span>
+<a id="__codelineno-9-67" name="__codelineno-9-67" href="#__codelineno-9-67"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">SugiyamaLayout</span><span class="p">(</span>
+<a id="__codelineno-9-68" name="__codelineno-9-68" href="#__codelineno-9-68"></a>    <span class="n">nodes</span><span class="o">=</span><span class="n">nodes</span><span class="p">,</span>
+<a id="__codelineno-9-69" name="__codelineno-9-69" href="#__codelineno-9-69"></a>    <span class="n">links</span><span class="o">=</span><span class="n">processed_links</span><span class="p">,</span>
+<a id="__codelineno-9-70" name="__codelineno-9-70" href="#__codelineno-9-70"></a>    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">),</span>
+<a id="__codelineno-9-71" name="__codelineno-9-71" href="#__codelineno-9-71"></a><span class="p">)</span>
+<a id="__codelineno-9-72" name="__codelineno-9-72" href="#__codelineno-9-72"></a><span class="n">layout</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h2 id="custom-link-formats">Custom Link Formats<a class="headerlink" href="#custom-link-formats" title="Permanent link">&para;</a></h2>
+<p>All preprocessing functions accept optional <code>get_source</code> and <code>get_target</code> callbacks for custom link formats:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">graph_layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">has_cycle</span><span class="p">,</span> <span class="n">topological_sort</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Using objects instead of dicts</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">Edge</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">tgt</span><span class="p">):</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">src</span> <span class="o">=</span> <span class="n">src</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">tgt</span> <span class="o">=</span> <span class="n">tgt</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="n">edges</span> <span class="o">=</span> <span class="p">[</span><span class="n">Edge</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">Edge</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">Edge</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="c1"># Provide custom accessors</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="n">has_cycles</span> <span class="o">=</span> <span class="n">has_cycle</span><span class="p">(</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>    <span class="n">edges</span><span class="p">,</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>    <span class="n">get_source</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span><span class="o">.</span><span class="n">src</span><span class="p">,</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>    <span class="n">get_target</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span><span class="o">.</span><span class="n">tgt</span><span class="p">,</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="p">)</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="c1"># Works with tuples too</span>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="n">tuple_edges</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="n">order</span> <span class="o">=</span> <span class="n">topological_sort</span><span class="p">(</span>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>    <span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>    <span class="n">tuple_edges</span><span class="p">,</span>
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a>    <span class="n">get_source</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a>    <span class="n">get_target</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detect_cycle(n, links)</code></td>
+<td>Find a cycle in the graph</td>
+<td><code>list[int]</code> or <code>None</code></td>
+</tr>
+<tr>
+<td><code>has_cycle(n, links)</code></td>
+<td>Check if graph has any cycle</td>
+<td><code>bool</code></td>
+</tr>
+<tr>
+<td><code>remove_cycles(n, links)</code></td>
+<td>Make graph acyclic by reversing edges</td>
+<td><code>(list, set)</code></td>
+</tr>
+<tr>
+<td><code>topological_sort(n, links)</code></td>
+<td>Get topological ordering</td>
+<td><code>list[int]</code> or <code>None</code></td>
+</tr>
+<tr>
+<td><code>connected_components(n, links)</code></td>
+<td>Find all connected components</td>
+<td><code>list[list[int]]</code></td>
+</tr>
+<tr>
+<td><code>is_connected(n, links)</code></td>
+<td>Check if graph is connected</td>
+<td><code>bool</code></td>
+</tr>
+<tr>
+<td><code>assign_layers_longest_path(n, links)</code></td>
+<td>Assign nodes to layers</td>
+<td><code>list[list[int]]</code></td>
+</tr>
+<tr>
+<td><code>minimize_crossings_barycenter(layers, links)</code></td>
+<td>Reduce edge crossings</td>
+<td><code>list[list[int]]</code></td>
+</tr>
+<tr>
+<td><code>count_crossings(layers, links)</code></td>
+<td>Count edge crossings</td>
+<td><code>int</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      MIT licensed
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections", "navigation.top", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

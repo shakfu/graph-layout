@@ -419,6 +419,26 @@ uv run python scripts/visualize.py
 
 This creates images in `./build/` showing each algorithm's output.
 
+## Documentation
+
+The full documentation site is at <https://shakfu.github.io/graph-layout>, built
+with MkDocs from `docs/`:
+
+```bash
+make docs-serve    # live reload at http://127.0.0.1:8000
+make docs          # build into site/
+make docs-deploy   # publish to the gh-pages branch
+```
+
+Publishing is manual. `.github/workflows/docs.yml` holds a strict build that is
+gated on `workflow_dispatch` rather than running on every push.
+
+Figures in the docs are generated during the build: a fenced block tagged
+`graph-layout` is executed against the installed library and replaced with the
+resulting inline SVG, so an example that no longer matches the API fails the
+build rather than leaving a stale image. See `docs/embedding-visualizations.md`
+and `scripts/mkdocs_hooks.py`.
+
 ## Algorithm Comparison
 
 | Algorithm | Best For | Complexity | Features |
@@ -726,6 +746,7 @@ make test          # Run tests
 make typecheck     # Type checking
 make lint          # Lint code
 make qa            # Run all qualtiy checks
+make docs          # Build the documentation site
 ```
 
 ## Related project: ogdf-py

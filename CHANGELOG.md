@@ -22,6 +22,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [unreleased]
 
+### Added
+
+- **MkDocs documentation site** (`mkdocs.yml`, `scripts/mkdocs_hooks.py`, `docs/`): a Material-themed site built with `make docs`, served with `make docs-serve`, and published to the `gh-pages` branch by `make docs-deploy`. Publishing is manual; `.github/workflows/docs.yml` holds a strict build gated on `workflow_dispatch`, since GitHub Pages serves one source and an Actions-artifact publish would fight the branch. Figures are not checked-in images. A fenced block tagged ```` ```graph-layout ```` is executed against the installed library at build time and replaced with the resulting inline SVG, so an example that stops matching the API fails the build instead of leaving a stale picture in place. The fence takes `title=`, `source` (show the code as well, above or below), `seed=`, and any keyword the renderer accepts; the block binds `layout`, `svg`, or `boxes`/`edges`. Labels default to `fill="currentColor"` so they follow the light and dark themes. MkDocs is in a separate `docs` dependency group, keeping it out of the test environment (`tests/test_mkdocs_hooks.py`).
+
+````markdown
+```graph-layout title="8-cycle" source node_radius=14
+layout = CircularLayout(
+    nodes=[{"index": i} for i in range(8)],
+    links=[{"source": i, "target": (i + 1) % 8} for i in range(8)],
+    size=(300, 300),
+).run()
+```
+````
+
 ## [0.5.0]
 
 Two changes alter behaviour for existing callers: `metrics.stress` now takes `links` as its second positional parameter, and `KamadaKawaiLayout` starts from a circle instead of a random placement, so its output differs. Both are described under Changed, and both have an escape hatch -- pass `ideal_distances=` by keyword, and `initial_layout="random"`.

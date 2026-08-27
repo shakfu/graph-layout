@@ -89,10 +89,17 @@ dev = [
     "ogdf-py>=0.1.1; sys_platform != 'win32' and python_version >= '3.10' and python_version < '3.14'",
 ]
 
+# Documentation site (mkdocs.yml). Not needed for tests or the build, so it is a
+# separate group: `uv run --group docs mkdocs serve`, or `make docs-serve`.
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+]
+
 [project.urls]
 Homepage = "https://github.com/shakfu/graph-layout"
 Repository = "https://github.com/shakfu/graph-layout"
-Documentation = "https://github.com/shakfu/graph-layout"
+Documentation = "https://shakfu.github.io/graph-layout"
 
 
 [tool.pytest.ini_options]

@@ -1,0 +1,67 @@
+site_name: graph-layout
+site_description: A collection of graph layout algorithms in Python
+site_url: https://shakfu.github.io/graph-layout/
+repo_url: https://github.com/shakfu/graph-layout
+repo_name: shakfu/graph-layout
+copyright: MIT licensed
+
+docs_dir: docs
+site_dir: site
+
+# Renders ```graph-layout fenced blocks into inline SVG at build time.
+hooks:
+  - scripts/mkdocs_hooks.py
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Gallery: gallery.md
+  - Guides:
+      - Algorithms: algorithms-guide.md
+      - Preprocessing: preprocessing-guide.md
+      - Embedding Visualizations: embedding-visualizations.md
+  - Development:
+      - Rectangularization Plan: rectangularization-plan.md
+      - Kandinsky Implementation Plan: kandinsky-implementation-plan.md
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn

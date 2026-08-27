@@ -1,0 +1,37 @@
+name: docs
+
+# Disabled: the site is published by hand with `make docs-deploy`, which pushes
+# to the gh-pages branch. GitHub Pages serves one source, so an Actions-artifact
+# publish job here would fight that branch; it has been removed rather than
+# left dormant. What remains is the strict build, runnable on demand to check
+# that every ```graph-layout block in docs/ still executes against the library.
+# Uncomment the triggers below to run it on pushes and pull requests.
+on: [workflow_dispatch]
+  # push:
+  #   branches: [ main ]
+  # pull_request:
+  #   branches: [ main ]
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --group docs --python 3.13
+
+      - name: Build with warnings as errors
+        run: uv run mkdocs build --strict

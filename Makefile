@@ -3,6 +3,7 @@
 
 .PHONY: all help install install-dev clean test test-watch test-coverage \
 		lint format check typecheck typecheck-legacy all dev sync build publish publish-test \
+		docs docs-serve docs-strict docs-deploy docs-clean \
 		wheel-check rebuild-cython qa showcase showcase-improvements demos \
 		oracle-install bench-ogdf
 
@@ -37,6 +38,12 @@ help:
 	@echo "  make typecheck    - Run mypy type checking (incl. the legacy ratchet)"
 	@echo "  make typecheck-legacy - Check the modules pyproject.toml silences"
 	@echo "  make qa           - Run all QA checks (check + typecheck + test)"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  make docs         - Build the MkDocs site into site/"
+	@echo "  make docs-serve   - Serve the docs with live reload"
+	@echo "  make docs-strict  - Build with warnings as errors"
+	@echo "  make docs-deploy  - Publish the site to the gh-pages branch"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean        - Remove build artifacts and cache files"
@@ -111,6 +118,32 @@ demos:
 bench-ogdf:
 	@uv run python tests/benchmarks/compare_ogdf.py $(ARGS)
 
+# Documentation. MkDocs lives in the `docs` dependency group, so `uv run --group
+# docs` installs it on demand rather than pulling it into the test environment.
+# Figures are rendered by executing the ```graph-layout blocks in docs/ against
+# the installed library (scripts/mkdocs_hooks.py), so a stale example fails here.
+DOCS := uv run --group docs mkdocs
+
+docs:
+	@$(DOCS) build
+
+docs-serve:
+	@$(DOCS) serve
+
+docs-strict:
+	@$(DOCS) build --strict
+
+# Builds and force-pushes the site to the gh-pages branch. This is the only way
+# the site is published: docs.yml is gated on workflow_dispatch and carries no
+# publish job. Set the repository's Pages source to the gh-pages branch. Strict,
+# so what gets published is held to the same warnings-as-errors bar as a local
+# `make docs-strict`.
+docs-deploy:
+	@$(DOCS) gh-deploy --strict --force
+
+docs-clean:
+	@rm -rf site/
+
 # Run tests with HTML coverage report
 test-html:
 	@uv run pytest --cov=$(SRC_DIR) --cov-report=html
@@ -180,6 +213,7 @@ clean:
 	@find . -type d -name "*.egg" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name ".*_cache" -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf htmlcov/
+	@rm -rf site/
 	@rm -rf dist/
 	@rm -rf build/
 	@rm -f .coverage

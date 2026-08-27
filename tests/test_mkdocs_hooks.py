@@ -61,6 +61,28 @@ class TestPassthrough:
         text = "    ```graph-layout\n    layout = None\n    ```\n"
         assert hooks.render_markdown(text) == text
 
+    def test_block_quoted_inside_a_longer_fence_is_not_executed(self):
+        # This is how the docs show the fence syntax itself. Executing it would
+        # replace the example with a drawing and never show readers what to type.
+        text = "````markdown\n" + fence(CYCLE, 'title="x"') + "````\n"
+        out = hooks.render_markdown(text)
+        assert "<figure" not in out
+        assert "```graph-layout" in out
+
+    def test_a_real_block_after_a_quoted_one_still_renders(self):
+        text = "````markdown\n" + fence(CYCLE) + "````\n\n" + fence(CYCLE)
+        assert hooks.render_markdown(text).count("<figure") == 1
+
+    def test_a_shorter_fence_does_not_close_a_longer_one(self):
+        text = "````text\n```\nstill inside\n````\n\n" + fence(CYCLE)
+        out = hooks.render_markdown(text)
+        assert "still inside" in out
+        assert out.count("<figure") == 1
+
+    def test_unrelated_unterminated_fence_is_passed_through(self):
+        text = "```python\nprint(1)\n"
+        assert hooks.render_markdown(text + fence(CYCLE)).count("<figure") == 0
+
 
 class TestRendering:
     def test_layout_binding_produces_inline_svg_figure(self):
@@ -147,13 +169,95 @@ class TestOptions:
         out = hooks.render_markdown(fence(CYCLE, "source=below"))
         assert out.index("<figure") < out.index("```python")
 
-    def test_source_is_omitted_by_default(self):
-        assert "```python" not in hooks.render_markdown(fence(CYCLE))
+    def test_source_is_shown_below_by_default(self):
+        # Every drawing in the docs must carry the code that produced it, so
+        # showing the source is the default rather than something to remember.
+        out = hooks.render_markdown(fence(CYCLE))
+        assert "```python" in out
+        assert out.index("<figure") < out.index("```python")
+
+    def test_inline_figures_default_to_a_collapsed_details_block(self):
+        # A full-width code block between inline figures would break the
+        # comparison row apart, so their source goes inside the figure.
+        out = hooks.render_markdown(fence(CYCLE, "class=inline"))
+        assert "```python" not in out
+        assert '<details class="graph-layout-source">' in out
+        assert out.index("<details") < out.index("</figure>")
+
+    def test_details_source_is_syntax_highlighted(self):
+        out = hooks.render_markdown(fence(CYCLE, "class=inline"))
+        assert '<div class="highlight">' in out
+        assert "CircularLayout" in out
+
+    def test_details_source_is_escaped(self):
+        out = hooks.render_markdown(fence('svg = "<svg/>"  # a < b', "class=inline"))
+        assert "# a &lt; b" in out
+        assert "<svg/>  #" not in out
+
+    def test_details_can_be_requested_for_a_figure_on_its_own_row(self):
+        out = hooks.render_markdown(fence(CYCLE, "source=details"))
+        assert '<details class="graph-layout-source">' in out
+        assert "```python" not in out
+
+    def test_source_none_omits_the_code_entirely(self):
+        out = hooks.render_markdown(fence(CYCLE, "source=none"))
+        assert "```python" not in out
+        assert "<details" not in out
+
+    def test_source_false_omits_the_code_entirely(self):
+        out = hooks.render_markdown(fence(CYCLE, "source=False"))
+        assert "```python" not in out
+        assert "<details" not in out
+
+    def test_explicit_source_below_still_wins_for_an_inline_figure(self):
+        out = hooks.render_markdown(fence(CYCLE, "class=inline source=below"))
+        assert "```python" in out
+        assert "<details" not in out
 
     def test_quoted_titles_with_spaces_survive_parsing(self):
         out = hooks.render_markdown(fence(CYCLE, "title='one two three' node_radius=7"))
         assert "<figcaption>one two three</figcaption>" in out
         assert 'r="7.0"' in out
+
+
+class TestComputedCaptions:
+    """A block may bind `caption` to report something only measurable after the run."""
+
+    def test_caption_binding_becomes_the_figcaption(self):
+        body = CYCLE + '\ncaption = f"{len(layout.nodes)} nodes"'
+        assert "<figcaption>6 nodes</figcaption>" in hooks.render_markdown(fence(body))
+
+    def test_caption_binding_overrides_the_title_option(self):
+        body = CYCLE + '\ncaption = "measured"'
+        out = hooks.render_markdown(fence(body, 'title="static"'))
+        assert "<figcaption>measured</figcaption>" in out
+        assert "static" not in out
+
+    def test_title_is_used_when_no_caption_is_bound(self):
+        out = hooks.render_markdown(fence(CYCLE, 'title="static"'))
+        assert "<figcaption>static</figcaption>" in out
+
+    def test_caption_is_html_escaped(self):
+        body = CYCLE + '\ncaption = "a < b & c"'
+        out = hooks.render_markdown(fence(body))
+        assert "<figcaption>a &lt; b &amp; c</figcaption>" in out
+
+    def test_non_string_caption_is_an_error(self):
+        with pytest.raises(Exception, match="caption must be a string"):
+            hooks.render_markdown(fence(CYCLE + "\ncaption = 42"))
+
+
+class TestFigureClass:
+    def test_class_option_is_added_to_the_figure(self):
+        out = hooks.render_markdown(fence(CYCLE, "class=inline"))
+        assert '<figure class="graph-layout-figure inline">' in out
+
+    def test_figures_carry_only_the_base_class_by_default(self):
+        assert '<figure class="graph-layout-figure">' in hooks.render_markdown(fence(CYCLE))
+
+    def test_class_option_is_attribute_escaped(self):
+        out = hooks.render_markdown(fence(CYCLE, "class='a\"b'"))
+        assert '<figure class="graph-layout-figure a&quot;b">' in out
 
 
 class TestDeterminism:
@@ -249,6 +353,21 @@ class TestSiteConfiguration:
     def test_every_docs_page_renders(self):
         for page in sorted(DOCS_DIR.rglob("*.md")):
             hooks.render_markdown(page.read_text(), source_path=str(page.relative_to(REPO_ROOT)))
+
+    def test_every_published_figure_carries_its_code(self):
+        """No drawing in the docs may appear without the code that produced it.
+
+        Checked per fence rather than by counting rendered blocks, so a page's
+        ordinary python code blocks cannot stand in for a figure's own source.
+        Uses the same fence walk as rendering, so a block quoted inside a longer
+        fence -- which never becomes a figure -- is not counted against a page.
+        """
+        for page in sorted(DOCS_DIR.rglob("*.md")):
+            for number, opts in hooks.iter_fences(page.read_text()):
+                options, _ = hooks._parse_options(opts)
+                assert options["source"] is not None, (
+                    f"{page.name}:{number} renders a figure with no source shown"
+                )
 
     def test_site_builds(self, tmp_path):
         pytest.importorskip("mkdocs", reason="mkdocs is in the optional docs group")
